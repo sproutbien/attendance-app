@@ -1,0 +1,103 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ── Typography ─────────────────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: -0.015em;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+
+button {
+  font-family: inherit;
+  letter-spacing: -0.01em;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+button:not(:disabled):hover {
+  filter: brightness(0.91);
+}
+
+button:not(:disabled):active {
+  transform: scale(0.97);
+  filter: brightness(0.87);
+}
+
+button:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────── */
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12) !important;
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
+
+td, th {
+  font-variant-numeric: tabular-nums;
+}
+
+tbody tr {
+  transition: background 0.1s ease;
+}
+
+tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* ── NavLinks ───────────────────────────────────────────────── */
+
+a {
+  transition: color 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+/* ── Scrollbar (Webkit) ─────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
