@@ -35,7 +35,7 @@ export default function LoginPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+      background: 'linear-gradient(135deg, #052e16 0%, #14532d 100%)',
       padding: '1rem',
     }}>
       <div style={{
@@ -48,10 +48,8 @@ export default function LoginPage() {
       }}>
         {/* Brand */}
         <div style={{ marginBottom: '2rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.375rem' }}>
-            <span style={{ fontSize: '1.375rem', fontWeight: 700, color: '#14532d', letterSpacing: '-0.03em' }}>
-              Sproutbien
-            </span>
+          <div style={{ marginBottom: '0.625rem' }}>
+            <img src="/logo.jpg" alt="Sproutbien" style={{ height: 40, display: 'block' }} />
           </div>
           <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0, letterSpacing: '-0.01em' }}>
             Attendance Tracker — Sign in to continue
@@ -103,7 +101,7 @@ export default function LoginPage() {
             style={{
               width: '100%',
               padding: '0.6875rem',
-              background: submitting ? '#3b82f6' : '#1d4ed8',
+              background: submitting ? '#16a34a' : '#15803d',
               color: '#fff',
               border: 'none',
               borderRadius: 8,

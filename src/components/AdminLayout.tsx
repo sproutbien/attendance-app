@@ -8,7 +8,7 @@ export default function AdminLayout() {
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
       <header style={{
-        background: '#0f172a',
+        background: '#14532d',
         padding: '0 1.5rem',
         display: 'flex',
         alignItems: 'center',
@@ -20,19 +20,17 @@ export default function AdminLayout() {
         boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <span style={{ fontWeight: 700, color: '#fff', fontSize: '1.0625rem', letterSpacing: '-0.02em' }}>
-            Sproutbien
-          </span>
+          <img src="/logo.jpg" alt="Sproutbien" style={{ height: 32, display: 'block' }} />
           <span style={{
             fontSize: '0.625rem',
-            background: 'rgba(96,165,250,0.15)',
-            color: '#93c5fd',
+            background: 'rgba(187,247,208,0.15)',
+            color: '#bbf7d0',
             padding: '2px 8px',
             borderRadius: 4,
             fontWeight: 700,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            border: '1px solid rgba(96,165,250,0.25)',
+            border: '1px solid rgba(187,247,208,0.25)',
           }}>
             Admin
           </span>
@@ -44,19 +42,19 @@ export default function AdminLayout() {
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-          <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.8125rem' }}>
+          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8125rem' }}>
             {employee?.full_name}
           </span>
           <button
             onClick={signOut}
             style={{
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.15)',
+              background: 'rgba(255,255,255,0.08)',
+              border: '1px solid rgba(255,255,255,0.2)',
               borderRadius: 6,
               padding: '0.3125rem 0.75rem',
               cursor: 'pointer',
               fontSize: '0.8125rem',
-              color: 'rgba(255,255,255,0.65)',
+              color: 'rgba(255,255,255,0.75)',
               fontFamily: 'inherit',
             }}
           >
@@ -65,7 +63,7 @@ export default function AdminLayout() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: '#f0fdf4', minHeight: 'calc(100vh - 56px)' }}>
         <Outlet />
       </div>
     </div>
@@ -79,8 +77,8 @@ function navStyle({ isActive }: { isActive: boolean }): CSSProperties {
     borderRadius: 6,
     fontSize: '0.875rem',
     fontWeight: isActive ? 600 : 400,
-    color: isActive ? '#fff' : 'rgba(255,255,255,0.55)',
-    background: isActive ? 'rgba(255,255,255,0.1)' : 'transparent',
+    color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
+    background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
     letterSpacing: '-0.01em',
   }
 }
