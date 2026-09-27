@@ -39,9 +39,10 @@ export default function AdminEmployeesPage() {
       }
     } else if (modal?.type === 'edit') {
       const ok = await updateEmployee(modal.employee.id, {
-        full_name:  data.full_name.trim(),
-        role:       data.role,
-        department: data.department.trim() || null,
+        full_name:      data.full_name.trim(),
+        role:           data.role,
+        department:     data.department.trim() || null,
+        monthly_salary: data.monthly_salary,
       })
       if (ok) {
         setModal(null)
@@ -221,10 +222,11 @@ function EmployeeModal({ mode, saving, error, onSave, onClose }: {
   const [password,   setPassword]   = useState('')
   const [role,       setRole]       = useState<'employee' | 'admin'>(existing?.role ?? 'employee')
   const [department, setDepartment] = useState(existing?.department  ?? '')
+  const [salary,     setSalary]     = useState(existing?.monthly_salary != null ? String(existing.monthly_salary) : '')
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    onSave({ full_name: fullName, email, password, role, department })
+    onSave({ full_name: fullName, email, password, role, department, monthly_salary: salary === '' ? null : Number(salary) })
   }
 
   return (
@@ -283,6 +285,19 @@ function EmployeeModal({ mode, saving, error, onSave, onClose }: {
               <input type="text" value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. Engineering" style={inputStyle} />
             </Field>
           </div>
+
+          <Field label="Monthly Gross Salary (optional)">
+            <input
+              type="number"
+              value={salary}
+              onChange={e => setSalary(e.target.value)}
+              min="0"
+              step="1"
+              placeholder="e.g. 50000"
+              style={inputStyle}
+            />
+            <p style={hintStyle}>Used for payroll calculations on the Reports page.</p>
+          </Field>
 
           {error && (
             <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: '0.875rem' }}>

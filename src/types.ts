@@ -5,6 +5,7 @@ export type Employee = {
   role: 'employee' | 'admin'
   department: string | null
   status: 'active' | 'inactive'
+  monthly_salary: number | null
   created_at: string
 }
 

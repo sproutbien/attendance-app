@@ -16,7 +16,7 @@ CREATE OR REPLACE FUNCTION create_employee(
 RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, auth
+SET search_path = public, auth, extensions
 AS $$
 DECLARE
   v_user_id uuid;
@@ -53,7 +53,7 @@ BEGIN
     identity_data, provider,
     last_sign_in_at, created_at, updated_at
   ) VALUES (
-    v_user_id::text,
+    v_user_id,
     v_user_id,
     p_email,
     jsonb_build_object('sub', v_user_id::text, 'email', p_email),

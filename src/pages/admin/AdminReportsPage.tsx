@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useMonthlyReport } from '../../hooks/useMonthlyReport'
 import type { EmployeeSummary } from '../../hooks/useMonthlyReport'
@@ -15,9 +15,19 @@ function csvEscape(val: string | number) {
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-function exportCSV(summaries: EmployeeSummary[], yearMonth: string) {
+function fmt(n: number) {
+  return n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+}
+
+function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays: number | null) {
   const label = monthLabel(yearMonth)
-  const headers = ['Employee', 'Email', 'Department', 'Total Days', 'Present', 'Late', 'Absent', 'On Leave']
+  const hasPayroll = workingDays != null && summaries.some(s => s.employee.monthly_salary != null)
+
+  const headers = [
+    'Employee', 'Email', 'Department', 'Total Days',
+    'Present', 'Late', 'Absent', 'On Leave',
+    ...(hasPayroll ? ['Gross Salary', 'Deduction', 'Net Pay'] : []),
+  ]
 
   const dataRows = summaries.map(s => [
     s.employee.full_name,
@@ -28,20 +38,38 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string) {
     s.late,
     s.absent,
     s.on_leave,
+    ...(hasPayroll ? [
+      s.employee.monthly_salary ?? '',
+      s.deduction != null ? s.deduction.toFixed(2) : '',
+      s.netPay != null ? s.netPay.toFixed(2) : '',
+    ] : []),
   ])
 
-  const totals = summaries.reduce(
+  const attTotals = summaries.reduce(
     (acc, s) => ({ present: acc.present + s.present, late: acc.late + s.late, absent: acc.absent + s.absent, on_leave: acc.on_leave + s.on_leave }),
     { present: 0, late: 0, absent: 0, on_leave: 0 }
   )
 
+  const payTotals = hasPayroll ? summaries.reduce(
+    (acc, s) => ({
+      gross: acc.gross + (s.employee.monthly_salary ?? 0),
+      ded: acc.ded + (s.deduction ?? 0),
+      net: acc.net + (s.netPay ?? 0),
+    }),
+    { gross: 0, ded: 0, net: 0 }
+  ) : null
+
   const lines = [
-    [`Sproutbien Attendance Report — ${label}`].map(csvEscape).join(','),
+    [`Sproutbien Attendance Report — ${label}` + (workingDays != null ? ` (${workingDays} working days)` : '')].map(csvEscape).join(','),
     '',
     headers.map(csvEscape).join(','),
     ...dataRows.map(row => row.map(csvEscape).join(',')),
     '',
-    ['TOTAL', '', '', '', totals.present, totals.late, totals.absent, totals.on_leave].map(csvEscape).join(','),
+    [
+      'TOTAL', '', '', '',
+      attTotals.present, attTotals.late, attTotals.absent, attTotals.on_leave,
+      ...(payTotals ? [payTotals.gross.toFixed(2), payTotals.ded.toFixed(2), payTotals.net.toFixed(2)] : []),
+    ].map(csvEscape).join(','),
   ]
 
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
@@ -58,17 +86,28 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string) {
 export default function AdminReportsPage() {
   const currentMonth = new Date().toISOString().slice(0, 7)
   const [yearMonth, setYearMonth] = useState(currentMonth)
-  const { summaries, loading, error } = useMonthlyReport(yearMonth)
+  const { summaries, loading, error, workingDays, savingWorkingDays, saveWorkingDays } = useMonthlyReport(yearMonth)
 
   const totals = summaries.reduce(
     (acc, s) => ({ present: acc.present + s.present, late: acc.late + s.late, absent: acc.absent + s.absent, on_leave: acc.on_leave + s.on_leave }),
     { present: 0, late: 0, absent: 0, on_leave: 0 }
   )
 
+  const hasPayroll = workingDays != null && !loading && summaries.some(s => s.employee.monthly_salary != null)
+
+  const payTotals = hasPayroll ? summaries.reduce(
+    (acc, s) => ({
+      gross: acc.gross + (s.employee.monthly_salary ?? 0),
+      deduction: acc.deduction + (s.deduction ?? 0),
+      netPay: acc.netPay + (s.netPay ?? 0),
+    }),
+    { gross: 0, deduction: 0, netPay: 0 }
+  ) : null
+
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Reports</h1>
           <input
@@ -87,7 +126,7 @@ export default function AdminReportsPage() {
           />
         </div>
         <button
-          onClick={() => exportCSV(summaries, yearMonth)}
+          onClick={() => exportCSV(summaries, yearMonth, workingDays)}
           disabled={loading || summaries.length === 0}
           style={{
             display: 'flex',
@@ -107,9 +146,18 @@ export default function AdminReportsPage() {
         </button>
       </div>
 
-      <p style={{ margin: '-1rem 0 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
+      <p style={{ margin: '0 0 1.25rem', color: '#64748b', fontSize: '0.875rem' }}>
         {monthLabel(yearMonth)} · {loading ? '…' : `${summaries.length} active employee${summaries.length !== 1 ? 's' : ''}`}
       </p>
+
+      {/* Working days editor */}
+      {!loading && (
+        <WorkingDaysEditor
+          workingDays={workingDays}
+          saving={savingWorkingDays}
+          onSave={saveWorkingDays}
+        />
+      )}
 
       {/* Summary pills */}
       {!loading && summaries.length > 0 && (
@@ -147,10 +195,15 @@ export default function AdminReportsPage() {
                 <th style={{ ...thStyle, textAlign: 'center', color: '#854d0e' }}>Late</th>
                 <th style={{ ...thStyle, textAlign: 'center', color: '#991b1b' }}>Absent</th>
                 <th style={{ ...thStyle, textAlign: 'center', color: '#5b21b6' }}>On Leave</th>
+                {hasPayroll && <>
+                  <th style={{ ...thStyle, textAlign: 'right', color: '#0369a1' }}>Gross</th>
+                  <th style={{ ...thStyle, textAlign: 'right', color: '#b91c1c' }}>Deduction</th>
+                  <th style={{ ...thStyle, textAlign: 'right', color: '#166534' }}>Net Pay</th>
+                </>}
               </tr>
             </thead>
             <tbody>
-              {summaries.map(s => <SummaryRow key={s.employee.id} summary={s} />)}
+              {summaries.map(s => <SummaryRow key={s.employee.id} summary={s} showPayroll={hasPayroll} />)}
             </tbody>
             <tfoot>
               <tr style={{ borderTop: '2px solid #e2e8f0', background: '#f8fafc' }}>
@@ -160,6 +213,11 @@ export default function AdminReportsPage() {
                 <TotalCell value={totals.late}     color="#854d0e" bg="#fef9c3" />
                 <TotalCell value={totals.absent}   color="#991b1b" bg="#fee2e2" />
                 <TotalCell value={totals.on_leave} color="#5b21b6" bg="#ede9fe" />
+                {hasPayroll && payTotals && <>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#0369a1' }}>{fmt(payTotals.gross)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#b91c1c' }}>{fmt(payTotals.deduction)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#166534' }}>{fmt(payTotals.netPay)}</td>
+                </>}
               </tr>
             </tfoot>
           </table>
@@ -168,17 +226,97 @@ export default function AdminReportsPage() {
 
       {!loading && summaries.length > 0 && (
         <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#94a3b8' }}>
-          "Days" = calendar days from the 1st to today (current month) or end of month (past months).
-          Absent = Days − Present − Late − On Leave.
+          "Days" = calendar days 1 to today (current month) or full month (past months).
+          Deduction = (Working Days − Days Present/Late) × Daily Rate. Absent and on-leave days are unpaid.
         </p>
       )}
     </div>
   )
 }
 
+// ── Working days inline editor ────────────────────────────────
+
+function WorkingDaysEditor({ workingDays, saving, onSave }: {
+  workingDays: number | null
+  saving: boolean
+  onSave: (days: number) => Promise<string | null>
+}) {
+  const [value, setValue] = useState(workingDays != null ? String(workingDays) : '')
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    setValue(workingDays != null ? String(workingDays) : '')
+  }, [workingDays])
+
+  async function handleSave() {
+    const n = parseInt(value, 10)
+    if (isNaN(n) || n < 1 || n > 31) { setErr('Enter 1–31'); return }
+    setErr(null)
+    const error = await onSave(n)
+    if (error) { setErr(error) } else { setSaved(true); setTimeout(() => setSaved(false), 2000) }
+  }
+
+  const unchanged = value === (workingDays != null ? String(workingDays) : '')
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+      background: '#fff', borderRadius: 12, padding: '0.875rem 1.125rem',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: '1.25rem',
+    }}>
+      <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#1e293b' }}>Working days this month</span>
+      <input
+        type="number"
+        value={value}
+        onChange={e => { setValue(e.target.value); setSaved(false) }}
+        min={1}
+        max={31}
+        placeholder="e.g. 22"
+        style={{
+          width: 72,
+          padding: '0.375rem 0.5rem',
+          border: `1px solid ${err ? '#fca5a5' : '#d1d5db'}`,
+          borderRadius: 8,
+          fontSize: '0.9375rem',
+          outline: 'none',
+          textAlign: 'center',
+          color: '#1e293b',
+          fontFamily: 'inherit',
+        }}
+      />
+      <button
+        onClick={handleSave}
+        disabled={saving || unchanged || value === ''}
+        style={{
+          padding: '0.375rem 0.875rem',
+          background: saved ? '#16a34a' : '#1d4ed8',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          fontWeight: 600,
+          fontSize: '0.8125rem',
+          cursor: (saving || unchanged || value === '') ? 'not-allowed' : 'pointer',
+          opacity: (saving || unchanged || value === '') ? 0.45 : 1,
+          whiteSpace: 'nowrap',
+          transition: 'background 0.2s',
+        }}
+      >
+        {saved ? 'Saved!' : saving ? '…' : 'Save'}
+      </button>
+      {err
+        ? <span style={{ fontSize: '0.8125rem', color: '#ef4444' }}>{err}</span>
+        : <span style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>
+            {workingDays == null ? 'Set working days to enable payroll calculations.' : `Payroll is calculated over ${workingDays} working days.`}
+          </span>
+      }
+    </div>
+  )
+}
+
 // ── Sub-components ────────────────────────────────────────────
 
-function SummaryRow({ summary: s }: { summary: EmployeeSummary }) {
+function SummaryRow({ summary: s, showPayroll }: { summary: EmployeeSummary; showPayroll: boolean }) {
   const attendanceRate = s.totalDays > 0 ? Math.round(((s.present + s.late) / s.totalDays) * 100) : 0
   const barColor = attendanceRate >= 80 ? '#16a34a' : attendanceRate >= 60 ? '#d97706' : '#ef4444'
 
@@ -199,6 +337,17 @@ function SummaryRow({ summary: s }: { summary: EmployeeSummary }) {
       <StatCell value={s.late}     color="#854d0e" bg="#fef9c3" />
       <StatCell value={s.absent}   color="#991b1b" bg="#fee2e2" dim={s.absent === 0} />
       <StatCell value={s.on_leave} color="#5b21b6" bg="#ede9fe" dim={s.on_leave === 0} />
+      {showPayroll && <>
+        <td style={{ ...tdStyle, textAlign: 'right', color: '#0369a1', fontWeight: 500 }}>
+          {s.employee.monthly_salary != null ? fmt(s.employee.monthly_salary) : <span style={{ color: '#cbd5e1' }}>—</span>}
+        </td>
+        <td style={{ ...tdStyle, textAlign: 'right', color: s.deduction && s.deduction > 0 ? '#b91c1c' : '#64748b', fontWeight: s.deduction && s.deduction > 0 ? 600 : 400 }}>
+          {s.deduction != null ? fmt(s.deduction) : <span style={{ color: '#cbd5e1' }}>—</span>}
+        </td>
+        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#166534' }}>
+          {s.netPay != null ? fmt(s.netPay) : <span style={{ color: '#cbd5e1' }}>—</span>}
+        </td>
+      </>}
     </tr>
   )
 }

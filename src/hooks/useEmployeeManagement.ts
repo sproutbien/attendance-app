@@ -8,6 +8,7 @@ export type EmployeeFormData = {
   password?: string
   role: 'employee' | 'admin'
   department: string
+  monthly_salary: number | null
 }
 
 export function useEmployeeManagement() {
@@ -31,7 +32,7 @@ export function useEmployeeManagement() {
   async function addEmployee(data: EmployeeFormData): Promise<boolean> {
     setSaving(true)
     setError(null)
-    const { error } = await supabase.rpc('create_employee', {
+    const { data: newId, error } = await supabase.rpc('create_employee', {
       p_email:      data.email.trim().toLowerCase(),
       p_password:   data.password!,
       p_full_name:  data.full_name.trim(),
@@ -42,6 +43,9 @@ export function useEmployeeManagement() {
       setError(error.message)
       setSaving(false)
       return false
+    }
+    if (newId && data.monthly_salary != null) {
+      await supabase.from('employees').update({ monthly_salary: data.monthly_salary }).eq('id', newId)
     }
     await fetchEmployees()
     setSaving(false)
