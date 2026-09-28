@@ -10,9 +10,25 @@ type ModalMode = { type: 'add' } | { type: 'edit'; employee: Employee }
 
 // ── Helpers ──────────────────────────────────────────────────
 
+/** "+91 98765 43210" / "9876543210" → "919876543210"; null if blank, undefined if invalid */
+function normalizePhone(input: string): string | null | undefined {
+  const digits = input.replace(/\D/g, '')
+  if (digits === '') return null
+  const full = digits.length === 10 ? `91${digits}` : digits // bare 10-digit = Indian mobile
+  return /^[1-9][0-9]{7,14}$/.test(full) ? full : undefined
+}
+
+function fmtPhone(phone: string) {
+  return phone.startsWith('91') && phone.length === 12
+    ? `+91 ${phone.slice(2, 7)} ${phone.slice(7)}`
+    : `+${phone}`
+}
+
 function initials(name: string) {
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
+
+const COLUMNS = ['Employee', 'Designation', 'Department', 'Role', '']
 
 const ROLE_COLORS = {
   admin:    { bg: '#ede9fe', text: '#5b21b6' },
@@ -28,6 +44,7 @@ export default function AdminEmployeesPage() {
 
   const active   = employees.filter(e => e.status === 'active')
   const inactive = employees.filter(e => e.status === 'inactive')
+  const designations = [...new Set(employees.map(e => e.designation).filter((d): d is string => !!d))].sort()
 
   async function handleSave(data: EmployeeFormData) {
     if (modal?.type === 'add') {
@@ -42,7 +59,9 @@ export default function AdminEmployeesPage() {
         full_name:      data.full_name.trim(),
         role:           data.role,
         department:     data.department.trim() || null,
+        designation:    data.designation.trim() || null,
         monthly_salary: data.monthly_salary,
+        phone:          data.phone,
       })
       if (ok) {
         setModal(null)
@@ -96,7 +115,7 @@ export default function AdminEmployeesPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    {['Employee', 'Department', 'Role', ''].map(h => (
+                    {COLUMNS.map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -122,7 +141,7 @@ export default function AdminEmployeesPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    {['Employee', 'Department', 'Role', ''].map(h => (
+                    {COLUMNS.map(h => (
                       <th key={h} style={thStyle}>{h}</th>
                     ))}
                   </tr>
@@ -147,6 +166,7 @@ export default function AdminEmployeesPage() {
       {modal && (
         <EmployeeModal
           mode={modal}
+          designations={designations}
           saving={saving}
           error={error}
           onSave={handleSave}
@@ -182,9 +202,19 @@ function EmployeeRow({ employee: e, onEdit, onToggle }: {
           </div>
           <div>
             <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9375rem' }}>{e.full_name}</div>
-            <div style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>{e.email}</div>
+            <div style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>
+              {e.email}
+              {e.phone
+                ? <> · <span title="WhatsApp">{fmtPhone(e.phone)}</span></>
+                : e.role === 'employee' && <> · <span style={{ color: '#d97706' }}>no WhatsApp number</span></>}
+            </div>
           </div>
         </div>
+      </td>
+      <td style={tdStyle}>
+        {e.designation
+          ? <span style={{ color: '#1e293b', fontWeight: 500 }}>{e.designation}</span>
+          : <button onClick={onEdit} style={{ ...ghostBtn, padding: '0.125rem 0.5rem', fontSize: '0.75rem', color: '#d97706', borderColor: '#fde68a' }}>+ Assign</button>}
       </td>
       <td style={{ ...tdStyle, color: '#64748b' }}>{e.department ?? '—'}</td>
       <td style={tdStyle}>
@@ -207,8 +237,9 @@ function EmployeeRow({ employee: e, onEdit, onToggle }: {
 
 // ── Add / Edit modal ──────────────────────────────────────────
 
-function EmployeeModal({ mode, saving, error, onSave, onClose }: {
+function EmployeeModal({ mode, designations, saving, error, onSave, onClose }: {
   mode: ModalMode
+  designations: string[]            // already in use, offered as suggestions
   saving: boolean
   error: string | null
   onSave: (data: EmployeeFormData) => void
@@ -222,11 +253,20 @@ function EmployeeModal({ mode, saving, error, onSave, onClose }: {
   const [password,   setPassword]   = useState('')
   const [role,       setRole]       = useState<'employee' | 'admin'>(existing?.role ?? 'employee')
   const [department, setDepartment] = useState(existing?.department  ?? '')
+  const [designation, setDesignation] = useState(existing?.designation ?? '')
   const [salary,     setSalary]     = useState(existing?.monthly_salary != null ? String(existing.monthly_salary) : '')
+  const [phone,      setPhone]      = useState(existing?.phone ? `+${existing.phone}` : '')
+  const [phoneError, setPhoneError] = useState<string | null>(null)
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    onSave({ full_name: fullName, email, password, role, department, monthly_salary: salary === '' ? null : Number(salary) })
+    const normalized = normalizePhone(phone)
+    if (normalized === undefined) {
+      setPhoneError('Enter a valid number with country code, e.g. +91 98765 43210')
+      return
+    }
+    setPhoneError(null)
+    onSave({ full_name: fullName, email, password, role, department, designation, monthly_salary: salary === '' ? null : Number(salary), phone: normalized })
   }
 
   return (
@@ -286,6 +326,21 @@ function EmployeeModal({ mode, saving, error, onSave, onClose }: {
             </Field>
           </div>
 
+          <Field label="Designation">
+            <input
+              type="text"
+              value={designation}
+              onChange={e => setDesignation(e.target.value)}
+              list="designation-options"
+              placeholder="e.g. Senior Designer"
+              maxLength={80}
+              style={inputStyle}
+            />
+            <datalist id="designation-options">
+              {designations.map(d => <option key={d} value={d} />)}
+            </datalist>
+          </Field>
+
           <Field label="Monthly Gross Salary (optional)">
             <input
               type="number"
@@ -297,6 +352,19 @@ function EmployeeModal({ mode, saving, error, onSave, onClose }: {
               style={inputStyle}
             />
             <p style={hintStyle}>Used for payroll calculations on the Reports page.</p>
+          </Field>
+
+          <Field label="WhatsApp number (optional)">
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => { setPhone(e.target.value); setPhoneError(null) }}
+              placeholder="+91 98765 43210"
+              style={{ ...inputStyle, borderColor: phoneError ? '#fca5a5' : '#d1d5db' }}
+            />
+            <p style={{ ...hintStyle, color: phoneError ? '#dc2626' : hintStyle.color }}>
+              {phoneError ?? 'Leave approval / rejection notifications are sent here. A 10-digit number is treated as Indian (+91).'}
+            </p>
           </Field>
 
           {error && (

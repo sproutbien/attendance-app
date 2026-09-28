@@ -4,8 +4,10 @@ export type Employee = {
   email: string
   role: 'employee' | 'admin'
   department: string | null
+  designation: string | null      // job title, e.g. "Senior Designer"
   status: 'active' | 'inactive'
   monthly_salary: number | null
+  phone: string | null            // WhatsApp number, digits with country code
   created_at: string
 }
 

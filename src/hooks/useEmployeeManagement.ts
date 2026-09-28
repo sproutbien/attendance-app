@@ -8,7 +8,9 @@ export type EmployeeFormData = {
   password?: string
   role: 'employee' | 'admin'
   department: string
+  designation: string
   monthly_salary: number | null
+  phone: string | null
 }
 
 export function useEmployeeManagement() {
@@ -44,8 +46,9 @@ export function useEmployeeManagement() {
       setSaving(false)
       return false
     }
-    if (newId && data.monthly_salary != null) {
-      await supabase.from('employees').update({ monthly_salary: data.monthly_salary }).eq('id', newId)
+    const designation = data.designation.trim() || null
+    if (newId && (data.monthly_salary != null || data.phone != null || designation != null)) {
+      await supabase.from('employees').update({ monthly_salary: data.monthly_salary, phone: data.phone, designation }).eq('id', newId)
     }
     await fetchEmployees()
     setSaving(false)
