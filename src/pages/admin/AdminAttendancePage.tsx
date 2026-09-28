@@ -4,6 +4,7 @@ import { useAdminAttendance } from '../../hooks/useAdminAttendance'
 import type { AdminAttendanceRow } from '../../hooks/useAdminAttendance'
 import { STATUS_COLORS, STATUS_LABELS } from '../../types'
 import type { AttendanceRecord } from '../../types'
+import { fmtDuration, totalBreakSeconds } from '../../lib/breaks'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -184,7 +185,7 @@ export default function AdminAttendancePage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Employee', 'Department', 'Status', 'Check In', 'Check Out'].map(h => (
+                {['Employee', 'Department', 'Status', 'Check In', 'Check Out', 'Break'].map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -228,6 +229,22 @@ function AttendanceTableRow({ row }: { row: AdminAttendanceRow }) {
       </td>
       <td style={tdStyle}>{fmtTime(row.record?.check_in_time)}</td>
       <td style={tdStyle}>{fmtTime(row.record?.check_out_time)}</td>
+      <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+        {fmtDuration(totalBreakSeconds(row.record))}
+        {row.record?.break_started_at && !row.record.check_out_time && (
+          <span style={{
+            marginLeft: 8,
+            padding: '1px 8px',
+            borderRadius: 99,
+            background: '#fef3c7',
+            color: '#b45309',
+            fontSize: '0.75rem',
+            fontWeight: 500,
+          }}>
+            On break
+          </span>
+        )}
+      </td>
     </tr>
   )
 }

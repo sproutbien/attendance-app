@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { AttendanceRecord } from '../types'
 import { useAuth } from '../contexts/AuthContext'
+import { totalBreakSeconds } from '../lib/breaks'
 
 const LATE_THRESHOLD_HOUR = 9
 
@@ -15,6 +16,7 @@ export function useAttendance() {
   const [monthRecords, setMonthRecords] = useState<AttendanceRecord[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const checkingIn = useRef(false)  // blocks a double-tap from inserting twice
 
   const fetchToday = useCallback(async () => {
     if (!employee) return
@@ -47,36 +49,62 @@ export function useAttendance() {
   }, [fetchToday, fetchMonth])
 
   async function checkIn() {
-    if (!employee) return
+    if (!employee || checkingIn.current) return
+    checkingIn.current = true
     setIsSubmitting(true)
     setError(null)
     const now = new Date()
-    const status = now.getHours() < LATE_THRESHOLD_HOUR ? 'present' : 'late'
-    const { data, error } = await supabase
-      .from('attendance_records')
-      .insert({
-        employee_id: employee.id,
-        date: todayISO(),
-        check_in_time: now.toISOString(),
-        status,
-      })
-      .select()
-      .single()
-    if (error) setError(error.message)
+    const fields = {
+      check_in_time: now.toISOString(),
+      status: now.getHours() < LATE_THRESHOLD_HOUR ? 'present' : 'late',
+    } as const
+
+    // A row for today may already exist (approved leave, admin entry, another tab),
+    // so fill that row in instead of inserting a duplicate.
+    const fillExisting = async () => {
+      const { data: existing, error } = await supabase
+        .from('attendance_records')
+        .select('*')
+        .eq('employee_id', employee.id)
+        .eq('date', todayISO())
+        .maybeSingle()
+      if (error || !existing) return { data: existing, error }
+      if (existing.check_in_time) return { data: existing, error: null }
+      return supabase
+        .from('attendance_records')
+        .update(fields)
+        .eq('id', existing.id)
+        .select()
+        .single()
+    }
+
+    let result = await fillExisting()
+    if (!result.error && !result.data) {
+      result = await supabase
+        .from('attendance_records')
+        .insert({ employee_id: employee.id, date: todayISO(), ...fields })
+        .select()
+        .single()
+      // Lost a race with another insert for today — use that row instead
+      if (result.error?.code === '23505') result = await fillExisting()
+    }
+
+    if (result.error) setError(result.error.message)
     else {
-      setTodayRecord(data)
+      setTodayRecord(result.data)
       await fetchMonth()
     }
+    checkingIn.current = false
     setIsSubmitting(false)
   }
 
-  async function checkOut() {
+  async function updateToday(changes: Partial<AttendanceRecord>) {
     if (!employee || !todayRecord) return
     setIsSubmitting(true)
     setError(null)
     const { data, error } = await supabase
       .from('attendance_records')
-      .update({ check_out_time: new Date().toISOString() })
+      .update(changes)
       .eq('id', todayRecord.id)
       .select()
       .single()
@@ -88,5 +116,28 @@ export function useAttendance() {
     setIsSubmitting(false)
   }
 
-  return { todayRecord, monthRecords, isSubmitting, error, checkIn, checkOut }
+  // Folds a running break into break_seconds and clears break_started_at
+  function endBreakChanges(now: Date): Partial<AttendanceRecord> {
+    if (!todayRecord?.break_started_at) return {}
+    return {
+      break_started_at: null,
+      break_seconds: totalBreakSeconds(todayRecord, now.getTime()),
+    }
+  }
+
+  function checkOut() {
+    const now = new Date()
+    return updateToday({ ...endBreakChanges(now), check_out_time: now.toISOString() })
+  }
+
+  function pauseBreak() {
+    if (todayRecord?.break_started_at) return Promise.resolve()
+    return updateToday({ break_started_at: new Date().toISOString() })
+  }
+
+  function resumeBreak() {
+    return updateToday(endBreakChanges(new Date()))
+  }
+
+  return { todayRecord, monthRecords, isSubmitting, error, checkIn, checkOut, pauseBreak, resumeBreak }
 }

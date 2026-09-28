@@ -17,6 +17,8 @@ export type AttendanceRecord = {
   date: string
   check_in_time: string | null
   check_out_time: string | null
+  break_started_at: string | null  // set while on a break
+  break_seconds: number            // total of finished breaks that day
   status: 'present' | 'absent' | 'late' | 'on_leave'
   notes: string | null
 }

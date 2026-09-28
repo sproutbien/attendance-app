@@ -15,7 +15,7 @@ function greeting() {
 
 export default function DashboardPage() {
   const { employee } = useAuth()
-  const { todayRecord, monthRecords, isSubmitting, error, checkIn, checkOut } = useAttendance()
+  const { todayRecord, monthRecords, isSubmitting, error, checkIn, checkOut, pauseBreak, resumeBreak } = useAttendance()
 
   const now = new Date()
   const todayLabel = now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -43,6 +43,8 @@ export default function DashboardPage() {
           isSubmitting={isSubmitting}
           onCheckIn={checkIn}
           onCheckOut={checkOut}
+          onPause={pauseBreak}
+          onResume={resumeBreak}
         />
 
         {error && (

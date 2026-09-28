@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import type { AttendanceRecord } from '../types'
 import { STATUS_COLORS, STATUS_LABELS } from '../types'
+import { fmtDuration, totalBreakSeconds } from '../lib/breaks'
 
 function fmtTime(iso: string | null | undefined) {
   if (!iso) return '—'
@@ -34,7 +35,7 @@ export default function MonthlyHistory({ records }: { records: AttendanceRecord[
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
         <thead>
           <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-            {['Date', 'Status', 'In', 'Out'].map(h => (
+            {['Date', 'Status', 'In', 'Out', 'Break'].map(h => (
               <th key={h} style={thStyle}>{h}</th>
             ))}
           </tr>
@@ -62,6 +63,7 @@ export default function MonthlyHistory({ records }: { records: AttendanceRecord[
                 </td>
                 <td style={tdStyle}>{fmtTime(rec?.check_in_time)}</td>
                 <td style={tdStyle}>{fmtTime(rec?.check_out_time)}</td>
+                <td style={tdStyle}>{fmtDuration(totalBreakSeconds(rec))}</td>
               </tr>
             )
           })}
