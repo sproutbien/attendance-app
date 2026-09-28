@@ -27,14 +27,14 @@ export default function ReportsPage() {
     <AppLayout>
       <div style={card}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#1e293b' }}>My Calendar</h2>
+          <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-strong, #1e293b)' }}>My Calendar</h2>
           <MonthPicker yearMonth={yearMonth} onChange={setYearMonth} />
         </div>
 
         {error ? (
           <p style={{ margin: 0, color: '#ef4444' }}>{error}</p>
         ) : loading || !employee ? (
-          <p style={{ margin: 0, color: '#94a3b8' }}>Loading…</p>
+          <p style={{ margin: 0, color: 'var(--text-faint, #94a3b8)' }}>Loading…</p>
         ) : (
           <>
             <MonthGrid yearMonth={yearMonth} markFor={myMark} noteFor={d => holidays.get(d)} />
@@ -68,7 +68,7 @@ export default function ReportsPage() {
 }
 
 const card: CSSProperties = {
-  background: '#fff',
+  background: 'var(--surface, #fff)',
   borderRadius: 16,
   padding: '1.5rem',
   boxShadow: '0 1px 4px rgba(0,0,0,0.06)',

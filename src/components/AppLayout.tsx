@@ -1,70 +1,103 @@
-import { NavLink } from 'react-router-dom'
-import type { CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Link } from 'react-router-dom'
+import { House, CalendarDays, ChartColumn, ChevronDown, User, LogOut, Sun, Moon, Monitor } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../lib/theme'
+import type { ThemeChoice } from '../lib/theme'
+import '../styles/app.css'
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { employee, signOut } = useAuth()
+const NAV = [
+  { to: '/dashboard', label: 'Dashboard', Icon: House },
+  { to: '/leave',     label: 'Leave',     Icon: CalendarDays },
+  { to: '/reports',   label: 'Reports',   Icon: ChartColumn },
+]
 
+const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
+  { value: 'light',  label: 'Light',  Icon: Sun },
+  { value: 'dark',   label: 'Dark',   Icon: Moon },
+  { value: 'system', label: 'System', Icon: Monitor },
+]
+
+/** Employee shell. `wide` lets the page lay out its own full-width sections (Dashboard). */
+export default function AppLayout({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+  const theme = useTheme()
   return (
-    <div style={{ minHeight: '100vh', background: '#f0fdf4' }}>
-      <header style={{
-        background: '#14532d',
-        padding: '0 1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: 56,
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.35)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <img src="/logo.jpg" alt="Sproutbien" style={{ height: 32, display: 'block', flexShrink: 0 }} />
-          <nav style={{ display: 'flex', gap: '0.125rem' }}>
-            <NavLink to="/dashboard" style={navStyle}>Dashboard</NavLink>
-            <NavLink to="/leave"     style={navStyle}>Leave</NavLink>
-            <NavLink to="/reports"   style={navStyle}>Reports</NavLink>
-          </nav>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8125rem' }}>
-            {employee?.full_name}
-          </span>
-          <button
-            onClick={signOut}
-            style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: 6,
-              padding: '0.3125rem 0.75rem',
-              cursor: 'pointer',
-              fontSize: '0.8125rem',
-              color: 'rgba(255,255,255,0.75)',
-              fontFamily: 'inherit',
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <div style={{ maxWidth: 600, margin: '0 auto', padding: '2rem 1.25rem', minHeight: 'calc(100vh - 56px)' }}>
-        {children}
-      </div>
+    <div className="sb-app" data-theme={theme.dataTheme}>
+      <Header theme={theme} />
+      {wide ? children : <div className="sb-narrow">{children}</div>}
+      <nav className="sb-tabbar" aria-label="Main">
+        {NAV.map(({ to, label, Icon }) => (
+          <NavLink key={to} to={to}><Icon size={22} strokeWidth={2} />{label}</NavLink>
+        ))}
+      </nav>
     </div>
   )
 }
 
-function navStyle({ isActive }: { isActive: boolean }): CSSProperties {
-  return {
-    textDecoration: 'none',
-    padding: '0.3125rem 0.75rem',
-    borderRadius: 6,
-    fontSize: '0.875rem',
-    fontWeight: isActive ? 600 : 400,
-    color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
-    background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
-    letterSpacing: '-0.01em',
-  }
+type Theme = ReturnType<typeof useTheme>
+
+function Header({ theme }: { theme: Theme }) {
+  return (
+    <header className="sb-header">
+      <Link to="/dashboard" className="sb-brand" aria-label="Sproutbien home">
+        <img src="/logo.jpg" alt="" />
+        <span className="sb-wordmark">
+          <strong>SproutBien</strong>
+          <span>nurturing businesses digitally</span>
+        </span>
+      </Link>
+      <nav className="sb-nav" aria-label="Main">
+        {NAV.map(({ to, label, Icon }) => (
+          <NavLink key={to} to={to}><Icon size={24} strokeWidth={2.2} />{label}</NavLink>
+        ))}
+      </nav>
+      <UserMenu theme={theme} />
+    </header>
+  )
+}
+
+function UserMenu({ theme }: { theme: Theme }) {
+  const { employee, signOut } = useAuth()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onClick = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onClick)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <div className="sb-user" ref={ref}>
+      <button className="sb-user-btn" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="Account menu">
+        <span className="sb-avatar"><User size={30} strokeWidth={2.2} fill="currentColor" /></span>
+        <ChevronDown size={22} strokeWidth={2.4} />
+      </button>
+      {open && (
+        <div className="sb-menu" role="menu">
+          <div className="sb-menu-who">
+            <strong>{employee?.full_name}</strong>
+            <span>{employee?.designation ?? employee?.email}</span>
+          </div>
+          <div className="sb-menu-label">Theme</div>
+          <div className="sb-theme-toggle">
+            {THEMES.map(({ value, label, Icon }) => (
+              <button key={value} aria-pressed={theme.choice === value} onClick={() => theme.setChoice(value)}>
+                <Icon size={18} />{label}
+              </button>
+            ))}
+          </div>
+          <button className="sb-menu-item" role="menuitem" onClick={signOut}>
+            <LogOut size={18} /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }

@@ -13,7 +13,7 @@ export function MonthPicker({ yearMonth, onChange, max }: {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
       <button onClick={() => onChange(shiftMonth(yearMonth, -1))} style={arrowStyle(false)} aria-label="Previous month">‹</button>
-      <span style={{ minWidth: 140, textAlign: 'center', fontWeight: 600, color: '#1e293b', fontSize: '0.9375rem' }}>
+      <span style={{ minWidth: 140, textAlign: 'center', fontWeight: 600, color: 'var(--text-strong, #1e293b)', fontSize: '0.9375rem' }}>
         {monthLabel(yearMonth)}
       </span>
       <button
@@ -31,8 +31,8 @@ export function MonthPicker({ yearMonth, onChange, max }: {
 function arrowStyle(disabled: boolean): CSSProperties {
   return {
     width: 32, height: 32, borderRadius: 8,
-    border: '1px solid #d1d5db', background: '#fff',
-    color: disabled ? '#cbd5e1' : '#374151',
+    border: '1px solid var(--border, #d1d5db)', background: 'var(--surface, #fff)',
+    color: disabled ? 'var(--text-faint, #cbd5e1)' : 'var(--text, #374151)',
     fontSize: '1.125rem', lineHeight: 1,
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'inherit',
@@ -43,7 +43,7 @@ function arrowStyle(disabled: boolean): CSSProperties {
 
 export function CalendarLegend({ marks }: { marks: DayMark[] }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', fontSize: '0.75rem', color: '#64748b' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
       {marks.map(m => {
         const s = MARK_STYLES[m]
         return (
@@ -90,7 +90,7 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick }: {
         <div key={d} style={{
           textAlign: 'center', fontSize: '0.6875rem', fontWeight: 600,
           textTransform: 'uppercase', letterSpacing: '0.05em',
-          color: d === 'Sun' ? '#94a3b8' : '#64748b', padding: '0.25rem 0',
+          color: d === 'Sun' ? 'var(--text-faint, #94a3b8)' : 'var(--text-muted, #64748b)', padding: '0.25rem 0',
         }}>
           {d}
         </div>
@@ -114,14 +114,14 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick }: {
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
               minHeight: 64, padding: '0.375rem', borderRadius: 8, boxSizing: 'border-box',
-              background: mark === 'none' ? '#fff' : s.bg,
-              border: s.border ?? (date === today ? '2px solid #16a34a' : '1px solid #e2e8f0'),
+              background: mark === 'none' ? 'var(--surface, #fff)' : mark === 'sunday' ? 'var(--surface-soft, #f8fafc)' : s.bg,
+              border: s.border ?? (date === today ? '2px solid #16a34a' : '1px solid var(--border, #e2e8f0)'),
               color: strong ? '#fff' : '#1e293b',
               cursor: onDayClick ? 'pointer' : 'default',
               textAlign: 'left', fontFamily: 'inherit', overflow: 'hidden',
             }}
           >
-            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: strong ? '#fff' : mark === 'sunday' ? '#94a3b8' : '#1e293b' }}>
+            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: strong ? '#fff' : mark === 'sunday' ? 'var(--text-faint, #94a3b8)' : mark === 'none' ? 'var(--text-strong, #1e293b)' : '#1e293b' }}>
               {Number(date.slice(8))}
             </span>
             {CELL_TAGS[mark] && (

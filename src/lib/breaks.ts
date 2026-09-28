@@ -27,6 +27,13 @@ export function fmtDuration(seconds: number) {
   return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`
 }
 
+/** 16320 → "04h 32m", 0 → "00h 00m" */
+export function fmtHM(seconds: number) {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`
+}
+
 /** 754 → "12:34", 3725 → "1:02:05" — for a live ticking timer */
 export function fmtClock(seconds: number) {
   const h = Math.floor(seconds / 3600)

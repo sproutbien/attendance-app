@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import AppLayout from '../components/AppLayout'
 import { useLeaveRequests } from '../hooks/useLeaveRequests'
 import type { LeaveRequest } from '../types'
+import { localDate } from '../lib/calendar'
 
 const STATUS_STYLES: Record<LeaveRequest['status'], { bg: string; text: string; label: string }> = {
   pending:  { bg: '#fef9c3', text: '#854d0e', label: 'Pending' },
@@ -27,7 +28,7 @@ export default function LeavePage() {
   const [success, setSuccess] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = localDate()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -52,7 +53,7 @@ export default function LeavePage() {
     <AppLayout>
       {/* Request form */}
       <div style={card}>
-        <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.125rem', fontWeight: 700, color: '#1e293b' }}>
+        <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-strong, #1e293b)' }}>
           Request Leave
         </h2>
         <form onSubmit={handleSubmit}>
@@ -82,7 +83,7 @@ export default function LeavePage() {
           </div>
 
           {showDayCount && (
-            <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: '#64748b' }}>
+            <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
               {dayCount(startDate, endDate)}
             </p>
           )}
@@ -132,13 +133,13 @@ export default function LeavePage() {
 
       {/* Request history */}
       <div style={{ ...card, marginTop: '1.5rem' }}>
-        <h3 style={{ margin: '0 0 1.25rem', fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
+        <h3 style={{ margin: '0 0 1.25rem', fontSize: '1rem', fontWeight: 600, color: 'var(--text-strong, #1e293b)' }}>
           My Requests
         </h3>
         {loading ? (
-          <p style={{ color: '#94a3b8', margin: 0 }}>Loading…</p>
+          <p style={{ color: 'var(--text-faint, #94a3b8)', margin: 0 }}>Loading…</p>
         ) : requests.length === 0 ? (
-          <p style={{ color: '#94a3b8', margin: 0 }}>No leave requests yet.</p>
+          <p style={{ color: 'var(--text-faint, #94a3b8)', margin: 0 }}>No leave requests yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {requests.map(r => <RequestRow key={r.id} r={r} />)}
@@ -153,7 +154,7 @@ function RequestRow({ r }: { r: LeaveRequest }) {
   const s = STATUS_STYLES[r.status]
   return (
     <div style={{
-      border: '1px solid #e2e8f0',
+      border: '1px solid var(--border, #e2e8f0)',
       borderRadius: 12,
       padding: '0.875rem 1rem',
       display: 'flex',
@@ -162,15 +163,15 @@ function RequestRow({ r }: { r: LeaveRequest }) {
       gap: '1rem',
     }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#1e293b', marginBottom: '0.2rem' }}>
+        <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-strong, #1e293b)', marginBottom: '0.2rem' }}>
           {fmtDate(r.start_date)}
           {r.start_date !== r.end_date && <> – {fmtDate(r.end_date)}</>}
-          <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.8125rem', marginLeft: 8 }}>
+          <span style={{ fontWeight: 400, color: 'var(--text-faint, #94a3b8)', fontSize: '0.8125rem', marginLeft: 8 }}>
             {dayCount(r.start_date, r.end_date)}
           </span>
         </div>
         <div style={{
-          color: '#64748b',
+          color: 'var(--text-muted, #64748b)',
           fontSize: '0.875rem',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -178,7 +179,7 @@ function RequestRow({ r }: { r: LeaveRequest }) {
         }}>
           {r.reason}
         </div>
-        <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+        <div style={{ color: 'var(--text-faint, #94a3b8)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
           Submitted {new Date(r.requested_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
         </div>
       </div>
@@ -211,7 +212,7 @@ function alertStyle(bg: string, border: string, color: string): CSSProperties {
 }
 
 const card: CSSProperties = {
-  background: '#fff',
+  background: 'var(--surface, #fff)',
   borderRadius: 16,
   padding: '1.5rem',
   boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
@@ -222,17 +223,17 @@ const labelStyle: CSSProperties = {
   fontSize: '0.875rem',
   fontWeight: 500,
   marginBottom: '0.375rem',
-  color: '#374151',
+  color: 'var(--text, #374151)',
 }
 
 const inputStyle: CSSProperties = {
   width: '100%',
   padding: '0.625rem 0.75rem',
-  border: '1px solid #d1d5db',
+  border: '1px solid var(--border, #d1d5db)',
   borderRadius: 8,
   fontSize: '0.9375rem',
   outline: 'none',
   boxSizing: 'border-box',
-  color: '#1e293b',
+  color: 'var(--text-strong, #1e293b)',
   fontFamily: 'inherit',
 }

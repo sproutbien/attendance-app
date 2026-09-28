@@ -5,15 +5,14 @@ import type { AdminAttendanceRow } from '../../hooks/useAdminAttendance'
 import { STATUS_COLORS, STATUS_LABELS } from '../../types'
 import type { AttendanceRecord } from '../../types'
 import { fmtDuration, totalBreakSeconds } from '../../lib/breaks'
+import { localDate } from '../../lib/calendar'
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
+const todayISO = () => localDate()
 
 function shiftDate(iso: string, days: number) {
   const d = new Date(iso + 'T00:00:00')
   d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
+  return localDate(d)
 }
 
 function fmtDateLabel(iso: string) {

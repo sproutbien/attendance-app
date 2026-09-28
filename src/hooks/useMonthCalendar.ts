@@ -100,5 +100,5 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
     leave: data.leave.get(empId)?.get(date),
   }), [data])
 
-  return { holidays: data.holidays, markFor, loading, error }
+  return { holidays: data.holidays, leave: data.leave, markFor, loading, error }
 }

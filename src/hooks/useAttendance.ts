@@ -3,14 +3,15 @@ import { supabase } from '../lib/supabase'
 import type { AttendanceRecord } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { totalBreakSeconds } from '../lib/breaks'
+import { currentYearMonth, daysInMonth, localDate } from '../lib/calendar'
 
 const LATE_THRESHOLD_HOUR = 9
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
+// Local calendar date, so an early-morning check-in in IST isn't filed under yesterday (UTC)
+const todayISO = () => localDate()
 
-export function useAttendance() {
+/** Today's record plus every record in `yearMonth` ("YYYY-MM", defaults to this month). */
+export function useAttendance(yearMonth = currentYearMonth()) {
   const { employee } = useAuth()
   const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null | undefined>(undefined)
   const [monthRecords, setMonthRecords] = useState<AttendanceRecord[]>([])
@@ -31,17 +32,15 @@ export function useAttendance() {
 
   const fetchMonth = useCallback(async () => {
     if (!employee) return
-    const now = new Date()
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
     const { data } = await supabase
       .from('attendance_records')
       .select('*')
       .eq('employee_id', employee.id)
-      .gte('date', monthStart)
-      .lte('date', todayISO())
+      .gte('date', `${yearMonth}-01`)
+      .lte('date', `${yearMonth}-${String(daysInMonth(yearMonth)).padStart(2, '0')}`)
       .order('date', { ascending: false })
     setMonthRecords(data ?? [])
-  }, [employee])
+  }, [employee, yearMonth])
 
   useEffect(() => {
     fetchToday()
