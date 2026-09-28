@@ -37,6 +37,18 @@ BEGIN
     (id_lisa,    '00000000-0000-0000-0000-000000000000', 'lisa.zhang@sproutbien.com',      pw, NOW(), '{"provider":"email","providers":["email"]}', '{"full_name":"Lisa Zhang"}',      'authenticated', 'authenticated', NOW(), NOW())
   ON CONFLICT (id) DO NOTHING;
 
+  -- GoTrue can't scan NULL into these string columns ("Database error querying schema")
+  UPDATE auth.users SET
+    confirmation_token         = COALESCE(confirmation_token, ''),
+    recovery_token             = COALESCE(recovery_token, ''),
+    email_change_token_new     = COALESCE(email_change_token_new, ''),
+    email_change_token_current = COALESCE(email_change_token_current, ''),
+    email_change               = COALESCE(email_change, ''),
+    phone_change               = COALESCE(phone_change, ''),
+    phone_change_token         = COALESCE(phone_change_token, ''),
+    reauthentication_token     = COALESCE(reauthentication_token, '')
+  WHERE id IN (id_sarah, id_michael, id_emma, id_james, id_olivia, id_priya, id_marcus, id_lisa);
+
   -- ── Auth identities ────────────────────────────────────────
   INSERT INTO auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
   VALUES

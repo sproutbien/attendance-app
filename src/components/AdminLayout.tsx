@@ -39,6 +39,7 @@ export default function AdminLayout() {
             <NavLink to="/admin/leave"      style={navStyle}>Leave</NavLink>
             <NavLink to="/admin/employees"  style={navStyle}>Employees</NavLink>
             <NavLink to="/admin/reports"    style={navStyle}>Reports</NavLink>
+            <NavLink to="/admin/calendar"   style={navStyle}>Calendar</NavLink>
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>

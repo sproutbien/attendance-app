@@ -6,10 +6,12 @@ import AdminLayout from './components/AdminLayout'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import LeavePage from './pages/LeavePage'
+import ReportsPage from './pages/ReportsPage'
 import AdminAttendancePage from './pages/admin/AdminAttendancePage'
 import AdminLeavePage from './pages/admin/AdminLeavePage'
 import AdminEmployeesPage from './pages/admin/AdminEmployeesPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
+import AdminCalendarPage from './pages/admin/AdminCalendarPage'
 
 export default function App() {
   return (
@@ -22,6 +24,7 @@ export default function App() {
           {/* Employee routes */}
           <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
           <Route path="/leave"     element={<ProtectedRoute><LeavePage /></ProtectedRoute>} />
+          <Route path="/reports"   element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
 
           {/* Admin routes — nested so AdminLayout wraps all sub-pages via <Outlet /> */}
           <Route
@@ -33,6 +36,7 @@ export default function App() {
             <Route path="leave"      element={<AdminLeavePage />} />
             <Route path="employees"  element={<AdminEmployeesPage />} />
             <Route path="reports"    element={<AdminReportsPage />} />
+            <Route path="calendar"   element={<AdminCalendarPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

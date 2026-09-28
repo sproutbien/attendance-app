@@ -24,6 +24,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <nav style={{ display: 'flex', gap: '0.125rem' }}>
             <NavLink to="/dashboard" style={navStyle}>Dashboard</NavLink>
             <NavLink to="/leave"     style={navStyle}>Leave</NavLink>
+            <NavLink to="/reports"   style={navStyle}>Reports</NavLink>
           </nav>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>

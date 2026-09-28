@@ -14,27 +14,41 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
-  const [employee, setEmployee] = useState<Employee | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [sessionReady, setSessionReady] = useState(false)
+  // The employee row tagged with the user it was fetched for
+  const [profile, setProfile] = useState<{ userId: string; employee: Employee | null } | null>(null)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session?.user) {
-        const { data } = await supabase
-          .from('employees')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
-        setEmployee(data ?? null)
-      } else {
-        setEmployee(null)
-      }
-      setLoading(false)
+      setSessionReady(true)
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
+  const userId = session?.user.id ?? null
+
+  // Fetch here rather than inside onAuthStateChange — awaiting supabase calls there can deadlock.
+  // Keyed on userId, so token refreshes don't refetch.
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    supabase
+      .from('employees')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setProfile({ userId, employee: data ?? null })
+      })
+    return () => { cancelled = true }
+  }, [userId])
+
+  const employee = profile && profile.userId === userId ? profile.employee : null
+  // Loading until the session is known AND the profile for this exact user has arrived —
+  // otherwise route guards briefly see a session with no employee ("Account not set up")
+  const loading = !sessionReady || (userId !== null && profile?.userId !== userId)
 
   return (
     <AuthContext.Provider value={{
