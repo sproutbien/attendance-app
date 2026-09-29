@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { LeaveRequest } from '../types'
+import { useAuth } from '../contexts/AuthContext'
+import { localDate } from '../lib/calendar'
 
 export type NewLeave = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session' | 'reason'>
-import { useAuth } from '../contexts/AuthContext'
 
 export function useLeaveRequests() {
   const { employee } = useAuth()
@@ -11,6 +12,7 @@ export function useLeaveRequests() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checkedInToday, setCheckedInToday] = useState(false)  // limits which leave can start today
 
   const fetchRequests = useCallback(async () => {
     if (!employee) return
@@ -25,6 +27,17 @@ export function useLeaveRequests() {
   }, [employee])
 
   useEffect(() => { fetchRequests() }, [fetchRequests])
+
+  useEffect(() => {
+    if (!employee) return
+    supabase
+      .from('attendance_records')
+      .select('check_in_time')
+      .eq('employee_id', employee.id)
+      .eq('date', localDate())
+      .maybeSingle()
+      .then(({ data }) => setCheckedInToday(!!data?.check_in_time))
+  }, [employee])
 
   async function submit(leave: NewLeave): Promise<boolean> {
     if (!employee) return false
@@ -51,5 +64,5 @@ export function useLeaveRequests() {
     return null
   }
 
-  return { requests, loading, submitting, error, submit, cancel }
+  return { requests, loading, submitting, error, checkedInToday, submit, cancel }
 }

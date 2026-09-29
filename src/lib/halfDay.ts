@@ -47,3 +47,32 @@ export function leaveLength(r: Pick<LeaveRequest, 'start_date' | 'end_date' | 'd
   const n = Math.round((new Date(r.end_date).getTime() - new Date(r.start_date).getTime()) / 86400000) + 1
   return `${n} day${n !== 1 ? 's' : ''}`
 }
+
+// Same-day leave rules — must match check_leave_request_timing() in migration 012.
+// Minutes since midnight, inclusive.
+const FULL_DAY_APPLY_UNTIL = 10 * 60 + 30   // 10:30 AM
+const HALF_DAY_APPLY_UNTIL = 13 * 60 + 30   // 1:30 PM
+
+/**
+ * Why a leave starting today can't be requested right now, or null if it can.
+ *   Not checked in: full day until 10:30 AM; half days any time.
+ *   Checked in:     afternoon half day until 1:30 PM only.
+ */
+export function sameDayLeaveBlock(
+  duration: LeaveRequest['duration'],
+  session: HalfDaySession | null,
+  checkedIn: boolean,
+  now = new Date(),
+): string | null {
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  if (checkedIn) {
+    if (duration === 'full') return 'You’ve already checked in today, so you can’t take a full day’s leave for today.'
+    if (session === 'morning') return 'You’ve already checked in today, so you can’t take the morning off.'
+    if (minutes > HALF_DAY_APPLY_UNTIL) return 'Afternoon half-day leave for today can only be requested until 1:30 PM.'
+    return null
+  }
+  if (duration === 'full' && minutes > FULL_DAY_APPLY_UNTIL) {
+    return 'Full-day leave for today can only be requested until 10:30 AM. You can still request a half day.'
+  }
+  return null
+}

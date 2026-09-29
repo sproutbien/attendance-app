@@ -4,7 +4,7 @@ import AppLayout from '../components/AppLayout'
 import { useLeaveRequests } from '../hooks/useLeaveRequests'
 import type { HalfDaySession, LeaveRequest } from '../types'
 import { localDate } from '../lib/calendar'
-import { SESSION_LABELS, canCancel, cancelDeadline, leaveLength } from '../lib/halfDay'
+import { SESSION_LABELS, canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 
 const STATUS_STYLES: Record<LeaveRequest['status'], { bg: string; text: string; label: string }> = {
   pending:  { bg: '#fef9c3', text: '#854d0e', label: 'Pending' },
@@ -18,7 +18,7 @@ function fmtDate(iso: string) {
 }
 
 export default function LeavePage() {
-  const { requests, loading, submitting, error, submit, cancel } = useLeaveRequests()
+  const { requests, loading, submitting, error, checkedInToday, submit, cancel } = useLeaveRequests()
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [duration, setDuration] = useState<LeaveRequest['duration']>('full')
@@ -38,6 +38,12 @@ export default function LeavePage() {
       setFormError('End date must be on or after start date.')
       return
     }
+    // Re-check at submit time — the page may have been open since before a cut-off
+    const blocked = startDate === localDate() && sameDayLeaveBlock(duration, half ? session : null, checkedInToday)
+    if (blocked) {
+      setFormError(blocked)
+      return
+    }
     const ok = await submit({
       start_date: startDate,
       end_date: half ? startDate : endDate,
@@ -55,6 +61,10 @@ export default function LeavePage() {
 
   const isHalf = duration === 'half'
   const showDayCount = !isHalf && startDate && endDate && endDate >= startDate
+  // Leave starting today is limited by the time and whether they've checked in
+  const startsToday = startDate === today
+  const sameDayBlock = startsToday ? sameDayLeaveBlock(duration, isHalf ? session : null, checkedInToday) : null
+  const sessionBlocked = (s: HalfDaySession) => startsToday && sameDayLeaveBlock('half', s, checkedInToday) !== null
 
   return (
     <AppLayout>
@@ -104,9 +114,14 @@ export default function LeavePage() {
                     role="radio"
                     aria-checked={session === s}
                     onClick={() => { setSession(s); setSuccess(false) }}
-                    style={sessionCard(session === s)}
+                    style={{ ...sessionCard(session === s), ...(sessionBlocked(s) ? { opacity: 0.5 } : null) }}
                   >
                     {SESSION_LABELS[s]}
+                    {sessionBlocked(s) && (
+                      <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted, #64748b)', marginTop: 2 }}>
+                        Not available today
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -161,6 +176,12 @@ export default function LeavePage() {
             />
           </div>
 
+          {sameDayBlock && !formError && (
+            <div style={alertStyle('#fffbeb', '#fde68a', '#92400e')}>
+              {sameDayBlock}
+            </div>
+          )}
+
           {(formError || error) && (
             <div style={alertStyle('#fef2f2', '#fecaca', '#dc2626')}>
               {formError ?? error}
@@ -175,16 +196,16 @@ export default function LeavePage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || !!sameDayBlock}
             style={{
               padding: '0.625rem 1.5rem',
-              background: submitting ? '#86efac' : '#16a34a',
+              background: submitting || sameDayBlock ? '#86efac' : '#16a34a',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
               fontWeight: 600,
               fontSize: '0.9375rem',
-              cursor: submitting ? 'not-allowed' : 'pointer',
+              cursor: submitting || sameDayBlock ? 'not-allowed' : 'pointer',
             }}
           >
             {submitting ? 'Submitting…' : 'Submit Request'}
