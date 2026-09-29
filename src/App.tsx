@@ -13,6 +13,7 @@ import AdminLeavePage from './pages/admin/AdminLeavePage'
 import AdminEmployeesPage from './pages/admin/AdminEmployeesPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
 import AdminCalendarPage from './pages/admin/AdminCalendarPage'
+import AdminCorrectionsPage from './pages/admin/AdminCorrectionsPage'
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
             <Route index element={<Navigate to="/admin/attendance" replace />} />
             <Route path="attendance" element={<AdminAttendancePage />} />
             <Route path="leave"      element={<AdminLeavePage />} />
+            <Route path="corrections" element={<AdminCorrectionsPage />} />
             <Route path="employees"  element={<AdminEmployeesPage />} />
             <Route path="reports"    element={<AdminReportsPage />} />
             <Route path="calendar"   element={<AdminCalendarPage />} />

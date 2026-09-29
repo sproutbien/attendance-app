@@ -5,27 +5,50 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
 
-/** Pending requests + cancellations no admin has marked seen. Refreshes on every page change. */
-function useLeaveAttention() {
+/**
+ * Nav badge counts: leave = pending requests + cancellations no admin has marked seen;
+ * corrections = pending correction requests. Refreshes on page change and after admin actions.
+ */
+function useAttentionCounts() {
   const { pathname } = useLocation()
-  const [count, setCount] = useState(0)
+  const [counts, setCounts] = useState({ leave: 0, corrections: 0 })
   useEffect(() => {
     let cancelled = false
-    const load = () => supabase
-      .from('leave_requests')
-      .select('id', { count: 'exact', head: true })
-      .or('status.eq.pending,and(status.eq.cancelled,cancel_seen_at.is.null)')
-      .then(({ count }) => { if (!cancelled) setCount(count ?? 0) })
+    const load = async () => {
+      const [leave, corrections] = await Promise.all([
+        supabase
+          .from('leave_requests')
+          .select('id', { count: 'exact', head: true })
+          .or('status.eq.pending,and(status.eq.cancelled,cancel_seen_at.is.null)'),
+        supabase
+          .from('attendance_corrections')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending'),
+      ])
+      if (!cancelled) setCounts({ leave: leave.count ?? 0, corrections: corrections.count ?? 0 })
+    }
     load()
     window.addEventListener(LEAVE_CHANGED, load)
     return () => { cancelled = true; window.removeEventListener(LEAVE_CHANGED, load) }
   }, [pathname])
-  return count
+  return counts
+}
+
+function Badge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span aria-label={`${count} need attention`} style={{
+      marginLeft: 6, padding: '0 6px', borderRadius: 99, background: '#f87171',
+      color: '#fff', fontSize: '0.6875rem', fontWeight: 700, lineHeight: '16px', display: 'inline-block',
+    }}>
+      {count}
+    </span>
+  )
 }
 
 export default function AdminLayout() {
   const { employee, signOut } = useAuth()
-  const leaveAttention = useLeaveAttention()
+  const attention = useAttentionCounts()
 
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
@@ -58,17 +81,8 @@ export default function AdminLayout() {
           </span>
           <nav style={{ display: 'flex', gap: '0.125rem' }}>
             <NavLink to="/admin/attendance" style={navStyle}>Attendance</NavLink>
-            <NavLink to="/admin/leave"      style={navStyle}>
-              Leave
-              {leaveAttention > 0 && (
-                <span aria-label={`${leaveAttention} need attention`} style={{
-                  marginLeft: 6, padding: '0 6px', borderRadius: 99, background: '#f87171',
-                  color: '#fff', fontSize: '0.6875rem', fontWeight: 700, lineHeight: '16px', display: 'inline-block',
-                }}>
-                  {leaveAttention}
-                </span>
-              )}
-            </NavLink>
+            <NavLink to="/admin/leave"      style={navStyle}>Leave<Badge count={attention.leave} /></NavLink>
+            <NavLink to="/admin/corrections" style={navStyle}>Corrections<Badge count={attention.corrections} /></NavLink>
             <NavLink to="/admin/employees"  style={navStyle}>Employees</NavLink>
             <NavLink to="/admin/reports"    style={navStyle}>Reports</NavLink>
             <NavLink to="/admin/calendar"   style={navStyle}>Calendar</NavLink>

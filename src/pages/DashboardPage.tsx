@@ -5,6 +5,10 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAttendance } from '../hooks/useAttendance'
+import { useCorrections } from '../hooks/useCorrections'
+import CorrectionDialog from '../components/CorrectionDialog'
+import MyCorrections from '../components/MyCorrections'
+import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import AppLayout from '../components/AppLayout'
 import { HeroLeaves, CornerLeaves } from '../components/Leaves'
@@ -85,6 +89,8 @@ export default function DashboardPage() {
   const [yearMonth, setYearMonth] = useState(thisMonth)
   const { todayRecord, monthRecords, isSubmitting, error, checkIn, checkOut, pauseBreak, resumeBreak } = useAttendance(yearMonth)
   const calendar = useMonthCalendar(yearMonth, employee?.id)
+  const corrections = useCorrections()
+  const [correcting, setCorrecting] = useState<{ date: string; rec?: AttendanceRecord } | null>(null)
 
   const state: DayState =
     todayRecord === undefined ? 'loading'
@@ -153,8 +159,21 @@ export default function DashboardPage() {
           calendar={calendar}
           employeeId={employee?.id}
           now={now}
+          pendingCorrections={corrections.pendingDates}
+          onCorrect={(date, rec) => setCorrecting({ date, rec })}
         />
+
+        <MyCorrections corrections={corrections.corrections} onWithdraw={corrections.withdraw} />
       </div>
+
+      {correcting && (
+        <CorrectionDialog
+          date={correcting.date}
+          record={correcting.rec}
+          onSubmit={corrections.submit}
+          onClose={() => setCorrecting(null)}
+        />
+      )}
     </AppLayout>
   )
 }
@@ -310,7 +329,7 @@ type LogRow = {
   brk: number
 }
 
-function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, employeeId, now }: {
+function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, employeeId, now, pendingCorrections, onCorrect }: {
   yearMonth: string
   onMonthChange: (ym: string) => void
   maxMonth: string
@@ -318,6 +337,8 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
   calendar: ReturnType<typeof useMonthCalendar>
   employeeId: string | undefined
   now: number
+  pendingCorrections: Set<string>
+  onCorrect: (date: string, rec?: AttendanceRecord) => void
 }) {
   const today = localDate()
   const isThisMonth = yearMonth === maxMonth
@@ -359,6 +380,12 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
     return { rows, presentDays, workingDays }
   }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now])
 
+  // Last 7 days: "Correct" button, or a marker while a request is open
+  const fix = (r: LogRow) => !isCorrectable(r.date) ? null
+    : pendingCorrections.has(r.date)
+      ? <span className="sb-fix-pending">Correction pending</span>
+      : <button type="button" className="sb-fix-btn" onClick={() => onCorrect(r.date, r.rec)}>Correct</button>
+
   const status = (r: LogRow) => (
     <span className={`sb-status s-${r.mark}`} title={r.note}>
       <i />{r.mark === 'holiday' && r.note ? r.note : MARK_LABELS[r.mark]}
@@ -392,7 +419,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
           <div className="sb-table-wrap">
             <table className="sb-table">
               <thead>
-                <tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th>Break</th><th>Total Work Hours</th></tr>
+                <tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th>Break</th><th>Total Work Hours</th><th><span className="sb-sr">Actions</span></th></tr>
               </thead>
               <tbody>
                 {rows.map(r => (
@@ -403,6 +430,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
                     <td>{fmtTime(r.rec?.check_out_time)}</td>
                     <td>{r.brk > 0 ? fmtHM(r.brk) : '—'}</td>
                     <td>{r.worked != null ? fmtHM(r.worked) : '—'}</td>
+                    <td className="sb-fix-cell">{fix(r)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -424,6 +452,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
                     <div><dt>Worked</dt><dd>{r.worked != null ? fmtHM(r.worked) : '—'}</dd></div>
                   </dl>
                 )}
+                {fix(r) && <div className="sb-li-fix">{fix(r)}</div>}
               </li>
             ))}
           </ul>

@@ -56,3 +56,21 @@ export const STATUS_LABELS: Record<AttendanceRecord['status'], string> = {
   absent:   'Absent',
   on_leave: 'On Leave',
 }
+
+export type AttendanceCorrection = {
+  id: string
+  employee_id: string
+  date: string
+  requested_check_in: string | null   // null = keep the recorded time
+  requested_check_out: string | null
+  reason: string
+  original_check_in: string | null    // record at the time of the request
+  original_check_out: string | null
+  status: 'pending' | 'approved' | 'rejected'
+  approved_check_in: string | null    // what the admin applied
+  approved_check_out: string | null
+  admin_note: string | null
+  requested_at: string
+  reviewed_by: string | null
+  reviewed_at: string | null
+}
