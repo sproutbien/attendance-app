@@ -34,7 +34,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
 
       let attendanceQuery = supabase
         .from('attendance_records')
-        .select('employee_id, date, status')
+        .select('employee_id, date, status, half_day_session')
         .gte('date', start)
         .lte('date', end)
       let leaveQuery = supabase
@@ -87,6 +87,13 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
           // Approved wins if an approved and a pending request overlap
           if (byDate.get(d) !== 'approved') byDate.set(d, l.status as 'approved' | 'pending')
         }
+      }
+
+      // Late check-ins (after 11:30 AM) become half days with no leave request behind them
+      for (const r of records ?? []) {
+        if (!r.half_day_session) continue
+        if (!halfDay.has(r.employee_id)) halfDay.set(r.employee_id, new Map())
+        halfDay.get(r.employee_id)!.set(r.date, r.half_day_session as HalfDaySession)
       }
 
       setData({

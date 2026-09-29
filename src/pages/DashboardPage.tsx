@@ -211,6 +211,9 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
     } else if (record?.status === 'on_leave') {
       head = 'You’re on leave today'
       hint = 'Check in only if you’re working today'
+    } else {
+      const d = new Date()
+      if (d.getHours() * 60 + d.getMinutes() > 11 * 60 + 30) hint = 'Checking in after 11:30 AM counts as a morning half-day leave'
     }
     body = (
       <button className="sb-bigbtn" onClick={onCheckIn} disabled={isSubmitting || state === 'loading' || locked}>

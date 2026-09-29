@@ -1,20 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { AttendanceRecord } from '../types'
+import type { AttendanceRecord, HalfDaySession } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { totalBreakSeconds } from '../lib/breaks'
 import { currentYearMonth, daysInMonth, localDate } from '../lib/calendar'
 import { halfDaySplit } from '../lib/halfDay'
 
-const LATE_THRESHOLD_HOUR = 9
+// Work starts 9:30 AM with a 10-minute grace. Minutes since midnight, inclusive.
+const ON_TIME_UNTIL = 9 * 60 + 40         // up to 9:40 AM → present
+const HALF_DAY_AFTER = 11 * 60 + 30       // after 11:30 AM → morning counts as half-day leave
 
-/** Late after 9 AM normally; after 1:30 PM when the morning is half-day leave. */
-function checkInStatus(now: Date, rec: AttendanceRecord | null) {
-  if (rec?.half_day_session === 'morning') {
+/**
+ * Status for a check-in at `now`:
+ *   ≤ 9:40 AM present · 9:41–11:30 AM late · after 11:30 AM morning half-day leave.
+ * On a morning half day (approved or automatic) it's present until 1:30 PM, late after.
+ */
+function checkInFields(now: Date, rec: AttendanceRecord | null): {
+  status: 'present' | 'late'
+  half_day_session: HalfDaySession | null
+} {
+  const minutes = now.getHours() * 60 + now.getMinutes()
+  const session = rec?.half_day_session ?? (minutes > HALF_DAY_AFTER ? 'morning' : null)
+  if (session === 'morning') {
     const lateFrom = halfDaySplit(localDate(now)).getTime() + 60_000  // 1:30 PM itself is on time
-    return now.getTime() < lateFrom ? 'present' : 'late'
+    return { status: now.getTime() < lateFrom ? 'present' : 'late', half_day_session: 'morning' }
   }
-  return now.getHours() < LATE_THRESHOLD_HOUR ? 'present' : 'late'
+  return { status: minutes <= ON_TIME_UNTIL ? 'present' : 'late', half_day_session: session }
 }
 
 // Local calendar date, so an early-morning check-in in IST isn't filed under yesterday (UTC)
@@ -65,7 +76,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     const now = new Date()
     const fields = (rec: AttendanceRecord | null) => ({
       check_in_time: now.toISOString(),
-      status: checkInStatus(now, rec),
+      ...checkInFields(now, rec),
     })
 
     // A row for today may already exist (approved leave, admin entry, another tab),
