@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 import type { LeaveRequest } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 
+/** Window event fired after the admin changes a leave request (refreshes the nav badge). */
+export const LEAVE_CHANGED = 'sb:leave-changed'
+
 export type LeaveRequestWithEmployee = LeaveRequest & {
   employee: { full_name: string; department: string | null }
 }
@@ -20,6 +23,7 @@ export function useLeaveQueue() {
       .select(`
         id, employee_id, start_date, end_date, duration, half_day_session, reason, status,
         requested_at, reviewed_by, reviewed_at,
+        cancelled_at, cancelled_after_approval, cancel_seen_at,
         employee:employees!employee_id(full_name, department)
       `)
       .order('requested_at', { ascending: true })
@@ -32,11 +36,19 @@ export function useLeaveQueue() {
   async function action(id: string, status: 'approved' | 'rejected') {
     if (!admin) return
     setActioning(prev => new Set(prev).add(id))
-    await supabase
+    // Only a still-pending request can be decided — the employee may have just cancelled it
+    const { data } = await supabase
       .from('leave_requests')
       .update({ status, reviewed_by: admin.id, reviewed_at: new Date().toISOString() })
       .eq('id', id)
-    // Optimistically update local state so the UI reflects the change immediately
+      .eq('status', 'pending')
+      .select('id')
+    if (!data?.length) {
+      await fetchRequests()
+      setActioning(prev => { const s = new Set(prev); s.delete(id); return s })
+      return
+    }
+    // Update local state so the UI reflects the change immediately
     setRequests(prev =>
       prev.map(r => r.id === id
         ? { ...r, status, reviewed_by: admin.id, reviewed_at: new Date().toISOString() }
@@ -44,10 +56,29 @@ export function useLeaveQueue() {
       )
     )
     setActioning(prev => { const s = new Set(prev); s.delete(id); return s })
+    window.dispatchEvent(new Event(LEAVE_CHANGED))
+  }
+
+  /** Dismiss in-app cancellation alerts (all of them when no ids are given). */
+  async function markCancellationsSeen(ids: string[]) {
+    if (ids.length === 0) return
+    const seenAt = new Date().toISOString()
+    const { error } = await supabase.from('leave_requests').update({ cancel_seen_at: seenAt }).in('id', ids)
+    if (!error) setRequests(prev => prev.map(r => ids.includes(r.id) ? { ...r, cancel_seen_at: seenAt } : r))
+    window.dispatchEvent(new Event(LEAVE_CHANGED))
   }
 
   const pending  = requests.filter(r => r.status === 'pending')
-  const reviewed = requests.filter(r => r.status !== 'pending')
+  // Everything decided or withdrawn, newest first
+  const history  = requests.filter(r => r.status !== 'pending')
+    .sort((a, b) => b.requested_at.localeCompare(a.requested_at))
+  const newCancellations = requests.filter(r => r.status === 'cancelled' && !r.cancel_seen_at)
+    .sort((a, b) => (b.cancelled_at ?? '').localeCompare(a.cancelled_at ?? ''))
 
-  return { pending, reviewed, loading, actioning, approve: (id: string) => action(id, 'approved'), reject: (id: string) => action(id, 'rejected') }
+  return {
+    pending, history, newCancellations, loading, actioning,
+    approve: (id: string) => action(id, 'approved'),
+    reject: (id: string) => action(id, 'rejected'),
+    markCancellationsSeen,
+  }
 }

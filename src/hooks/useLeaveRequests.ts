@@ -43,5 +43,13 @@ export function useLeaveRequests() {
     return true
   }
 
-  return { requests, loading, submitting, error, submit }
+  /** Returns an error message, or null on success. */
+  async function cancel(id: string): Promise<string | null> {
+    const { error } = await supabase.rpc('cancel_leave_request', { p_id: id })
+    if (error) return error.message
+    await fetchRequests()
+    return null
+  }
+
+  return { requests, loading, submitting, error, submit, cancel }
 }

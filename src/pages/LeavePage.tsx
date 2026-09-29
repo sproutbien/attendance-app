@@ -4,12 +4,13 @@ import AppLayout from '../components/AppLayout'
 import { useLeaveRequests } from '../hooks/useLeaveRequests'
 import type { HalfDaySession, LeaveRequest } from '../types'
 import { localDate } from '../lib/calendar'
-import { SESSION_LABELS, leaveLength } from '../lib/halfDay'
+import { SESSION_LABELS, canCancel, cancelDeadline, leaveLength } from '../lib/halfDay'
 
 const STATUS_STYLES: Record<LeaveRequest['status'], { bg: string; text: string; label: string }> = {
   pending:  { bg: '#fef9c3', text: '#854d0e', label: 'Pending' },
   approved: { bg: '#dcfce7', text: '#166534', label: 'Approved' },
   rejected: { bg: '#fee2e2', text: '#991b1b', label: 'Rejected' },
+  cancelled: { bg: '#f1f5f9', text: '#475569', label: 'Cancelled' },
 }
 
 function fmtDate(iso: string) {
@@ -17,7 +18,7 @@ function fmtDate(iso: string) {
 }
 
 export default function LeavePage() {
-  const { requests, loading, submitting, error, submit } = useLeaveRequests()
+  const { requests, loading, submitting, error, submit, cancel } = useLeaveRequests()
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [duration, setDuration] = useState<LeaveRequest['duration']>('full')
@@ -202,7 +203,7 @@ export default function LeavePage() {
           <p style={{ color: 'var(--text-faint, #94a3b8)', margin: 0 }}>No leave requests yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {requests.map(r => <RequestRow key={r.id} r={r} />)}
+            {requests.map(r => <RequestRow key={r.id} r={r} onCancel={() => cancel(r.id)} />)}
           </div>
         )}
       </div>
@@ -210,53 +211,137 @@ export default function LeavePage() {
   )
 }
 
-function RequestRow({ r }: { r: LeaveRequest }) {
+function fmtDeadline(d: Date) {
+  return `${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}, ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
+}
+
+function RequestRow({ r, onCancel }: { r: LeaveRequest; onCancel: () => Promise<string | null> }) {
   const s = STATUS_STYLES[r.status]
+  const [confirming, setConfirming] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [cancelError, setCancelError] = useState<string | null>(null)
+  const cancellable = canCancel(r)
+
+  async function handleCancel() {
+    setBusy(true)
+    setCancelError(null)
+    const err = await onCancel()
+    setBusy(false)
+    if (err) setCancelError(err)
+    else setConfirming(false)
+  }
+
   return (
     <div style={{
       border: '1px solid var(--border, #e2e8f0)',
       borderRadius: 12,
       padding: '0.875rem 1rem',
-      display: 'flex',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: '1rem',
+      opacity: r.status === 'cancelled' ? 0.75 : 1,
     }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-strong, #1e293b)', marginBottom: '0.2rem' }}>
-          {fmtDate(r.start_date)}
-          {r.start_date !== r.end_date && <> – {fmtDate(r.end_date)}</>}
-          <span style={{ fontWeight: 400, color: 'var(--text-faint, #94a3b8)', fontSize: '0.8125rem', marginLeft: 8 }}>
-            {leaveLength(r)}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-strong, #1e293b)', marginBottom: '0.2rem' }}>
+            {fmtDate(r.start_date)}
+            {r.start_date !== r.end_date && <> – {fmtDate(r.end_date)}</>}
+            <span style={{ fontWeight: 400, color: 'var(--text-faint, #94a3b8)', fontSize: '0.8125rem', marginLeft: 8 }}>
+              {leaveLength(r)}
+            </span>
+          </div>
+          <div style={{
+            color: 'var(--text-muted, #64748b)',
+            fontSize: '0.875rem',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {r.reason}
+          </div>
+          <div style={{ color: 'var(--text-faint, #94a3b8)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+            Submitted {new Date(r.requested_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            {r.cancelled_at && <> · Cancelled {new Date(r.cancelled_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</>}
+            {cancellable && <> · Can be cancelled until {fmtDeadline(cancelDeadline(r))}</>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem', flexShrink: 0 }}>
+          <span style={{
+            padding: '3px 12px',
+            borderRadius: 99,
+            background: s.bg,
+            color: s.text,
+            fontWeight: 600,
+            fontSize: '0.8125rem',
+            marginTop: 2,
+          }}>
+            {s.label}
           </span>
-        </div>
-        <div style={{
-          color: 'var(--text-muted, #64748b)',
-          fontSize: '0.875rem',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {r.reason}
-        </div>
-        <div style={{ color: 'var(--text-faint, #94a3b8)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-          Submitted {new Date(r.requested_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+          {cancellable && !confirming && (
+            <button type="button" onClick={() => setConfirming(true)} style={cancelLinkStyle}>
+              Cancel leave
+            </button>
+          )}
         </div>
       </div>
-      <span style={{
-        flexShrink: 0,
-        padding: '3px 12px',
-        borderRadius: 99,
-        background: s.bg,
-        color: s.text,
-        fontWeight: 600,
-        fontSize: '0.8125rem',
-        marginTop: 2,
-      }}>
-        {s.label}
-      </span>
+
+      {confirming && (
+        <div style={{
+          marginTop: '0.75rem',
+          padding: '0.75rem',
+          borderRadius: 10,
+          background: 'var(--red-soft, #fef2f2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.75rem',
+          flexWrap: 'wrap',
+        }}>
+          <span style={{ fontSize: '0.875rem', color: 'var(--red, #b91c1c)' }}>
+            Cancel this {r.status === 'approved' ? 'approved ' : ''}leave? Your admin will be notified.
+          </span>
+          <span style={{ display: 'flex', gap: '0.5rem' }}>
+            <button type="button" onClick={() => { setConfirming(false); setCancelError(null) }} disabled={busy} style={keepBtnStyle}>
+              Keep it
+            </button>
+            <button type="button" onClick={handleCancel} disabled={busy} style={confirmBtnStyle}>
+              {busy ? 'Cancelling…' : 'Yes, cancel'}
+            </button>
+          </span>
+          {cancelError && <span style={{ width: '100%', fontSize: '0.8125rem', color: 'var(--red, #b91c1c)' }}>{cancelError}</span>}
+        </div>
+      )}
     </div>
   )
+}
+
+const cancelLinkStyle: CSSProperties = {
+  padding: 0,
+  border: 'none',
+  background: 'none',
+  color: 'var(--red, #b91c1c)',
+  fontSize: '0.8125rem',
+  fontWeight: 600,
+  cursor: 'pointer',
+}
+
+const keepBtnStyle: CSSProperties = {
+  padding: '0.375rem 0.875rem',
+  borderRadius: 8,
+  border: '1px solid var(--border, #d1d5db)',
+  background: 'var(--surface, #fff)',
+  color: 'var(--text, #374151)',
+  fontWeight: 600,
+  fontSize: '0.8125rem',
+  cursor: 'pointer',
+}
+
+const confirmBtnStyle: CSSProperties = {
+  padding: '0.375rem 0.875rem',
+  borderRadius: 8,
+  border: 'none',
+  background: '#dc2626',
+  color: '#fff',
+  fontWeight: 600,
+  fontSize: '0.8125rem',
+  cursor: 'pointer',
 }
 
 function alertStyle(bg: string, border: string, color: string): CSSProperties {

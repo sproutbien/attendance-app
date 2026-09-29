@@ -1,9 +1,31 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { CSSProperties } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
+import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
+
+/** Pending requests + cancellations no admin has marked seen. Refreshes on every page change. */
+function useLeaveAttention() {
+  const { pathname } = useLocation()
+  const [count, setCount] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    const load = () => supabase
+      .from('leave_requests')
+      .select('id', { count: 'exact', head: true })
+      .or('status.eq.pending,and(status.eq.cancelled,cancel_seen_at.is.null)')
+      .then(({ count }) => { if (!cancelled) setCount(count ?? 0) })
+    load()
+    window.addEventListener(LEAVE_CHANGED, load)
+    return () => { cancelled = true; window.removeEventListener(LEAVE_CHANGED, load) }
+  }, [pathname])
+  return count
+}
 
 export default function AdminLayout() {
   const { employee, signOut } = useAuth()
+  const leaveAttention = useLeaveAttention()
 
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
@@ -36,7 +58,17 @@ export default function AdminLayout() {
           </span>
           <nav style={{ display: 'flex', gap: '0.125rem' }}>
             <NavLink to="/admin/attendance" style={navStyle}>Attendance</NavLink>
-            <NavLink to="/admin/leave"      style={navStyle}>Leave</NavLink>
+            <NavLink to="/admin/leave"      style={navStyle}>
+              Leave
+              {leaveAttention > 0 && (
+                <span aria-label={`${leaveAttention} need attention`} style={{
+                  marginLeft: 6, padding: '0 6px', borderRadius: 99, background: '#f87171',
+                  color: '#fff', fontSize: '0.6875rem', fontWeight: 700, lineHeight: '16px', display: 'inline-block',
+                }}>
+                  {leaveAttention}
+                </span>
+              )}
+            </NavLink>
             <NavLink to="/admin/employees"  style={navStyle}>Employees</NavLink>
             <NavLink to="/admin/reports"    style={navStyle}>Reports</NavLink>
             <NavLink to="/admin/calendar"   style={navStyle}>Calendar</NavLink>

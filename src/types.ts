@@ -41,10 +41,13 @@ export type LeaveRequest = {
   duration: 'full' | 'half'
   half_day_session: HalfDaySession | null  // only for half days (start_date = end_date)
   reason: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   requested_at: string
   reviewed_by: string | null
   reviewed_at: string | null
+  cancelled_at: string | null
+  cancelled_after_approval: boolean
+  cancel_seen_at: string | null    // when an admin dismissed the in-app cancellation alert
 }
 
 export const STATUS_LABELS: Record<AttendanceRecord['status'], string> = {

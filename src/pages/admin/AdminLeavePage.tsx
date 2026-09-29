@@ -8,15 +8,35 @@ function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-const REVIEWED_STATUS_STYLES = {
-  approved: { bg: '#dcfce7', text: '#166534', label: 'Approved' },
-  rejected: { bg: '#fee2e2', text: '#991b1b', label: 'Rejected' },
-  pending:  { bg: '#fef9c3', text: '#854d0e', label: 'Pending'  },
+function fmtDateTime(iso: string) {
+  return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
+const STATUS_STYLES = {
+  approved:  { bg: '#dcfce7', text: '#166534', label: 'Approved'  },
+  rejected:  { bg: '#fee2e2', text: '#991b1b', label: 'Rejected'  },
+  cancelled: { bg: '#f1f5f9', text: '#475569', label: 'Cancelled' },
+  pending:   { bg: '#fef9c3', text: '#854d0e', label: 'Pending'   },
+}
+
+type HistoryFilter = 'all' | 'approved' | 'rejected' | 'cancelled'
+const FILTERS: { value: HistoryFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
 export default function AdminLeavePage() {
-  const { pending, reviewed, loading, actioning, approve, reject } = useLeaveQueue()
-  const [showReviewed, setShowReviewed] = useState(false)
+  const { pending, history, newCancellations, loading, actioning, approve, reject, markCancellationsSeen } = useLeaveQueue()
+  const [filter, setFilter] = useState<HistoryFilter>('all')
+  const [search, setSearch] = useState('')
+
+  const q = search.trim().toLowerCase()
+  const shown = history.filter(r =>
+    (filter === 'all' || r.status === filter) &&
+    (!q || r.employee.full_name.toLowerCase().includes(q) || r.reason.toLowerCase().includes(q)),
+  )
 
   return (
     <div>
@@ -38,6 +58,40 @@ export default function AdminLeavePage() {
           </span>
         )}
       </div>
+
+      {/* Cancellation alerts — stay until an admin marks them seen */}
+      {!loading && newCancellations.length > 0 && (
+        <div style={{ ...card, marginBottom: '1.5rem', border: '1px solid #fecaca', background: '#fffafa' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#991b1b' }}>
+              Cancelled by employees ({newCancellations.length})
+            </h2>
+            <button onClick={() => markCancellationsSeen(newCancellations.map(r => r.id))} style={smallBtn}>
+              Mark all as seen
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {newCancellations.map(r => (
+              <div key={r.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', padding: '0.75rem 0', borderTop: '1px solid #fee2e2' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, color: '#1e293b' }}>
+                    {r.employee.full_name}
+                    <span style={{ fontWeight: 400, color: '#64748b', marginLeft: 8, fontSize: '0.875rem' }}>
+                      {fmtDate(r.start_date)}{r.start_date !== r.end_date ? ` – ${fmtDate(r.end_date)}` : ''} · {leaveLength(r)}
+                    </span>
+                  </div>
+                  <div style={{ color: '#64748b', fontSize: '0.875rem', margin: '0.2rem 0' }}>{r.reason}</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                    {r.cancelled_after_approval ? 'Was approved' : 'Was pending'}
+                    {r.cancelled_at && <> · cancelled {fmtDateTime(r.cancelled_at)}</>}
+                  </div>
+                </div>
+                <button onClick={() => markCancellationsSeen([r.id])} style={smallBtn}>Seen</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Pending section */}
       <div style={{ ...card, marginBottom: '1.5rem' }}>
@@ -67,35 +121,57 @@ export default function AdminLeavePage() {
         )}
       </div>
 
-      {/* Reviewed section */}
-      {!loading && reviewed.length > 0 && (
-        <div style={card}>
-          <button
-            onClick={() => setShowReviewed(v => !v)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
-              Reviewed ({reviewed.length})
-            </h2>
-            <span style={{ color: '#64748b', fontSize: '0.875rem' }}>{showReviewed ? '▲ Hide' : '▼ Show'}</span>
-          </button>
-
-          {showReviewed && (
-            <div style={{ marginTop: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {reviewed.map(r => <ReviewedRow key={r.id} request={r} />)}
-            </div>
-          )}
+      {/* History: every decided or cancelled application, with its reason */}
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
+            Past applications {!loading && `(${history.length})`}
+          </h2>
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name or reason"
+            style={{ padding: '0.4375rem 0.75rem', border: '1px solid #d1d5db', borderRadius: 8, fontSize: '0.875rem', fontFamily: 'inherit', minWidth: 200 }}
+          />
         </div>
-      )}
+
+        <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          {FILTERS.map(f => {
+            const active = filter === f.value
+            const count = f.value === 'all' ? history.length : history.filter(r => r.status === f.value).length
+            return (
+              <button
+                key={f.value}
+                onClick={() => setFilter(f.value)}
+                aria-pressed={active}
+                style={{
+                  padding: '0.3125rem 0.875rem',
+                  borderRadius: 99,
+                  border: active ? '1px solid #16a34a' : '1px solid #e2e8f0',
+                  background: active ? '#dcfce7' : '#fff',
+                  color: active ? '#166534' : '#475569',
+                  fontWeight: active ? 600 : 500,
+                  fontSize: '0.8125rem',
+                  cursor: 'pointer',
+                }}
+              >
+                {f.label} ({count})
+              </button>
+            )
+          })}
+        </div>
+
+        {loading ? (
+          <p style={{ color: '#94a3b8', margin: 0 }}>Loading…</p>
+        ) : shown.length === 0 ? (
+          <p style={{ color: '#94a3b8', margin: 0 }}>No applications match.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {shown.map(r => <HistoryRow key={r.id} request={r} />)}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -181,44 +257,62 @@ function PendingCard({
   )
 }
 
-function ReviewedRow({ request: r }: { request: LeaveRequestWithEmployee }) {
-  const s = REVIEWED_STATUS_STYLES[r.status as keyof typeof REVIEWED_STATUS_STYLES]
+function HistoryRow({ request: r }: { request: LeaveRequestWithEmployee }) {
+  const s = STATUS_STYLES[r.status]
+  const decided = r.status === 'approved' || r.cancelled_after_approval ? 'Approved' : 'Rejected'
   return (
     <div style={{
       display: 'flex',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       justifyContent: 'space-between',
-      padding: '0.75rem 0',
-      borderBottom: '1px solid #f1f5f9',
+      padding: '0.875rem 0',
+      borderTop: '1px solid #f1f5f9',
       gap: '1rem',
       flexWrap: 'wrap',
     }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <span style={{ fontWeight: 600, color: '#1e293b' }}>{r.employee.full_name}</span>
-        <span style={{ color: '#94a3b8', fontSize: '0.8125rem', marginLeft: 8 }}>
+      <div style={{ flex: 1, minWidth: 220 }}>
+        <div>
+          <span style={{ fontWeight: 600, color: '#1e293b' }}>{r.employee.full_name}</span>
+          {r.employee.department && <span style={{ color: '#94a3b8', fontSize: '0.8125rem', marginLeft: 6 }}>{r.employee.department}</span>}
+        </div>
+        <div style={{ color: '#374151', fontSize: '0.875rem', fontWeight: 500, margin: '0.125rem 0' }}>
           {fmtDate(r.start_date)}{r.start_date !== r.end_date ? ` – ${fmtDate(r.end_date)}` : ''}
-          {' · '}{leaveLength(r)}
-        </span>
+          <span style={{ color: '#94a3b8', fontWeight: 400 }}>{' · '}{leaveLength(r)}</span>
+        </div>
+        <div style={{ color: '#64748b', fontSize: '0.875rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+          <span style={{ color: '#94a3b8' }}>Reason: </span>{r.reason}
+        </div>
+        <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+          Submitted {fmtDate(r.requested_at.slice(0, 10))}
+          {r.reviewed_at && <> · {decided} {fmtDate(r.reviewed_at.slice(0, 10))}</>}
+          {r.cancelled_at && <> · Cancelled by employee {fmtDateTime(r.cancelled_at)}</>}
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
-        {r.reviewed_at && (
-          <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-            {fmtDate(r.reviewed_at.slice(0, 10))}
-          </span>
-        )}
-        <span style={{
-          padding: '2px 10px',
-          borderRadius: 99,
-          background: s.bg,
-          color: s.text,
-          fontWeight: 600,
-          fontSize: '0.8125rem',
-        }}>
-          {s.label}
-        </span>
-      </div>
+      <span style={{
+        flexShrink: 0,
+        padding: '2px 10px',
+        borderRadius: 99,
+        background: s.bg,
+        color: s.text,
+        fontWeight: 600,
+        fontSize: '0.8125rem',
+      }}>
+        {s.label}
+      </span>
     </div>
   )
+}
+
+const smallBtn: CSSProperties = {
+  padding: '0.3125rem 0.75rem',
+  borderRadius: 8,
+  border: '1px solid #e2e8f0',
+  background: '#fff',
+  color: '#374151',
+  fontWeight: 600,
+  fontSize: '0.8125rem',
+  cursor: 'pointer',
+  flexShrink: 0,
 }
 
 const card: CSSProperties = {

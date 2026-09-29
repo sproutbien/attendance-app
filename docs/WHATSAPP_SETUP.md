@@ -1,12 +1,13 @@
 # WhatsApp leave notifications — setup
 
-Two notifications, sent automatically:
+Notifications sent automatically:
 
 | When | To | Template |
 |---|---|---|
 | Employee submits a leave request | Admin number(s) | `leave_request_admin` |
 | Admin approves a request | The employee | `leave_approved` |
 | Admin declines a request | The employee | `leave_rejected` |
+| Employee cancels a request (pending or approved) | Admin number(s) | `leave_cancelled_admin` |
 
 How it works: a database trigger (`on_leave_whatsapp`, migration 006) calls the
 `leave-whatsapp` Edge Function in the background. The function reads the leave
@@ -58,7 +59,7 @@ The token shown on the API Setup page expires after 24 hours. Create a permanent
 ## 3. Message templates
 
 WhatsApp Manager → **Message templates** → **Create template**.
-Create all three with **Category: Utility**, **Language: English** (code `en`).
+Create all four with **Category: Utility**, **Language: English** (code `en`).
 Meta approval usually takes minutes to a day. The names must match exactly.
 
 **`leave_request_admin`**
@@ -71,6 +72,15 @@ Reason: {{5}}
 Please review it in the Sproutbien attendance app.
 ```
 Sample values: `Priya Patel`, `Design`, `3 Oct 2026 – 5 Oct 2026`, `3 days`, `Family function`
+
+**`leave_cancelled_admin`**
+```
+{{1}} ({{2}}) has cancelled their leave.
+
+Dates: {{3}} ({{4}})
+The request was {{5}} before it was cancelled.
+```
+Sample values: `Priya Patel`, `Design`, `3 Oct 2026 – 5 Oct 2026`, `3 days`, `approved`
 
 **`leave_approved`**
 ```

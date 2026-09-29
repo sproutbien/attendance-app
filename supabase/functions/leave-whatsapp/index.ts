@@ -2,6 +2,7 @@
 // Called by the on_leave_whatsapp trigger (migration 006) via pg_net.
 //   leave_submitted → template "leave_request_admin" to ADMIN_WHATSAPP_NUMBERS
 //   leave_reviewed  → template "leave_approved" / "leave_rejected" to the employee
+//   leave_cancelled → template "leave_cancelled_admin" to ADMIN_WHATSAPP_NUMBERS
 // Setup: docs/WHATSAPP_SETUP.md
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
@@ -88,7 +89,7 @@ Deno.serve(async req => {
   // Re-read the row — never trust request contents for what gets sent
   const { data: leave, error } = await supabase
     .from('leave_requests')
-    .select('start_date, end_date, half_day_session, reason, status, employee:employees!employee_id(full_name, department, phone)')
+    .select('start_date, end_date, half_day_session, reason, status, cancelled_after_approval, employee:employees!employee_id(full_name, department, phone)')
     .eq('id', leaveId)
     .maybeSingle()
 
@@ -113,6 +114,15 @@ Deno.serve(async req => {
         param(dates),
         param(dayCount(leave.start_date, leave.end_date, leave.half_day_session)),
         param(leave.reason, 300),
+      ])))
+    } else if (event === 'leave_cancelled' && leave.status === 'cancelled') {
+      // {{1}} name  {{2}} department  {{3}} dates  {{4}} day count  {{5}} previous status
+      await Promise.all(ADMIN_WHATSAPP_NUMBERS.map(to => sendTemplate(to, 'leave_cancelled_admin', [
+        param(employee.full_name),
+        param(employee.department),
+        param(dates),
+        param(dayCount(leave.start_date, leave.end_date, leave.half_day_session)),
+        param(leave.cancelled_after_approval ? 'approved' : 'pending'),
       ])))
     } else if (event === 'leave_reviewed' && (leave.status === 'approved' || leave.status === 'rejected')) {
       if (!employee.phone) {
