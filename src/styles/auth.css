@@ -1,0 +1,283 @@
+/* ============================================================
+   Auth screens (login / forgot password / reset password)
+   ============================================================ */
+
+.auth-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  overflow: hidden;
+  color-scheme: light;
+  font-family: 'Nunito Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  background:
+    /* floor: brighter band across the lower fifth */
+    linear-gradient(180deg, rgba(255,255,255,0) 76%, rgba(255,255,255,0.75) 79%, #f7f9f6 100%),
+    linear-gradient(135deg, #f3f6f2 0%, #e9efe8 55%, #e4ebe4 100%);
+}
+
+/* Large soft green arch behind the card */
+.auth-page::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 22%;
+  width: min(1080px, 150vw);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #dfe9dc 0%, #e3ece0 45%, #e8eee6 70%);
+  box-shadow: inset 0 40px 80px rgba(255,255,255,0.6);
+  pointer-events: none;
+}
+
+/* Diagonal light rays from the top-left */
+.auth-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      125deg,
+      rgba(255,255,255,0) 0px,
+      rgba(255,255,255,0) 60px,
+      rgba(255,255,255,0.55) 110px,
+      rgba(255,255,255,0) 170px,
+      rgba(255,255,255,0) 260px
+    );
+  mask-image: linear-gradient(115deg, #000 0%, rgba(0,0,0,0.6) 35%, transparent 60%);
+  -webkit-mask-image: linear-gradient(115deg, #000 0%, rgba(0,0,0,0.6) 35%, transparent 60%);
+  pointer-events: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 560px;
+  padding: 4.5rem 3.5rem 4.25rem;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  box-shadow:
+    0 30px 60px -20px rgba(30, 70, 35, 0.18),
+    0 8px 24px rgba(30, 70, 35, 0.06);
+}
+
+/* ── Brand ─────────────────────────────────────────────────── */
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.auth-brand img {
+  width: 112px;
+  height: 112px;
+  display: block;
+  margin: 0 auto 0.75rem;
+  object-fit: contain;
+  mix-blend-mode: multiply; /* drop the jpg's white box onto the card */
+}
+
+.auth-wordmark {
+  margin: 0;
+  font-size: 2.7rem;
+  line-height: 1.1;
+  font-weight: 800;
+  font-variant: small-caps;
+  letter-spacing: 0.01em;
+  color: #0f3b24;
+}
+
+.auth-wordmark span {
+  color: #3a9a1d;
+}
+
+.auth-tagline {
+  margin: 0.25rem 0 0;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: #2f4a44;
+}
+
+.auth-heading {
+  margin: 0 0 0.375rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #10261a;
+  text-align: center;
+}
+
+.auth-subheading {
+  margin: 0 0 1.5rem;
+  font-size: 0.9rem;
+  color: #5b6f61;
+  text-align: center;
+}
+
+/* ── Fields ────────────────────────────────────────────────── */
+
+.auth-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  background: #f8faf9;
+  border: 1px solid #e2e8e5;
+  border-radius: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.auth-field:focus-within {
+  background: #fff;
+  border-color: #6aaa4f;
+  box-shadow: 0 0 0 3px rgba(58, 154, 29, 0.14);
+}
+
+.auth-field > svg {
+  flex: none;
+  margin-left: 1.1rem;
+  color: #5d6f6b;
+}
+
+.auth-field input {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  padding: 0 1rem 0 0.9rem;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.95rem;
+  color: #10261a;
+}
+
+.auth-field input::placeholder {
+  color: #7b8a86;
+}
+
+.auth-eye {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-right: 0.35rem;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #5d6f6b;
+  cursor: pointer;
+}
+
+.auth-eye:focus-visible {
+  outline: 2px solid #3a9a1d;
+}
+
+/* ── Links / messages ──────────────────────────────────────── */
+
+.auth-row-end {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.25rem 0 1.25rem;
+}
+
+.auth-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #2d8a1a;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+  filter: none;
+}
+
+.auth-link:active {
+  transform: none;
+}
+
+.auth-back {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.auth-msg {
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.auth-msg--error {
+  background: #fdecea;
+  border: 1px solid #f7c9c4;
+  color: #b42318;
+}
+
+.auth-msg--success {
+  background: #eaf5e4;
+  border: 1px solid #cde6c1;
+  color: #1f5a1d;
+}
+
+/* ── Primary button ────────────────────────────────────────── */
+
+.auth-submit {
+  position: relative;
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  height: 80px;
+  background: linear-gradient(90deg, #0f5a35 0%, #1f6f33 45%, #3c9d25 100%);
+  box-shadow: 0 14px 28px -10px rgba(40, 130, 40, 0.55);
+  color: #fff;
+  font: inherit;
+  font-size: 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-submit:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.auth-submit-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 2.5rem 1.25rem;
+    border-radius: 20px;
+  }
+  .auth-wordmark { font-size: 2.1rem; }
+  .auth-tagline  { font-size: 1.05rem; }
+  .auth-submit   { height: 64px; font-size: 1.25rem; }
+  .auth-submit-arrow { width: 42px; height: 42px; }
+  .auth-brand img { width: 88px; height: 88px; }
+}
