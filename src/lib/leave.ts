@@ -1,4 +1,4 @@
-import type { LeaveTypeCode } from '../types'
+import type { LeaveRequest, LeaveTypeCode } from '../types'
 
 export const LEAVE_TYPE_LABELS: Record<LeaveTypeCode, string> = {
   casual: 'Casual',
@@ -38,4 +38,19 @@ export function workingDays(start: string, end: string, half: boolean, holidays:
     d.setDate(d.getDate() + 1)
   }
   return half ? n * 0.5 : n
+}
+
+type Span = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session'>
+
+/**
+ * A pending or approved request that already covers any of these dates, or undefined.
+ * The other half of a half day is allowed. Mirrors check_leave_overlap() in migration 015.
+ */
+export function findLeaveClash(existing: (Span & Pick<LeaveRequest, 'status'>)[], wanted: Span) {
+  return existing.find(r =>
+    (r.status === 'pending' || r.status === 'approved') &&
+    r.start_date <= wanted.end_date &&
+    r.end_date >= wanted.start_date &&
+    !(r.duration === 'half' && wanted.duration === 'half' && r.half_day_session !== wanted.half_day_session),
+  )
 }

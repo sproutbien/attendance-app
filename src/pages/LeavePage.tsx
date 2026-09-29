@@ -6,7 +6,7 @@ import type { HalfDaySession, LeaveRequest, LeaveTypeCode } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { useHolidayDates, useLeaveBalances } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
-import { LEAVE_TYPE_LABELS, daysLabel, fmtDays, workingDays } from '../lib/leave'
+import { LEAVE_TYPE_LABELS, daysLabel, findLeaveClash, fmtDays, workingDays } from '../lib/leave'
 import { localDate } from '../lib/calendar'
 import { SESSION_LABELS, canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 
@@ -51,6 +51,10 @@ export default function LeavePage() {
       setFormError(blocked)
       return
     }
+    if (clashMessage) {
+      setFormError(clashMessage)
+      return
+    }
     const ok = await submit({
       start_date: startDate,
       end_date: half ? startDate : endDate,
@@ -84,6 +88,20 @@ export default function LeavePage() {
   const available = typeBalance?.available ?? null
   const estPaid = requested == null ? 0 : leaveType === 'lop' ? 0 : Math.min(requested, Math.max(0, Math.floor((available ?? 0) * 2) / 2))
   const estLop = requested == null ? 0 : requested - estPaid
+
+  // Days that already have pending or approved leave can't be requested again
+  const clash = startDate && rangeEnd && rangeEnd >= startDate
+    ? findLeaveClash(requests, { start_date: startDate, end_date: rangeEnd, duration, half_day_session: isHalf ? session : null })
+    : undefined
+  const clashMessage = clash
+    ? `You already have ${clash.status} leave for ${fmtSpan(clash)}. Cancel it first if you want to change it.`
+    : null
+  const formBlock = clashMessage ?? sameDayBlock
+  // Upcoming booked days, so they know what to avoid
+  const booked = requests
+    .filter(r => (r.status === 'pending' || r.status === 'approved') && r.end_date >= today)
+    .sort((a, b) => a.start_date.localeCompare(b.start_date))
+    .slice(0, 6)
 
   return (
     <AppLayout>
@@ -225,9 +243,17 @@ export default function LeavePage() {
             />
           </div>
 
-          {sameDayBlock && !formError && (
+          {booked.length > 0 && (
+            <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
+              Already booked: {booked.map((r, i) => (
+                <span key={r.id}>{i > 0 && ', '}{fmtSpan(r)} ({r.status})</span>
+              ))}
+            </p>
+          )}
+
+          {formBlock && !formError && (
             <div style={alertStyle('#fffbeb', '#fde68a', '#92400e')}>
-              {sameDayBlock}
+              {formBlock}
             </div>
           )}
 
@@ -245,16 +271,16 @@ export default function LeavePage() {
 
           <button
             type="submit"
-            disabled={submitting || !!sameDayBlock}
+            disabled={submitting || !!formBlock}
             style={{
               padding: '0.625rem 1.5rem',
-              background: submitting || sameDayBlock ? '#86efac' : '#16a34a',
+              background: submitting || formBlock ? '#86efac' : '#16a34a',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
               fontWeight: 600,
               fontSize: '0.9375rem',
-              cursor: submitting || sameDayBlock ? 'not-allowed' : 'pointer',
+              cursor: submitting || formBlock ? 'not-allowed' : 'pointer',
             }}
           >
             {submitting ? 'Submitting…' : 'Submit Request'}
@@ -279,6 +305,13 @@ export default function LeavePage() {
       </div>
     </AppLayout>
   )
+}
+
+/** "3 Oct" / "3 Oct (morning half)" / "10 Oct – 12 Oct" */
+function fmtSpan(r: Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session'>) {
+  const day = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  if (r.start_date !== r.end_date) return `${day(r.start_date)} – ${day(r.end_date)}`
+  return r.duration === 'half' && r.half_day_session ? `${day(r.start_date)} (${r.half_day_session} half)` : day(r.start_date)
 }
 
 function fmtDeadline(d: Date) {
