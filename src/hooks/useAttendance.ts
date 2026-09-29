@@ -4,8 +4,18 @@ import type { AttendanceRecord } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { totalBreakSeconds } from '../lib/breaks'
 import { currentYearMonth, daysInMonth, localDate } from '../lib/calendar'
+import { halfDaySplit } from '../lib/halfDay'
 
 const LATE_THRESHOLD_HOUR = 9
+
+/** Late after 9 AM normally; after 1:30 PM when the morning is half-day leave. */
+function checkInStatus(now: Date, rec: AttendanceRecord | null) {
+  if (rec?.half_day_session === 'morning') {
+    const lateFrom = halfDaySplit(localDate(now)).getTime() + 60_000  // 1:30 PM itself is on time
+    return now.getTime() < lateFrom ? 'present' : 'late'
+  }
+  return now.getHours() < LATE_THRESHOLD_HOUR ? 'present' : 'late'
+}
 
 // Local calendar date, so an early-morning check-in in IST isn't filed under yesterday (UTC)
 const todayISO = () => localDate()
@@ -53,10 +63,10 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     setIsSubmitting(true)
     setError(null)
     const now = new Date()
-    const fields = {
+    const fields = (rec: AttendanceRecord | null) => ({
       check_in_time: now.toISOString(),
-      status: now.getHours() < LATE_THRESHOLD_HOUR ? 'present' : 'late',
-    } as const
+      status: checkInStatus(now, rec),
+    })
 
     // A row for today may already exist (approved leave, admin entry, another tab),
     // so fill that row in instead of inserting a duplicate.
@@ -71,7 +81,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
       if (existing.check_in_time) return { data: existing, error: null }
       return supabase
         .from('attendance_records')
-        .update(fields)
+        .update(fields(existing))
         .eq('id', existing.id)
         .select()
         .single()
@@ -81,7 +91,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     if (!result.error && !result.data) {
       result = await supabase
         .from('attendance_records')
-        .insert({ employee_id: employee.id, date: todayISO(), ...fields })
+        .insert({ employee_id: employee.id, date: todayISO(), ...fields(null) })
         .select()
         .single()
       // Lost a race with another insert for today — use that row instead
@@ -124,9 +134,9 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     }
   }
 
-  function checkOut() {
-    const now = new Date()
-    return updateToday({ ...endBreakChanges(now), check_out_time: now.toISOString() })
+  /** `at` back-dates the check-out, e.g. to 1:30 PM for an afternoon half day. */
+  function checkOut(at = new Date()) {
+    return updateToday({ ...endBreakChanges(at), check_out_time: at.toISOString() })
   }
 
   function pauseBreak() {

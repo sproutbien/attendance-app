@@ -18,7 +18,7 @@ export function useLeaveQueue() {
     const { data } = await supabase
       .from('leave_requests')
       .select(`
-        id, employee_id, start_date, end_date, reason, status,
+        id, employee_id, start_date, end_date, duration, half_day_session, reason, status,
         requested_at, reviewed_by, reviewed_at,
         employee:employees!employee_id(full_name, department)
       `)

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import AppLayout from '../components/AppLayout'
 import { useLeaveRequests } from '../hooks/useLeaveRequests'
-import type { LeaveRequest } from '../types'
+import type { HalfDaySession, LeaveRequest } from '../types'
 import { localDate } from '../lib/calendar'
+import { SESSION_LABELS, leaveLength } from '../lib/halfDay'
 
 const STATUS_STYLES: Record<LeaveRequest['status'], { bg: string; text: string; label: string }> = {
   pending:  { bg: '#fef9c3', text: '#854d0e', label: 'Pending' },
@@ -15,15 +16,12 @@ function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function dayCount(start: string, end: string) {
-  const n = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1
-  return `${n} day${n !== 1 ? 's' : ''}`
-}
-
 export default function LeavePage() {
   const { requests, loading, submitting, error, submit } = useLeaveRequests()
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [duration, setDuration] = useState<LeaveRequest['duration']>('full')
+  const [session, setSession] = useState<HalfDaySession>('morning')
   const [reason, setReason] = useState('')
   const [success, setSuccess] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -34,11 +32,18 @@ export default function LeavePage() {
     e.preventDefault()
     setFormError(null)
     setSuccess(false)
-    if (endDate < startDate) {
+    const half = duration === 'half'
+    if (!half && endDate < startDate) {
       setFormError('End date must be on or after start date.')
       return
     }
-    const ok = await submit(startDate, endDate, reason.trim())
+    const ok = await submit({
+      start_date: startDate,
+      end_date: half ? startDate : endDate,
+      duration,
+      half_day_session: half ? session : null,
+      reason: reason.trim(),
+    })
     if (ok) {
       setStartDate('')
       setEndDate('')
@@ -47,7 +52,8 @@ export default function LeavePage() {
     }
   }
 
-  const showDayCount = startDate && endDate && endDate >= startDate
+  const isHalf = duration === 'half'
+  const showDayCount = !isHalf && startDate && endDate && endDate >= startDate
 
   return (
     <AppLayout>
@@ -57,6 +63,59 @@ export default function LeavePage() {
           Request Leave
         </h2>
         <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={labelStyle}>Leave type</label>
+            <div role="radiogroup" aria-label="Leave type" style={segmentWrap}>
+              {(['full', 'half'] as const).map(d => (
+                <button
+                  key={d}
+                  type="button"
+                  role="radio"
+                  aria-checked={duration === d}
+                  onClick={() => { setDuration(d); setSuccess(false) }}
+                  style={segmentBtn(duration === d)}
+                >
+                  {d === 'full' ? 'Full day' : 'Half day'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {isHalf ? (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={labelStyle}>Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  min={today}
+                  onChange={e => { setStartDate(e.target.value); setSuccess(false) }}
+                  required
+                  style={inputStyle}
+                />
+              </div>
+              <label style={labelStyle}>Session</label>
+              <div role="radiogroup" aria-label="Session" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.625rem' }}>
+                {(['morning', 'afternoon'] as const).map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    role="radio"
+                    aria-checked={session === s}
+                    onClick={() => { setSession(s); setSuccess(false) }}
+                    style={sessionCard(session === s)}
+                  >
+                    {SESSION_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+              <p style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
+                {session === 'morning'
+                  ? 'Once approved, Check In opens at 1:30 PM that day.'
+                  : 'Once approved, you’ll be checked out automatically at 1:30 PM that day.'}
+              </p>
+            </div>
+          ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: showDayCount ? '0.5rem' : '1rem' }}>
             <div>
               <label style={labelStyle}>Start date</label>
@@ -81,10 +140,11 @@ export default function LeavePage() {
               />
             </div>
           </div>
+          )}
 
           {showDayCount && (
             <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
-              {dayCount(startDate, endDate)}
+              {leaveLength({ start_date: startDate, end_date: endDate, duration, half_day_session: null })}
             </p>
           )}
 
@@ -167,7 +227,7 @@ function RequestRow({ r }: { r: LeaveRequest }) {
           {fmtDate(r.start_date)}
           {r.start_date !== r.end_date && <> – {fmtDate(r.end_date)}</>}
           <span style={{ fontWeight: 400, color: 'var(--text-faint, #94a3b8)', fontSize: '0.8125rem', marginLeft: 8 }}>
-            {dayCount(r.start_date, r.end_date)}
+            {leaveLength(r)}
           </span>
         </div>
         <div style={{
@@ -208,6 +268,42 @@ function alertStyle(bg: string, border: string, color: string): CSSProperties {
     borderRadius: 8,
     color,
     fontSize: '0.875rem',
+  }
+}
+
+const segmentWrap: CSSProperties = {
+  display: 'inline-flex',
+  padding: 3,
+  borderRadius: 10,
+  background: 'var(--surface-soft, #f1f5f9)',
+  border: '1px solid var(--border, #e2e8f0)',
+}
+
+function segmentBtn(active: boolean): CSSProperties {
+  return {
+    padding: '0.5rem 1.25rem',
+    border: 'none',
+    borderRadius: 8,
+    background: active ? 'var(--surface, #fff)' : 'transparent',
+    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
+    color: active ? 'var(--green-dark, #166534)' : 'var(--text-muted, #64748b)',
+    fontWeight: active ? 700 : 500,
+    fontSize: '0.9rem',
+    cursor: 'pointer',
+  }
+}
+
+function sessionCard(active: boolean): CSSProperties {
+  return {
+    padding: '0.75rem 0.875rem',
+    textAlign: 'left',
+    borderRadius: 10,
+    border: active ? '2px solid #16a34a' : '1px solid var(--border, #d1d5db)',
+    background: active ? 'var(--green-soft, #f0fdf4)' : 'var(--surface, #fff)',
+    color: 'var(--text-strong, #1e293b)',
+    fontWeight: active ? 600 : 500,
+    fontSize: '0.9rem',
+    cursor: 'pointer',
   }
 }
 

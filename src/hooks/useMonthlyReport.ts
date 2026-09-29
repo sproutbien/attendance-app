@@ -65,7 +65,7 @@ export function useMonthlyReport(yearMonth: string) {
           .order('full_name'),
         supabase
           .from('attendance_records')
-          .select('employee_id, status')
+          .select('employee_id, status, half_day_session')
           .gte('date', start)
           .lte('date', end),
         supabase
@@ -89,9 +89,13 @@ export function useMonthlyReport(yearMonth: string) {
       for (const r of records ?? []) {
         if (!tally.has(r.employee_id)) tally.set(r.employee_id, { present: 0, late: 0, on_leave: 0 })
         const t = tally.get(r.employee_id)!
-        if (r.status === 'present')  t.present++
-        if (r.status === 'late')     t.late++
-        if (r.status === 'on_leave') t.on_leave++
+        // Half-day leave: 0.5 leave + 0.5 of whatever they did with the other half
+        // (present/late if they checked in; otherwise it falls through to absent)
+        const w = r.half_day_session ? 0.5 : 1
+        if (r.half_day_session)      t.on_leave += 0.5
+        if (r.status === 'present')  t.present += w
+        if (r.status === 'late')     t.late += w
+        if (r.status === 'on_leave') t.on_leave += r.half_day_session ? 0 : 1
       }
 
       const result: EmployeeSummary[] = (employees ?? []).map(emp => {

@@ -159,7 +159,7 @@ export default function AdminReportsPage() {
       <div style={{ background: '#fff', borderRadius: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', padding: '1rem 1.25rem', marginBottom: '1.25rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>Attendance calendar</h2>
-          <CalendarLegend marks={['leave', 'leave_pending', 'holiday', 'present', 'late', 'absent', 'sunday']} />
+          <CalendarLegend marks={['leave', 'half_leave', 'leave_pending', 'holiday', 'present', 'late', 'absent', 'sunday']} />
         </div>
         {error || calendar.error ? (
           <div style={{ padding: '1rem 0', color: '#ef4444' }}>{error ?? calendar.error}</div>

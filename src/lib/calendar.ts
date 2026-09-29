@@ -46,11 +46,12 @@ export function suggestedWorkingDays(yearMonth: string, holidayDates: Iterable<s
 
 // ── Day marks ─────────────────────────────────────────────────
 
-export type DayMark = 'holiday' | 'leave' | 'leave_pending' | 'present' | 'late' | 'absent' | 'sunday' | 'none'
+export type DayMark = 'holiday' | 'leave' | 'half_leave' | 'leave_pending' | 'present' | 'late' | 'absent' | 'sunday' | 'none'
 
 export const MARK_STYLES: Record<DayMark, { bg: string; text: string; border?: string; code: string; label: string }> = {
   holiday:       { bg: '#2563eb', text: '#fff',    code: 'H',  label: 'Public holiday' },
   leave:         { bg: '#dc2626', text: '#fff',    code: 'LV', label: 'Leave' },
+  half_leave:    { bg: '#fecaca', text: '#991b1b', code: 'HD', label: 'Half-day leave' },
   leave_pending: { bg: '#fee2e2', text: '#b91c1c', border: '1px dashed #dc2626', code: 'LV', label: 'Leave (pending)' },
   present:       { bg: '#dcfce7', text: '#166534', code: 'P',  label: 'Present' },
   late:          { bg: '#fef3c7', text: '#92400e', code: 'L',  label: 'Late' },
@@ -61,7 +62,7 @@ export const MARK_STYLES: Record<DayMark, { bg: string; text: string; border?: s
 
 /**
  * What a single employee-day shows. Precedence:
- * holiday → approved leave → pending leave → present/late/absent record → Sunday → absent (past working days only)
+ * holiday → approved half-day leave → approved leave → pending leave → present/late/absent record → Sunday → absent (past working days only)
  */
 export function resolveMark(
   date: string,
@@ -70,9 +71,11 @@ export function resolveMark(
     holiday: boolean
     attendance?: AttendanceRecord['status']
     leave?: 'approved' | 'pending'
+    halfDay?: boolean   // approved half-day leave on this date
   },
 ): DayMark {
   if (opts.holiday) return 'holiday'
+  if (opts.halfDay) return 'half_leave'
   if (opts.leave === 'approved' || opts.attendance === 'on_leave') return 'leave'
   if (opts.leave === 'pending') return 'leave_pending'
   if (opts.attendance === 'present') return 'present'

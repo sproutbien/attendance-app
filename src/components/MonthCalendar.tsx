@@ -70,7 +70,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 // Short tag shown inside a day cell (cells are narrow on the employee layout)
 const CELL_TAGS: Record<DayMark, string> = {
-  holiday: 'HOLIDAY', leave: 'LEAVE', leave_pending: 'PENDING',
+  holiday: 'HOLIDAY', leave: 'LEAVE', half_leave: 'HALF DAY', leave_pending: 'PENDING',
   present: 'PRESENT', late: 'LATE', absent: 'ABSENT', sunday: '', none: '',
 }
 

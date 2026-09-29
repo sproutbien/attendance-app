@@ -4,7 +4,7 @@ import AppLayout from '../components/AppLayout'
 import { MonthGrid, MonthPicker, CalendarLegend } from '../components/MonthCalendar'
 import { useAuth } from '../contexts/AuthContext'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
-import { MARK_STYLES, currentYearMonth, monthDates } from '../lib/calendar'
+import { MARK_STYLES, currentYearMonth, localDate, monthDates } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
 
 const COUNTED: DayMark[] = ['present', 'late', 'leave', 'leave_pending', 'holiday', 'absent']
@@ -12,14 +12,21 @@ const COUNTED: DayMark[] = ['present', 'late', 'leave', 'leave_pending', 'holida
 export default function ReportsPage() {
   const { employee } = useAuth()
   const [yearMonth, setYearMonth] = useState(currentYearMonth())
-  const { holidays, markFor, loading, error } = useMonthCalendar(yearMonth, employee?.id)
+  const { holidays, markFor, statusFor, loading, error } = useMonthCalendar(yearMonth, employee?.id)
 
   const myMark = (date: string) => markFor(employee!.id, date)
   const counts = new Map<DayMark, number>()
+  const add = (m: DayMark, n: number) => counts.set(m, (counts.get(m) ?? 0) + n)
   if (!loading && employee) {
+    const today = localDate()
     for (const d of monthDates(yearMonth)) {
       const m = myMark(d)
-      counts.set(m, (counts.get(m) ?? 0) + 1)
+      if (m !== 'half_leave') { add(m, 1); continue }
+      // Half-day leave: half leave, half whatever happened in the other session
+      add('leave', 0.5)
+      const status = statusFor(employee.id, d)
+      if (status === 'present' || status === 'late') add(status, 0.5)
+      else if (d < today) add('absent', 0.5)
     }
   }
 
@@ -40,7 +47,7 @@ export default function ReportsPage() {
             <MonthGrid yearMonth={yearMonth} markFor={myMark} noteFor={d => holidays.get(d)} />
 
             <div style={{ marginTop: '1rem' }}>
-              <CalendarLegend marks={['leave', 'leave_pending', 'holiday', 'present', 'late', 'absent', 'sunday']} />
+              <CalendarLegend marks={['leave', 'half_leave', 'leave_pending', 'holiday', 'present', 'late', 'absent', 'sunday']} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem', marginTop: '1.25rem' }}>

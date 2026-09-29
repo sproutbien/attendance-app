@@ -31,7 +31,10 @@ function dateRange(start: string, end: string) {
   return start === end ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`
 }
 
-function dayCount(start: string, end: string) {
+const SESSIONS: Record<string, string> = { morning: 'Morning, 9:30 AM – 1:30 PM', afternoon: 'Afternoon, 1:30 PM – 5:30 PM' }
+
+function dayCount(start: string, end: string, halfDaySession: string | null) {
+  if (halfDaySession) return 'Half day'
   const n = Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1
   return `${n} day${n !== 1 ? 's' : ''}`
 }
@@ -85,7 +88,7 @@ Deno.serve(async req => {
   // Re-read the row — never trust request contents for what gets sent
   const { data: leave, error } = await supabase
     .from('leave_requests')
-    .select('start_date, end_date, reason, status, employee:employees!employee_id(full_name, department, phone)')
+    .select('start_date, end_date, half_day_session, reason, status, employee:employees!employee_id(full_name, department, phone)')
     .eq('id', leaveId)
     .maybeSingle()
 
@@ -95,7 +98,8 @@ Deno.serve(async req => {
   }
 
   const employee = leave.employee as unknown as { full_name: string; department: string | null; phone: string | null }
-  const dates = dateRange(leave.start_date, leave.end_date)
+  const dates = dateRange(leave.start_date, leave.end_date) +
+    (leave.half_day_session ? ` (${SESSIONS[leave.half_day_session]})` : '')
 
   try {
     if (event === 'leave_submitted') {
@@ -107,7 +111,7 @@ Deno.serve(async req => {
         param(employee.full_name),
         param(employee.department),
         param(dates),
-        param(dayCount(leave.start_date, leave.end_date)),
+        param(dayCount(leave.start_date, leave.end_date, leave.half_day_session)),
         param(leave.reason, 300),
       ])))
     } else if (event === 'leave_reviewed' && (leave.status === 'approved' || leave.status === 'rejected')) {

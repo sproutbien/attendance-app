@@ -11,6 +11,8 @@ export type Employee = {
   created_at: string
 }
 
+export type HalfDaySession = 'morning' | 'afternoon'
+
 export type AttendanceRecord = {
   id: string
   employee_id: string
@@ -20,6 +22,7 @@ export type AttendanceRecord = {
   break_started_at: string | null  // set while on a break
   break_seconds: number            // total of finished breaks that day
   status: 'present' | 'absent' | 'late' | 'on_leave'
+  half_day_session: HalfDaySession | null  // set when half of this day is approved leave
   notes: string | null
 }
 
@@ -35,6 +38,8 @@ export type LeaveRequest = {
   employee_id: string
   start_date: string
   end_date: string
+  duration: 'full' | 'half'
+  half_day_session: HalfDaySession | null  // only for half days (start_date = end_date)
   reason: string
   status: 'pending' | 'approved' | 'rejected'
   requested_at: string

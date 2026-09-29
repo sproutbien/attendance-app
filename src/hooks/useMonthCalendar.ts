@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { AttendanceRecord } from '../types'
+import type { AttendanceRecord, HalfDaySession } from '../types'
 import { daysInMonth, localDate, monthDates, resolveMark } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
 
 type MonthData = {
   holidays: Map<string, string>                                        // date → name
   attendance: Map<string, Map<string, AttendanceRecord['status']>>    // employee → date → status
-  leave: Map<string, Map<string, 'approved' | 'pending'>>             // employee → date → status
+  leave: Map<string, Map<string, 'approved' | 'pending'>>             // employee → date → status (full days, and pending half days)
+  halfDay: Map<string, Map<string, HalfDaySession>>                   // employee → date → approved half-day session
 }
 
-const EMPTY: MonthData = { holidays: new Map(), attendance: new Map(), leave: new Map() }
+const EMPTY: MonthData = { holidays: new Map(), attendance: new Map(), leave: new Map(), halfDay: new Map() }
 
 /**
  * Holidays, attendance and leave for one month.
@@ -38,7 +39,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
         .lte('date', end)
       let leaveQuery = supabase
         .from('leave_requests')
-        .select('employee_id, start_date, end_date, status')
+        .select('employee_id, start_date, end_date, status, duration, half_day_session')
         .in('status', ['approved', 'pending'])
         .lte('start_date', end)
         .gte('end_date', start)
@@ -71,8 +72,14 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
       }
 
       const leave: MonthData['leave'] = new Map()
+      const halfDay: MonthData['halfDay'] = new Map()
       const dates = monthDates(yearMonth)
       for (const l of leaves ?? []) {
+        if (l.duration === 'half' && l.status === 'approved') {
+          if (!halfDay.has(l.employee_id)) halfDay.set(l.employee_id, new Map())
+          halfDay.get(l.employee_id)!.set(l.start_date, l.half_day_session as HalfDaySession)
+          continue
+        }
         if (!leave.has(l.employee_id)) leave.set(l.employee_id, new Map())
         const byDate = leave.get(l.employee_id)!
         for (const d of dates) {
@@ -86,6 +93,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
         holidays: new Map((holidays ?? []).map(h => [h.date, h.name])),
         attendance,
         leave,
+        halfDay,
       })
       setLoading(false)
     }
@@ -98,7 +106,13 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
     holiday: data.holidays.has(date),
     attendance: data.attendance.get(empId)?.get(date),
     leave: data.leave.get(empId)?.get(date),
+    halfDay: data.halfDay.get(empId)?.has(date),
   }), [data])
 
-  return { holidays: data.holidays, leave: data.leave, markFor, loading, error }
+  const statusFor = useCallback(
+    (empId: string, date: string) => data.attendance.get(empId)?.get(date),
+    [data],
+  )
+
+  return { holidays: data.holidays, leave: data.leave, halfDay: data.halfDay, markFor, statusFor, loading, error }
 }

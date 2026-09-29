@@ -11,12 +11,13 @@ import { HeroLeaves, CornerLeaves } from '../components/Leaves'
 import { currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
 import { fmtClock, fmtHM, totalBreakSeconds, workedSeconds } from '../lib/breaks'
-import type { AttendanceRecord } from '../types'
+import { halfDaySplit } from '../lib/halfDay'
+import type { AttendanceRecord, HalfDaySession } from '../types'
 
 type DayState = 'loading' | 'idle' | 'working' | 'break' | 'done'
 
 const MARK_LABELS: Record<DayMark, string> = {
-  present: 'Present', late: 'Late', absent: 'Absent', leave: 'On Leave', leave_pending: 'Leave pending',
+  present: 'Present', late: 'Late', absent: 'Absent', leave: 'On Leave', half_leave: 'Half-day leave', leave_pending: 'Leave pending',
   holiday: 'Holiday', sunday: 'Weekly off', none: 'Not checked in',
 }
 
@@ -66,6 +67,18 @@ function useNow(active: boolean) {
   return now
 }
 
+/** True once `time` has passed; re-renders at that moment. */
+function usePassed(time: number | null) {
+  const [, rerender] = useState(0)
+  const passed = time != null && Date.now() >= time
+  useEffect(() => {
+    if (time == null || passed) return
+    const id = setTimeout(() => rerender(n => n + 1), time - Date.now() + 50)
+    return () => clearTimeout(id)
+  }, [time, passed])
+  return passed
+}
+
 export default function DashboardPage() {
   const { employee } = useAuth()
   const thisMonth = currentYearMonth()
@@ -80,6 +93,16 @@ export default function DashboardPage() {
     : todayRecord.break_started_at ? 'break'
     : 'working'
   const now = useNow(state === 'working' || state === 'break')
+
+  // Approved half-day leave today: morning → check-in opens at 1:30 PM,
+  // afternoon → auto check-out at 1:30 PM (the server job does this too if the app is closed)
+  const halfDay = todayRecord?.half_day_session ?? null
+  const split = halfDay ? halfDaySplit(localDate()).getTime() : null
+  const pastSplit = usePassed(split)
+  const clockedIn = state === 'working' || state === 'break'
+  useEffect(() => {
+    if (halfDay === 'afternoon' && clockedIn && pastSplit && !isSubmitting) checkOut(new Date(split!))
+  }, [halfDay, clockedIn, pastSplit])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const firstName = employee?.full_name.split(' ')[0] ?? ''
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -107,8 +130,10 @@ export default function DashboardPage() {
             state={state}
             record={todayRecord ?? null}
             isSubmitting={isSubmitting}
+            halfDay={halfDay}
+            pastSplit={pastSplit}
             onCheckIn={checkIn}
-            onCheckOut={checkOut}
+            onCheckOut={() => checkOut()}
           />
           <TodayTime
             state={state}
@@ -136,10 +161,12 @@ export default function DashboardPage() {
 
 // ── Check-in panel (left) ─────────────────────────────────────
 
-function CheckInPanel({ state, record, isSubmitting, onCheckIn, onCheckOut }: {
+function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheckIn, onCheckOut }: {
   state: DayState
   record: AttendanceRecord | null
   isSubmitting: boolean
+  halfDay: HalfDaySession | null
+  pastSplit: boolean
   onCheckIn: () => void
   onCheckOut: () => void
 }) {
@@ -165,6 +192,7 @@ function CheckInPanel({ state, record, isSubmitting, onCheckIn, onCheckOut }: {
       </>
     )
     hint = state === 'break' ? 'Checking out will also end your break' : 'Tap to end your workday'
+    if (halfDay === 'afternoon') hint = 'Half-day leave this afternoon — you’ll be checked out automatically at 1:30 PM'
     body = (
       <button className="sb-bigbtn is-out" onClick={onCheckOut} disabled={isSubmitting}>
         <LogOut size={54} strokeWidth={2.2} />
@@ -172,12 +200,20 @@ function CheckInPanel({ state, record, isSubmitting, onCheckIn, onCheckOut }: {
       </button>
     )
   } else {
-    if (record?.status === 'on_leave') {
+    // Morning leave: locked until 1:30 PM. Afternoon leave: locked once 1:30 PM has passed.
+    const locked = (halfDay === 'morning' && !pastSplit) || (halfDay === 'afternoon' && pastSplit)
+    if (halfDay === 'morning') {
+      head = pastSplit ? 'Welcome back from your half day' : 'Half-day leave this morning'
+      hint = pastSplit ? 'Tap to start your afternoon' : 'Check In opens at 1:30 PM, when your leave ends'
+    } else if (halfDay === 'afternoon') {
+      head = pastSplit ? 'You’re on leave this afternoon' : 'Half-day leave this afternoon'
+      hint = pastSplit ? 'Enjoy your afternoon off' : 'You’ll be checked out automatically at 1:30 PM'
+    } else if (record?.status === 'on_leave') {
       head = 'You’re on leave today'
       hint = 'Check in only if you’re working today'
     }
     body = (
-      <button className="sb-bigbtn" onClick={onCheckIn} disabled={isSubmitting || state === 'loading'}>
+      <button className="sb-bigbtn" onClick={onCheckIn} disabled={isSubmitting || state === 'loading' || locked}>
         <CircleArrowRight size={62} strokeWidth={2.2} />
         {isSubmitting ? '…' : 'Check In'}
       </button>
@@ -286,14 +322,17 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
   const { rows, presentDays, workingDays } = useMemo(() => {
     const recMap = new Map(records.map(r => [r.date, r]))
     const leave = employeeId ? calendar.leave.get(employeeId) : undefined
+    const halfDay = employeeId ? calendar.halfDay.get(employeeId) : undefined
     const rows: LogRow[] = monthDates(yearMonth)
       .filter(d => d <= today)
       .reverse()
       .map(date => {
         const rec = recMap.get(date)
         const holiday = calendar.holidays.has(date)
-        // A real check-in wins over leave/holiday: they came in
-        const mark: DayMark = rec?.check_in_time
+        // A real check-in wins over full-day leave/holiday: they came in. Half days stay tagged.
+        const isHalf = !!rec?.half_day_session || !!halfDay?.has(date)
+        const mark: DayMark = isHalf ? 'half_leave'
+          : rec?.check_in_time
           ? (rec.status === 'late' ? 'late' : 'present')
           : resolveMark(date, today, { holiday, attendance: rec?.status, leave: leave?.get(date) })
         const complete = !!rec?.check_in_time && (!!rec.check_out_time || date === today)
@@ -305,14 +344,17 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
         }
       })
 
-    const presentDays = rows.filter(r => r.mark === 'present' || r.mark === 'late').length
+    // A half-day leave counts as half a day, both worked (if they checked in) and expected
+    const weight = (r: LogRow) => r.mark === 'half_leave' ? 0.5 : 1
+    const cameIn = (r: LogRow) => r.mark === 'present' || r.mark === 'late' || (r.mark === 'half_leave' && !!r.rec?.check_in_time)
+    const presentDays = rows.filter(cameIn).reduce((n, r) => n + weight(r), 0)
     // Days they were expected in: not Sunday / holiday / approved leave, and today only once checked in
     const workingDays = rows.filter(r =>
       !isSunday(r.date) && !calendar.holidays.has(r.date) && r.mark !== 'leave' &&
-      (r.date < today || r.mark === 'present' || r.mark === 'late'),
-    ).length
+      (r.date < today || cameIn(r)),
+    ).reduce((n, r) => n + weight(r), 0)
     return { rows, presentDays, workingDays }
-  }, [records, calendar.holidays, calendar.leave, employeeId, yearMonth, today, now])
+  }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now])
 
   const status = (r: LogRow) => (
     <span className={`sb-status s-${r.mark}`} title={r.note}>

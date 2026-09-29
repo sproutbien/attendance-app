@@ -2,14 +2,10 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useLeaveQueue } from '../../hooks/useLeaveQueue'
 import type { LeaveRequestWithEmployee } from '../../hooks/useLeaveQueue'
+import { leaveLength } from '../../lib/halfDay'
 
 function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function dayCount(start: string, end: string) {
-  const n = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1
-  return `${n} day${n !== 1 ? 's' : ''}`
 }
 
 const REVIEWED_STATUS_STYLES = {
@@ -137,7 +133,7 @@ function PendingCard({
           {fmtDate(r.start_date)}
           {r.start_date !== r.end_date && <> – {fmtDate(r.end_date)}</>}
           <span style={{ fontWeight: 400, color: '#94a3b8', fontSize: '0.8125rem', marginLeft: 8 }}>
-            {dayCount(r.start_date, r.end_date)}
+            {leaveLength(r)}
           </span>
         </div>
         <div style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '0.25rem' }}>{r.reason}</div>
@@ -201,7 +197,7 @@ function ReviewedRow({ request: r }: { request: LeaveRequestWithEmployee }) {
         <span style={{ fontWeight: 600, color: '#1e293b' }}>{r.employee.full_name}</span>
         <span style={{ color: '#94a3b8', fontSize: '0.8125rem', marginLeft: 8 }}>
           {fmtDate(r.start_date)}{r.start_date !== r.end_date ? ` – ${fmtDate(r.end_date)}` : ''}
-          {' · '}{dayCount(r.start_date, r.end_date)}
+          {' · '}{leaveLength(r)}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
