@@ -11,6 +11,7 @@ export type EmployeeFormData = {
   designation: string
   monthly_salary: number | null
   phone: string | null
+  joining_date: string | null
 }
 
 export function useEmployeeManagement() {
@@ -47,8 +48,8 @@ export function useEmployeeManagement() {
       return false
     }
     const designation = data.designation.trim() || null
-    if (newId && (data.monthly_salary != null || data.phone != null || designation != null)) {
-      await supabase.from('employees').update({ monthly_salary: data.monthly_salary, phone: data.phone, designation }).eq('id', newId)
+    if (newId && (data.monthly_salary != null || data.phone != null || designation != null || data.joining_date != null)) {
+      await supabase.from('employees').update({ monthly_salary: data.monthly_salary, phone: data.phone, designation, joining_date: data.joining_date }).eq('id', newId)
     }
     await fetchEmployees()
     setSaving(false)

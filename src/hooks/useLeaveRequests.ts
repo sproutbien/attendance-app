@@ -4,7 +4,7 @@ import type { LeaveRequest } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { localDate } from '../lib/calendar'
 
-export type NewLeave = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session' | 'reason'>
+export type NewLeave = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session' | 'leave_type' | 'reason'>
 
 export function useLeaveRequests() {
   const { employee } = useAuth()

@@ -62,6 +62,7 @@ export default function AdminEmployeesPage() {
         designation:    data.designation.trim() || null,
         monthly_salary: data.monthly_salary,
         phone:          data.phone,
+        joining_date:   data.joining_date,
       })
       if (ok) {
         setModal(null)
@@ -257,6 +258,7 @@ function EmployeeModal({ mode, designations, saving, error, onSave, onClose }: {
   const [salary,     setSalary]     = useState(existing?.monthly_salary != null ? String(existing.monthly_salary) : '')
   const [phone,      setPhone]      = useState(existing?.phone ? `+${existing.phone}` : '')
   const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [joiningDate, setJoiningDate] = useState(existing?.joining_date ?? '')
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -266,7 +268,7 @@ function EmployeeModal({ mode, designations, saving, error, onSave, onClose }: {
       return
     }
     setPhoneError(null)
-    onSave({ full_name: fullName, email, password, role, department, designation, monthly_salary: salary === '' ? null : Number(salary), phone: normalized })
+    onSave({ full_name: fullName, email, password, role, department, designation, monthly_salary: salary === '' ? null : Number(salary), phone: normalized, joining_date: joiningDate || null })
   }
 
   return (
@@ -352,6 +354,16 @@ function EmployeeModal({ mode, designations, saving, error, onSave, onClose }: {
               style={inputStyle}
             />
             <p style={hintStyle}>Used for payroll calculations on the Reports page.</p>
+          </Field>
+
+          <Field label="Joining date (optional)">
+            <input
+              type="date"
+              value={joiningDate}
+              onChange={e => setJoiningDate(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={hintStyle}>Paid leave is credited from this month. Leave empty for staff who joined before this leave year (1 April).</p>
           </Field>
 
           <Field label="WhatsApp number (optional)">

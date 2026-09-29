@@ -2,7 +2,11 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import AppLayout from '../components/AppLayout'
 import { useLeaveRequests } from '../hooks/useLeaveRequests'
-import type { HalfDaySession, LeaveRequest } from '../types'
+import type { HalfDaySession, LeaveRequest, LeaveTypeCode } from '../types'
+import { useAuth } from '../contexts/AuthContext'
+import { useHolidayDates, useLeaveBalances } from '../hooks/useLeaveBalances'
+import LeaveBalanceCards from '../components/LeaveBalanceCards'
+import { LEAVE_TYPE_LABELS, daysLabel, fmtDays, workingDays } from '../lib/leave'
 import { localDate } from '../lib/calendar'
 import { SESSION_LABELS, canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 
@@ -23,6 +27,9 @@ export default function LeavePage() {
   const [endDate, setEndDate] = useState('')
   const [duration, setDuration] = useState<LeaveRequest['duration']>('full')
   const [session, setSession] = useState<HalfDaySession>('morning')
+  const [leaveType, setLeaveType] = useState<LeaveTypeCode>('casual')
+  const { employee } = useAuth()
+  const current = useLeaveBalances(employee?.id)
   const [reason, setReason] = useState('')
   const [success, setSuccess] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -49,9 +56,11 @@ export default function LeavePage() {
       end_date: half ? startDate : endDate,
       duration,
       half_day_session: half ? session : null,
+      leave_type: leaveType,
       reason: reason.trim(),
     })
     if (ok) {
+      current.refresh()
       setStartDate('')
       setEndDate('')
       setReason('')
@@ -66,8 +75,20 @@ export default function LeavePage() {
   const sameDayBlock = startsToday ? sameDayLeaveBlock(duration, isHalf ? session : null, checkedInToday) : null
   const sessionBlocked = (s: HalfDaySession) => startsToday && sameDayLeaveBlock('half', s, checkedInToday) !== null
 
+  // Estimate how the request splits into paid days and Loss of Pay (the server decides on approval)
+  const rangeEnd = isHalf ? startDate : endDate
+  const holidays = useHolidayDates(startDate, rangeEnd)
+  const atStart = useLeaveBalances(employee?.id, startDate || undefined)
+  const requested = startDate && rangeEnd && rangeEnd >= startDate ? workingDays(startDate, rangeEnd, isHalf, holidays) : null
+  const typeBalance = atStart.balances.find(b => b.leave_type === leaveType)
+  const available = typeBalance?.available ?? null
+  const estPaid = requested == null ? 0 : leaveType === 'lop' ? 0 : Math.min(requested, Math.max(0, Math.floor((available ?? 0) * 2) / 2))
+  const estLop = requested == null ? 0 : requested - estPaid
+
   return (
     <AppLayout>
+      <LeaveBalanceCards balances={current.balances} loading={current.loading} error={current.error} />
+
       {/* Request form */}
       <div style={card}>
         <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-strong, #1e293b)' }}>
@@ -75,8 +96,26 @@ export default function LeavePage() {
         </h2>
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Leave type</label>
-            <div role="radiogroup" aria-label="Leave type" style={segmentWrap}>
+            <label style={labelStyle} htmlFor="leave-type">Leave type</label>
+            <select
+              id="leave-type"
+              value={leaveType}
+              onChange={e => { setLeaveType(e.target.value as LeaveTypeCode); setSuccess(false) }}
+              style={{ ...inputStyle, maxWidth: 320 }}
+            >
+              {current.balances.length === 0
+                ? (Object.keys(LEAVE_TYPE_LABELS) as LeaveTypeCode[]).map(c => <option key={c} value={c}>{LEAVE_TYPE_LABELS[c]}</option>)
+                : current.balances.map(b => (
+                  <option key={b.leave_type} value={b.leave_type}>
+                    {b.name}{b.is_paid ? ` (${fmtDays(b.available)} available)` : ' (unpaid)'}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={labelStyle}>Duration</label>
+            <div role="radiogroup" aria-label="Duration" style={segmentWrap}>
               {(['full', 'half'] as const).map(d => (
                 <button
                   key={d}
@@ -158,9 +197,19 @@ export default function LeavePage() {
           </div>
           )}
 
-          {showDayCount && (
+          {requested != null && (
             <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
-              {leaveLength({ start_date: startDate, end_date: endDate, duration, half_day_session: null })}
+              {requested === 0
+                ? 'These dates are all Sundays or holidays — no leave needed.'
+                : <>
+                    <b style={{ color: 'var(--text-strong, #1e293b)' }}>{daysLabel(requested)}</b>
+                    {!isHalf && showDayCount && ' (Sundays and holidays not counted)'}
+                    {leaveType === 'lop'
+                      ? ' · unpaid'
+                      : estLop > 0
+                        ? <> · {fmtDays(estPaid)} from {LEAVE_TYPE_LABELS[leaveType]}, <b style={{ color: 'var(--red, #b91c1c)' }}>{fmtDays(estLop)} as Loss of Pay</b> (balance {fmtDays(available)}; final split on approval)</>
+                        : <> · from {LEAVE_TYPE_LABELS[leaveType]} (balance {fmtDays(available)})</>}
+                  </>}
             </p>
           )}
 
@@ -265,7 +314,10 @@ function RequestRow({ r, onCancel }: { r: LeaveRequest; onCancel: () => Promise<
             {fmtDate(r.start_date)}
             {r.start_date !== r.end_date && <> – {fmtDate(r.end_date)}</>}
             <span style={{ fontWeight: 400, color: 'var(--text-faint, #94a3b8)', fontSize: '0.8125rem', marginLeft: 8 }}>
-              {leaveLength(r)}
+              {LEAVE_TYPE_LABELS[r.leave_type]} · {leaveLength(r)}
+              {r.status === 'approved' && r.lop_days != null && r.lop_days > 0 && (
+                <span style={{ color: 'var(--red, #b91c1c)' }}> · {fmtDays(r.paid_days)} paid, {fmtDays(r.lop_days)} LOP</span>
+              )}
             </span>
           </div>
           <div style={{

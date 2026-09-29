@@ -28,9 +28,9 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays:
   const hasPayroll = workingDays != null && summaries.some(s => s.employee.monthly_salary != null)
 
   const headers = [
-    'Employee', 'Email', 'Department', 'Total Days',
-    'Present', 'Late', 'Absent', 'On Leave',
-    ...(hasPayroll ? ['Gross Salary', 'Deduction', 'Net Pay'] : []),
+    'Employee', 'Email', 'Department', 'Working Days',
+    'Present', 'Late', 'Absent', 'On Leave', 'Paid Leave', 'LOP',
+    ...(hasPayroll ? ['Paid Days', 'Gross Salary', 'Deduction', 'Net Pay'] : []),
   ]
 
   const dataRows = summaries.map(s => [
@@ -42,7 +42,10 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays:
     s.late,
     s.absent,
     s.on_leave,
+    s.paid_leave,
+    s.lop,
     ...(hasPayroll ? [
+      s.paidDays ?? '',
       s.employee.monthly_salary ?? '',
       s.deduction != null ? s.deduction.toFixed(2) : '',
       s.netPay != null ? s.netPay.toFixed(2) : '',
@@ -218,12 +221,13 @@ export default function AdminReportsPage() {
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 <th style={thStyle}>Employee</th>
                 <th style={thStyle}>Department</th>
-                <th style={{ ...thStyle, textAlign: 'center' }}>Days</th>
+                <th style={{ ...thStyle, textAlign: 'center' }} title="Working days so far (Sundays and holidays excluded)">Work Days</th>
                 <th style={{ ...thStyle, textAlign: 'center', color: '#166534' }}>Present</th>
                 <th style={{ ...thStyle, textAlign: 'center', color: '#854d0e' }}>Late</th>
                 <th style={{ ...thStyle, textAlign: 'center', color: '#991b1b' }}>Absent</th>
                 <th style={{ ...thStyle, textAlign: 'center', color: '#5b21b6' }}>On Leave</th>
                 {hasPayroll && <>
+                  <th style={{ ...thStyle, textAlign: 'center', color: '#166534' }} title="Days worked plus paid leave">Paid Days</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#0369a1' }}>Gross</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#b91c1c' }}>Deduction</th>
                   <th style={{ ...thStyle, textAlign: 'right', color: '#166534' }}>Net Pay</th>
@@ -242,6 +246,7 @@ export default function AdminReportsPage() {
                 <TotalCell value={totals.absent}   color="#991b1b" bg="#fee2e2" />
                 <TotalCell value={totals.on_leave} color="#5b21b6" bg="#ede9fe" />
                 {hasPayroll && payTotals && <>
+                  <td style={{ ...tdStyle, textAlign: 'center', color: '#64748b' }}>—</td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#0369a1' }}>{fmt(payTotals.gross)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#b91c1c' }}>{fmt(payTotals.deduction)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#166534' }}>{fmt(payTotals.netPay)}</td>
@@ -254,8 +259,8 @@ export default function AdminReportsPage() {
 
       {!loading && summaries.length > 0 && (
         <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#94a3b8' }}>
-          "Days" = calendar days 1 to today (current month) or full month (past months).
-          Deduction = (Working Days − Days Present/Late) × Daily Rate. Absent and on-leave days are unpaid.
+          "Work Days" = working days (Sundays and public holidays excluded) from the 1st to today, or the full month for past months.
+          Paid Days = days worked + paid leave. Deduction = (Working Days − Paid Days) × Daily Rate, so absences and Loss of Pay are unpaid.
         </p>
       )}
     </div>
@@ -369,8 +374,11 @@ function SummaryRow({ summary: s, showPayroll }: { summary: EmployeeSummary; sho
       <StatCell value={s.present}  color="#166534" bg="#dcfce7" />
       <StatCell value={s.late}     color="#854d0e" bg="#fef9c3" />
       <StatCell value={s.absent}   color="#991b1b" bg="#fee2e2" dim={s.absent === 0} />
-      <StatCell value={s.on_leave} color="#5b21b6" bg="#ede9fe" dim={s.on_leave === 0} />
+      <StatCell value={s.on_leave} color="#5b21b6" bg="#ede9fe" dim={s.on_leave === 0} note={s.lop > 0 ? `${s.lop} LOP` : undefined} />
       {showPayroll && <>
+        <td style={{ ...tdStyle, textAlign: 'center', color: '#166534', fontWeight: 600 }}>
+          {s.paidDays != null ? s.paidDays : <span style={{ color: '#cbd5e1' }}>—</span>}
+        </td>
         <td style={{ ...tdStyle, textAlign: 'right', color: '#0369a1', fontWeight: 500 }}>
           {s.employee.monthly_salary != null ? fmt(s.employee.monthly_salary) : <span style={{ color: '#cbd5e1' }}>—</span>}
         </td>
@@ -385,7 +393,7 @@ function SummaryRow({ summary: s, showPayroll }: { summary: EmployeeSummary; sho
   )
 }
 
-function StatCell({ value, color, bg, dim }: { value: number; color: string; bg: string; dim?: boolean }) {
+function StatCell({ value, color, bg, dim, note }: { value: number; color: string; bg: string; dim?: boolean; note?: string }) {
   if (value === 0 || dim) {
     return <td style={{ ...tdStyle, textAlign: 'center', color: '#cbd5e1', fontWeight: 500 }}>{value}</td>
   }
@@ -398,6 +406,7 @@ function StatCell({ value, color, bg, dim }: { value: number; color: string; bg:
       }}>
         {value}
       </span>
+      {note && <div style={{ fontSize: '0.6875rem', color: '#b91c1c', marginTop: 2 }}>{note}</div>}
     </td>
   )
 }

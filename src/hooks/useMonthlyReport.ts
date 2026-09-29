@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Employee } from '../types'
+import { isSunday, monthDates } from '../lib/calendar'
 
 export type EmployeeSummary = {
   employee: Pick<Employee, 'id' | 'full_name' | 'email' | 'department' | 'monthly_salary'>
-  totalDays: number
+  totalDays: number      // working days so far (Sundays and public holidays excluded)
   present: number
   late: number
   on_leave: number
+  paid_leave: number     // part of on_leave covered by a paid leave balance
+  lop: number            // on_leave days that are unpaid (Loss of Pay)
   absent: number
+  paidUnits: number      // worked days + paid leave, before capping at working days
   paidDays: number | null
   deductedDays: number | null
   deduction: number | null
@@ -25,11 +29,12 @@ function monthDateRange(yearMonth: string): { start: string; end: string; totalD
   return { start, end, totalDays: lastDay }
 }
 
-function computePayroll(present: number, late: number, salary: number | null, wd: number | null) {
+/** paidUnits: days worked plus paid leave (each day capped at 1). */
+function computePayroll(paidUnits: number, salary: number | null, wd: number | null) {
   if (wd == null || salary == null) {
     return { paidDays: null, deductedDays: null, deduction: null, netPay: null }
   }
-  const paidDays = Math.min(present + late, wd)
+  const paidDays = Math.min(paidUnits, wd)
   const deductedDays = wd - paidDays
   const dailyRate = salary / wd
   const deduction = dailyRate * deductedDays
@@ -51,7 +56,7 @@ export function useMonthlyReport(yearMonth: string) {
       setLoading(true)
       setError(null)
 
-      const { start, end, totalDays } = monthDateRange(yearMonth)
+      const { start, end } = monthDateRange(yearMonth)
 
       const [
         { data: employees, error: empErr },
@@ -65,7 +70,7 @@ export function useMonthlyReport(yearMonth: string) {
           .order('full_name'),
         supabase
           .from('attendance_records')
-          .select('employee_id, status, half_day_session')
+          .select('employee_id, status, half_day_session, paid_leave')
           .gte('date', start)
           .lte('date', end),
         supabase
@@ -74,6 +79,10 @@ export function useMonthlyReport(yearMonth: string) {
           .eq('year_month', yearMonth)
           .maybeSingle(),
       ])
+      const { data: holidays } = await supabase.from('public_holidays').select('date').gte('date', start).lte('date', end)
+      const holidaySet = new Set((holidays ?? []).map(h => h.date))
+      // Working days so far this month: absent is counted against these, not calendar days
+      const totalDays = monthDates(yearMonth).filter(d => d >= start && d <= end && !isSunday(d) && !holidaySet.has(d)).length
 
       if (cancelled) return
       if (empErr || recErr || setErr) {
@@ -85,10 +94,16 @@ export function useMonthlyReport(yearMonth: string) {
       const wd = settings?.working_days ?? null
       setWorkingDays(wd)
 
-      const tally = new Map<string, { present: number; late: number; on_leave: number }>()
+      type Tally = { present: number; late: number; on_leave: number; paid_leave: number; paid_units: number }
+      const empty = (): Tally => ({ present: 0, late: 0, on_leave: 0, paid_leave: 0, paid_units: 0 })
+      const tally = new Map<string, Tally>()
       for (const r of records ?? []) {
-        if (!tally.has(r.employee_id)) tally.set(r.employee_id, { present: 0, late: 0, on_leave: 0 })
+        if (!tally.has(r.employee_id)) tally.set(r.employee_id, empty())
         const t = tally.get(r.employee_id)!
+        const paidLeave = Number(r.paid_leave ?? 0)
+        const worked = r.status === 'present' || r.status === 'late' ? (r.half_day_session ? 0.5 : 1) : 0
+        t.paid_leave += paidLeave
+        t.paid_units += Math.min(1, worked + paidLeave)
         // Half-day leave: 0.5 leave + 0.5 of whatever they did with the other half
         // (present/late if they checked in; otherwise it falls through to absent)
         const w = r.half_day_session ? 0.5 : 1
@@ -99,8 +114,8 @@ export function useMonthlyReport(yearMonth: string) {
       }
 
       const result: EmployeeSummary[] = (employees ?? []).map(emp => {
-        const t = tally.get(emp.id) ?? { present: 0, late: 0, on_leave: 0 }
-        const absent = totalDays - t.present - t.late - t.on_leave
+        const t = tally.get(emp.id) ?? empty()
+        const absent = Math.max(0, totalDays - t.present - t.late - t.on_leave)
         const salary = (emp.monthly_salary as number | null) ?? null
         return {
           employee: { id: emp.id, full_name: emp.full_name, email: emp.email, department: emp.department, monthly_salary: salary },
@@ -108,8 +123,11 @@ export function useMonthlyReport(yearMonth: string) {
           present: t.present,
           late: t.late,
           on_leave: t.on_leave,
+          paid_leave: t.paid_leave,
+          lop: Math.max(0, t.on_leave - t.paid_leave),
           absent,
-          ...computePayroll(t.present, t.late, salary, wd),
+          paidUnits: t.paid_units,
+          ...computePayroll(t.paid_units, salary, wd),
         }
       })
 
@@ -131,7 +149,7 @@ export function useMonthlyReport(yearMonth: string) {
     setWorkingDays(days)
     setSummaries(prev => prev.map(s => ({
       ...s,
-      ...computePayroll(s.present, s.late, s.employee.monthly_salary, days),
+      ...computePayroll(s.paidUnits, s.employee.monthly_salary, days),
     })))
     return null
   }, [yearMonth])

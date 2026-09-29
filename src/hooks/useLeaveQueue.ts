@@ -21,7 +21,7 @@ export function useLeaveQueue() {
     const { data } = await supabase
       .from('leave_requests')
       .select(`
-        id, employee_id, start_date, end_date, duration, half_day_session, reason, status,
+        id, employee_id, start_date, end_date, duration, half_day_session, leave_type, days, paid_days, lop_days, reason, status,
         requested_at, reviewed_by, reviewed_at,
         cancelled_at, cancelled_after_approval, cancel_seen_at,
         employee:employees!employee_id(full_name, department)
@@ -42,16 +42,17 @@ export function useLeaveQueue() {
       .update({ status, reviewed_by: admin.id, reviewed_at: new Date().toISOString() })
       .eq('id', id)
       .eq('status', 'pending')
-      .select('id')
+      .select('id, reviewed_at, days, paid_days, lop_days')
     if (!data?.length) {
       await fetchRequests()
       setActioning(prev => { const s = new Set(prev); s.delete(id); return s })
       return
     }
-    // Update local state so the UI reflects the change immediately
+    // Update local state so the UI reflects the change immediately (incl. the server's paid / LOP split)
+    const saved = data[0]
     setRequests(prev =>
       prev.map(r => r.id === id
-        ? { ...r, status, reviewed_by: admin.id, reviewed_at: new Date().toISOString() }
+        ? { ...r, ...saved, status, reviewed_by: admin.id }
         : r
       )
     )

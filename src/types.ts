@@ -8,6 +8,7 @@ export type Employee = {
   status: 'active' | 'inactive'
   monthly_salary: number | null
   phone: string | null            // WhatsApp number, digits with country code
+  joining_date: string | null     // leave accrues from this month; null = full year
   created_at: string
 }
 
@@ -23,6 +24,7 @@ export type AttendanceRecord = {
   break_seconds: number            // total of finished breaks that day
   status: 'present' | 'absent' | 'late' | 'on_leave'
   half_day_session: HalfDaySession | null  // set when half of this day is approved leave
+  paid_leave: number               // part of the day covered by paid leave (0, 0.5, 1)
   notes: string | null
 }
 
@@ -39,6 +41,10 @@ export type LeaveRequest = {
   start_date: string
   end_date: string
   duration: 'full' | 'half'
+  leave_type: LeaveTypeCode
+  days: number | null              // working days (Sundays/holidays excluded), set by the server
+  paid_days: number | null         // set on approval
+  lop_days: number | null          // set on approval: days beyond the balance
   half_day_session: HalfDaySession | null  // only for half days (start_date = end_date)
   reason: string
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'
@@ -73,4 +79,40 @@ export type AttendanceCorrection = {
   requested_at: string
   reviewed_by: string | null
   reviewed_at: string | null
+}
+
+export type LeaveTypeCode = 'casual' | 'sick' | 'earned' | 'lop'
+
+export type LeaveType = {
+  code: LeaveTypeCode
+  name: string
+  is_paid: boolean
+  yearly_quota: number
+  carry_forward_cap: number
+  sort_order: number
+}
+
+/** One row of leave_balances(): a type's balance in the current leave year. */
+export type LeaveBalance = {
+  leave_type: LeaveTypeCode
+  name: string
+  is_paid: boolean
+  yearly_quota: number
+  carried: number
+  accrued: number
+  adjusted: number
+  used: number
+  pending: number
+  available: number | null         // null for Loss of Pay
+}
+
+export type LeaveAdjustment = {
+  id: string
+  employee_id: string
+  leave_type: LeaveTypeCode
+  leave_year: number
+  days: number
+  reason: string
+  created_by: string | null
+  created_at: string
 }

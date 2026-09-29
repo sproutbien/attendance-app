@@ -3,6 +3,10 @@ import type { CSSProperties } from 'react'
 import { useLeaveQueue } from '../../hooks/useLeaveQueue'
 import type { LeaveRequestWithEmployee } from '../../hooks/useLeaveQueue'
 import { leaveLength } from '../../lib/halfDay'
+import { LEAVE_TYPE_LABELS, daysLabel, fmtDays } from '../../lib/leave'
+import { useLeaveBalances } from '../../hooks/useLeaveBalances'
+import AdminLeaveBalances from '../../components/AdminLeaveBalances'
+import LeaveTypeSettings from '../../components/LeaveTypeSettings'
 
 function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
@@ -31,6 +35,7 @@ export default function AdminLeavePage() {
   const { pending, history, newCancellations, loading, actioning, approve, reject, markCancellationsSeen } = useLeaveQueue()
   const [filter, setFilter] = useState<HistoryFilter>('all')
   const [search, setSearch] = useState('')
+  const [tab, setTab] = useState<'requests' | 'balances' | 'types'>('requests')
 
   const q = search.trim().toLowerCase()
   const shown = history.filter(r =>
@@ -38,13 +43,46 @@ export default function AdminLeavePage() {
     (!q || r.employee.full_name.toLowerCase().includes(q) || r.reason.toLowerCase().includes(q)),
   )
 
+  const tabs = (
+    <div role="tablist" style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.25rem', borderBottom: '1px solid #e2e8f0' }}>
+      {([['requests', 'Requests'], ['balances', 'Balances'], ['types', 'Leave types']] as const).map(([value, label]) => (
+        <button
+          key={value}
+          role="tab"
+          aria-selected={tab === value}
+          onClick={() => setTab(value)}
+          style={{
+            padding: '0.5rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
+            fontSize: '0.9375rem', fontWeight: tab === value ? 700 : 500,
+            color: tab === value ? '#166534' : '#64748b',
+            borderBottom: tab === value ? '2px solid #16a34a' : '2px solid transparent', marginBottom: -1,
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (tab !== 'requests') {
+    return (
+      <div>
+        <h1 style={{ margin: '0 0 1rem', fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Leave</h1>
+        {tabs}
+        {tab === 'balances' ? <AdminLeaveBalances /> : <LeaveTypeSettings />}
+      </div>
+    )
+  }
+
   return (
     <div>
+      <h1 style={{ margin: '0 0 1rem', fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Leave</h1>
+      {tabs}
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>
+        <h2 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 700, color: '#1e293b' }}>
           Leave Requests
-        </h1>
+        </h2>
         {!loading && pending.length > 0 && (
           <span style={{
             background: '#fef9c3',
@@ -212,6 +250,7 @@ function PendingCard({
             {leaveLength(r)}
           </span>
         </div>
+        <PendingBalanceLine request={r} />
         <div style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '0.25rem' }}>{r.reason}</div>
         <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
           Submitted {fmtDate(r.requested_at.slice(0, 10))}
@@ -257,6 +296,24 @@ function PendingCard({
   )
 }
 
+/** Type, working days and the employee's balance for it, with a warning if part will be LOP. */
+function PendingBalanceLine({ request: r }: { request: LeaveRequestWithEmployee }) {
+  const { balances, loading } = useLeaveBalances(r.employee_id, r.start_date)
+  const b = balances.find(x => x.leave_type === r.leave_type)
+  const days = r.days ?? 0
+  const available = b?.available ?? 0
+  const lop = r.leave_type === 'lop' ? days : Math.max(0, days - Math.max(0, Math.floor(available * 2) / 2))
+  return (
+    <div style={{ fontSize: '0.8125rem', color: '#475569', marginBottom: '0.25rem' }}>
+      <b>{LEAVE_TYPE_LABELS[r.leave_type]}</b> · {daysLabel(days)}
+      {r.leave_type !== 'lop' && !loading && b && <> · balance {fmtDays(b.available)}</>}
+      {!loading && lop > 0 && r.leave_type !== 'lop' && (
+        <span style={{ color: '#b91c1c', fontWeight: 600 }}> · {fmtDays(lop)} will be Loss of Pay</span>
+      )}
+    </div>
+  )
+}
+
 function HistoryRow({ request: r }: { request: LeaveRequestWithEmployee }) {
   const s = STATUS_STYLES[r.status]
   const decided = r.status === 'approved' || r.cancelled_after_approval ? 'Approved' : 'Rejected'
@@ -277,7 +334,12 @@ function HistoryRow({ request: r }: { request: LeaveRequestWithEmployee }) {
         </div>
         <div style={{ color: '#374151', fontSize: '0.875rem', fontWeight: 500, margin: '0.125rem 0' }}>
           {fmtDate(r.start_date)}{r.start_date !== r.end_date ? ` – ${fmtDate(r.end_date)}` : ''}
-          <span style={{ color: '#94a3b8', fontWeight: 400 }}>{' · '}{leaveLength(r)}</span>
+          <span style={{ color: '#94a3b8', fontWeight: 400 }}>{' · '}{LEAVE_TYPE_LABELS[r.leave_type]} · {leaveLength(r)}</span>
+          {r.status === 'approved' && r.paid_days != null && (
+            <span style={{ color: r.lop_days ? '#b91c1c' : '#94a3b8', fontWeight: 400 }}>
+              {' · '}{fmtDays(r.paid_days)} paid{r.lop_days ? `, ${fmtDays(r.lop_days)} LOP` : ''}
+            </span>
+          )}
         </div>
         <div style={{ color: '#64748b', fontSize: '0.875rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
           <span style={{ color: '#94a3b8' }}>Reason: </span>{r.reason}
