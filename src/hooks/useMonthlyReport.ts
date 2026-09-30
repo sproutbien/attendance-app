@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Employee } from '../types'
-import { isSunday, monthDates } from '../lib/calendar'
+import { TRACKING_START, isSunday, monthDates } from '../lib/calendar'
 
 export type EmployeeSummary = {
   employee: Pick<Employee, 'id' | 'full_name' | 'email' | 'department' | 'monthly_salary'>
@@ -81,8 +81,8 @@ export function useMonthlyReport(yearMonth: string) {
       ])
       const { data: holidays } = await supabase.from('public_holidays').select('date').gte('date', start).lte('date', end)
       const holidaySet = new Set((holidays ?? []).map(h => h.date))
-      // Working days so far this month: absent is counted against these, not calendar days
-      const totalDays = monthDates(yearMonth).filter(d => d >= start && d <= end && !isSunday(d) && !holidaySet.has(d)).length
+      // Working days so far this month (from TRACKING_START): absent is counted against these, not calendar days
+      const totalDays = monthDates(yearMonth).filter(d => d >= start && d >= TRACKING_START && d <= end && !isSunday(d) && !holidaySet.has(d)).length
 
       if (cancelled) return
       if (empErr || recErr || setErr) {

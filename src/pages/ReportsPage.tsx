@@ -4,7 +4,7 @@ import AppLayout from '../components/AppLayout'
 import { MonthGrid, MonthPicker, CalendarLegend } from '../components/MonthCalendar'
 import { useAuth } from '../contexts/AuthContext'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
-import { MARK_STYLES, currentYearMonth, localDate, monthDates } from '../lib/calendar'
+import { MARK_STYLES, TRACKING_START, currentYearMonth, localDate, monthDates } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
 
 const COUNTED: DayMark[] = ['present', 'late', 'leave', 'leave_pending', 'holiday', 'absent']
@@ -26,7 +26,7 @@ export default function ReportsPage() {
       add('leave', 0.5)
       const status = statusFor(employee.id, d)
       if (status === 'present' || status === 'late') add(status, 0.5)
-      else if (d < today) add('absent', 0.5)
+      else if (d < today && d >= TRACKING_START) add('absent', 0.5)
     }
   }
 

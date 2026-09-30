@@ -2,6 +2,12 @@ import type { AttendanceRecord } from '../types'
 
 // ── Date helpers (local time, "YYYY-MM" / "YYYY-MM-DD" strings) ──
 
+/**
+ * First day attendance is tracked (data was reset before this). Earlier days with no
+ * check-in show blank instead of Absent and don't count as absent in reports.
+ */
+export const TRACKING_START = '2026-10-01'
+
 export function localDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -62,7 +68,7 @@ export const MARK_STYLES: Record<DayMark, { bg: string; text: string; border?: s
 
 /**
  * What a single employee-day shows. Precedence:
- * holiday → approved half-day leave → approved leave → pending leave → present/late/absent record → Sunday → absent (past working days only)
+ * holiday → approved half-day leave → approved leave → pending leave → present/late/absent record → Sunday → absent (past working days since TRACKING_START only)
  */
 export function resolveMark(
   date: string,
@@ -82,6 +88,6 @@ export function resolveMark(
   if (opts.attendance === 'late') return 'late'
   if (opts.attendance === 'absent') return 'absent'
   if (isSunday(date)) return 'sunday'
-  if (date < today) return 'absent'
+  if (date < today && date >= TRACKING_START) return 'absent'
   return 'none'
 }

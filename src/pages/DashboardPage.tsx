@@ -12,7 +12,7 @@ import MyCorrections from '../components/MyCorrections'
 import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import AppLayout from '../components/AppLayout'
-import { currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
+import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
 import { fmtClock, fmtHM, totalBreakSeconds, workedSeconds } from '../lib/breaks'
 import { halfDaySplit } from '../lib/halfDay'
@@ -393,7 +393,7 @@ function useMonthLog(
     const leave = employeeId ? calendar.leave.get(employeeId) : undefined
     const halfDay = employeeId ? calendar.halfDay.get(employeeId) : undefined
     const rows: LogRow[] = monthDates(yearMonth)
-      .filter(d => d <= today)
+      .filter(d => d <= today && (d >= TRACKING_START || recMap.has(d)))
       .reverse()
       .map(date => {
         const rec = recMap.get(date)
@@ -417,10 +417,11 @@ function useMonthLog(
     const weight = (r: LogRow) => r.mark === 'half_leave' ? 0.5 : 1
     const cameIn = (r: LogRow) => r.mark === 'present' || r.mark === 'late' || (r.mark === 'half_leave' && !!r.rec?.check_in_time)
     const presentDays = rows.filter(cameIn).reduce((n, r) => n + weight(r), 0)
-    // Days they were expected in: not Sunday / holiday / approved leave, and today only once checked in
+    // Days they were expected in: not Sunday / holiday / approved leave, tracked past days,
+    // and today (or an untracked day) only once checked in
     const workingDays = rows.filter(r =>
       !isSunday(r.date) && !calendar.holidays.has(r.date) && r.mark !== 'leave' &&
-      (r.date < today || cameIn(r)),
+      ((r.date < today && r.date >= TRACKING_START) || cameIn(r)),
     ).reduce((n, r) => n + weight(r), 0)
 
     const workedTotal = rows.reduce((n, r) => n + (r.worked ?? 0), 0)
@@ -459,7 +460,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingC
         <CalendarDays size={20} strokeWidth={2} />
         <h2>{isThisMonth ? 'This Month’s Log' : 'Monthly Log'}</h2>
         <div className="sb-monthnav">
-          <button onClick={() => onMonthChange(shiftMonth(yearMonth, -1))} aria-label="Previous month">
+          <button onClick={() => onMonthChange(shiftMonth(yearMonth, -1))} disabled={yearMonth <= TRACKING_START.slice(0, 7)} aria-label="Previous month">
             <ChevronLeft size={18} strokeWidth={2.4} />
           </button>
           <span>{monthLabel(yearMonth)}</span>
