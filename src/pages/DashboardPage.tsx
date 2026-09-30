@@ -91,6 +91,7 @@ export default function DashboardPage() {
   const calendar = useMonthCalendar(yearMonth, employee?.id)
   const corrections = useCorrections()
   const [correcting, setCorrecting] = useState<{ date: string; rec?: AttendanceRecord } | null>(null)
+  const [confirmingOut, setConfirmingOut] = useState(false)
 
   const state: DayState =
     todayRecord === undefined ? 'loading'
@@ -134,7 +135,7 @@ export default function DashboardPage() {
             halfDay={halfDay}
             pastSplit={pastSplit}
             onCheckIn={checkIn}
-            onCheckOut={() => checkOut()}
+            onCheckOut={() => setConfirmingOut(true)}
           />
           <TodayTime
             state={state}
@@ -171,6 +172,30 @@ export default function DashboardPage() {
           onSubmit={corrections.submit}
           onClose={() => setCorrecting(null)}
         />
+      )}
+
+      {confirmingOut && clockedIn && (
+        <div className="sb-modal-backdrop" onClick={() => setConfirmingOut(false)}>
+          <div className="sb-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title" onClick={e => e.stopPropagation()}>
+            <div className="sb-modal-head">
+              <h2 id="checkout-title">Check out now?</h2>
+            </div>
+            <p className="sb-modal-sub">
+              {state === 'break' ? 'This will also end your break. ' : ''}You won’t be able to check in again today.
+            </p>
+            <div className="sb-modal-actions">
+              <button type="button" className="sb-btn-ghost" onClick={() => setConfirmingOut(false)}>Cancel</button>
+              <button
+                type="button"
+                className="sb-btn-primary"
+                disabled={isSubmitting}
+                onClick={async () => { await checkOut(); setConfirmingOut(false) }}
+              >
+                {isSubmitting ? 'Checking out…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AppLayout>
   )
