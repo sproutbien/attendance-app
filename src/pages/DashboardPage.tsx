@@ -118,7 +118,7 @@ export default function DashboardPage() {
   return (
     <AppLayout wide>
       <section className="sb-hero">
-        <p className="sb-hero-date"><CalendarDays size={24} strokeWidth={2} />{todayLabel}</p>
+        <p className="sb-hero-date"><CalendarDays size={16} strokeWidth={2} />{todayLabel}</p>
         <h1>Good {greeting()}, <em>{firstName}</em></h1>
         <p className="sb-hero-sub">{SUBTITLE[state]}</p>
       </section>
@@ -206,7 +206,7 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
     if (halfDay === 'afternoon') hint = 'Half-day leave this afternoon — you’ll be checked out automatically at 1:30 PM'
     action = (
       <button className="sb-bigbtn is-out" onClick={onCheckOut} disabled={isSubmitting}>
-        <LogOut size={26} strokeWidth={2.2} />
+        <LogOut size={18} strokeWidth={2.2} />
         {isSubmitting ? '…' : 'Check Out'}
       </button>
     )
@@ -228,7 +228,7 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
     }
     action = (
       <button className="sb-bigbtn" onClick={onCheckIn} disabled={isSubmitting || state === 'loading' || locked}>
-        <CircleArrowRight size={28} strokeWidth={2.2} />
+        <CircleArrowRight size={18} strokeWidth={2.2} />
         {isSubmitting ? '…' : 'Check In'}
       </button>
     )
@@ -240,12 +240,12 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
     <div className="sb-card sb-att">
       <div className="sb-checkin">
         <div className="sb-card-head">
-          <Clock size={30} strokeWidth={2.2} />
+          <Clock size={20} strokeWidth={2} />
           <h2>Today’s Attendance</h2>
           {mark && <span className={`sb-status s-${mark}`}><i />{MARK_LABELS[mark]}</span>}
         </div>
         <div className="sb-att-body">
-          <span className="sb-att-ring"><Icon size={48} strokeWidth={2} /></span>
+          <span className="sb-att-ring"><Icon size={32} strokeWidth={1.8} /></span>
           <div className="sb-att-main">
             <strong>{head}</strong>
             {sub && <span>{sub}</span>}
@@ -290,14 +290,14 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
   return (
     <div className="sb-card sb-time">
       <div className="sb-card-head">
-        <Clock size={30} strokeWidth={2.2} />
+        <Clock size={20} strokeWidth={2} />
         <h2>Today’s Time</h2>
         <span className={`sb-chip ${chip.cls}`}><i />{chip.label}</span>
       </div>
 
       <div className="sb-stats">
         <div className="sb-stat">
-          <span className="sb-stat-icon"><BriefcaseBusiness size={34} strokeWidth={2} /></span>
+          <span className="sb-stat-icon"><BriefcaseBusiness size={22} strokeWidth={2} /></span>
           <div>
             <div className="sb-stat-label">Work Time</div>
             <div className="sb-stat-value">{fmtHM(workedSeconds(record, now))}</div>
@@ -305,7 +305,7 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
         </div>
         <span className="sb-stats-divider" />
         <div className="sb-stat">
-          <span className="sb-stat-icon is-break"><Coffee size={34} strokeWidth={2} /></span>
+          <span className="sb-stat-icon is-break"><Coffee size={22} strokeWidth={2} /></span>
           <div>
             <div className="sb-stat-label">Break Time</div>
             <div className="sb-stat-value">{fmtHM(totalBreakSeconds(record, now))}</div>
@@ -320,8 +320,8 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
       >
         <span className="sb-pause-dot">
           {state === 'break'
-            ? <Play size={24} strokeWidth={2.5} fill="currentColor" />
-            : <Pause size={24} strokeWidth={2.5} fill="currentColor" />}
+            ? <Play size={16} strokeWidth={2.5} fill="currentColor" />
+            : <Pause size={16} strokeWidth={2.5} fill="currentColor" />}
         </span>
         <span className="sb-pause-text">
           {barTitle}
@@ -350,14 +350,14 @@ function MonthSummary({ title, loading, log }: {
   return (
     <div className="sb-card sb-month">
       <Link to="/reports" className="sb-card-head sb-month-head">
-        <ChartColumn size={30} strokeWidth={2.2} />
+        <ChartColumn size={20} strokeWidth={2} />
         <h2>{title}</h2>
-        <ChevronRight size={22} strokeWidth={2.2} className="sb-month-go" />
+        <ChevronRight size={18} strokeWidth={2.2} className="sb-month-go" />
       </Link>
       <ul className="sb-month-list">
         {items.map(({ Icon, tone, label, value }) => (
           <li key={label}>
-            <span className={`sb-month-icon ${tone}`}><Icon size={20} strokeWidth={2.2} /></span>
+            <span className={`sb-month-icon ${tone}`}><Icon size={15} strokeWidth={2.2} /></span>
             <span className="sb-month-label">{label}</span>
             <b>{loading ? '—' : value}</b>
           </li>
@@ -456,15 +456,15 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingC
   return (
     <section className="sb-log">
       <div className="sb-log-head">
-        <CalendarDays size={32} strokeWidth={2} />
+        <CalendarDays size={20} strokeWidth={2} />
         <h2>{isThisMonth ? 'This Month’s Log' : 'Monthly Log'}</h2>
         <div className="sb-monthnav">
           <button onClick={() => onMonthChange(shiftMonth(yearMonth, -1))} aria-label="Previous month">
-            <ChevronLeft size={22} strokeWidth={2.4} />
+            <ChevronLeft size={18} strokeWidth={2.4} />
           </button>
           <span>{monthLabel(yearMonth)}</span>
           <button onClick={() => onMonthChange(shiftMonth(yearMonth, 1))} disabled={isThisMonth} aria-label="Next month">
-            <ChevronRight size={22} strokeWidth={2.4} />
+            <ChevronRight size={18} strokeWidth={2.4} />
           </button>
         </div>
       </div>

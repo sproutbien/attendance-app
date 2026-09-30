@@ -48,7 +48,7 @@ function Header({ theme }: { theme: Theme }) {
       </Link>
       <nav className="sb-nav" aria-label="Main">
         {NAV.map(({ to, label, Icon }) => (
-          <NavLink key={to} to={to}><Icon size={24} strokeWidth={2.2} />{label}</NavLink>
+          <NavLink key={to} to={to}><Icon size={18} strokeWidth={2} />{label}</NavLink>
         ))}
       </nav>
       <UserMenu theme={theme} />
@@ -76,8 +76,8 @@ function UserMenu({ theme }: { theme: Theme }) {
   return (
     <div className="sb-user" ref={ref}>
       <button className="sb-user-btn" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="Account menu">
-        <span className="sb-avatar"><User size={30} strokeWidth={2.2} fill="currentColor" /></span>
-        <ChevronDown size={22} strokeWidth={2.4} />
+        <span className="sb-avatar"><User size={20} strokeWidth={2.2} fill="currentColor" /></span>
+        <ChevronDown size={18} strokeWidth={2.4} />
       </button>
       {open && (
         <div className="sb-menu" role="menu">

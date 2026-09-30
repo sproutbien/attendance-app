@@ -33,7 +33,7 @@ export default function MyCorrections({ corrections, onWithdraw }: {
   return (
     <section className="sb-log sb-corrections">
       <div className="sb-log-head">
-        <ClipboardPen size={30} strokeWidth={2} />
+        <ClipboardPen size={20} strokeWidth={2} />
         <h2>Correction Requests</h2>
       </div>
       {error && <p className="sb-error">{error}</p>}
