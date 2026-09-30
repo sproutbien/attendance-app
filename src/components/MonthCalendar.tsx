@@ -4,22 +4,23 @@ import type { DayMark } from '../lib/calendar'
 
 // ── Month switcher: ‹ September 2026 › ────────────────────────
 
-export function MonthPicker({ yearMonth, onChange, max }: {
+export function MonthPicker({ yearMonth, onChange, max, compact = false }: {
   yearMonth: string
   onChange: (yearMonth: string) => void
   max?: string
+  compact?: boolean   // smaller type for the employee area
 }) {
   const nextDisabled = max != null && shiftMonth(yearMonth, 1) > max
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-      <button onClick={() => onChange(shiftMonth(yearMonth, -1))} style={arrowStyle(false)} aria-label="Previous month">‹</button>
-      <span style={{ minWidth: 140, textAlign: 'center', fontWeight: 600, color: 'var(--text-strong, #1e293b)', fontSize: '0.9375rem' }}>
+      <button onClick={() => onChange(shiftMonth(yearMonth, -1))} style={arrowStyle(false, compact)} aria-label="Previous month">‹</button>
+      <span style={{ minWidth: compact ? 110 : 140, textAlign: 'center', fontWeight: compact ? 500 : 600, color: 'var(--text-strong, #1e293b)', fontSize: compact ? 13 : '0.9375rem' }}>
         {monthLabel(yearMonth)}
       </span>
       <button
         onClick={() => onChange(shiftMonth(yearMonth, 1))}
         disabled={nextDisabled}
-        style={arrowStyle(nextDisabled)}
+        style={arrowStyle(nextDisabled, compact)}
         aria-label="Next month"
       >
         ›
@@ -28,12 +29,13 @@ export function MonthPicker({ yearMonth, onChange, max }: {
   )
 }
 
-function arrowStyle(disabled: boolean): CSSProperties {
+function arrowStyle(disabled: boolean, compact: boolean): CSSProperties {
+  const size = compact ? 28 : 32
   return {
-    width: 32, height: 32, borderRadius: 8,
+    width: size, height: size, borderRadius: 8,
     border: '1px solid var(--border, #d1d5db)', background: 'var(--surface, #fff)',
     color: disabled ? 'var(--text-faint, #cbd5e1)' : 'var(--text, #374151)',
-    fontSize: '1.125rem', lineHeight: 1,
+    fontSize: compact ? 15 : '1.125rem', lineHeight: 1,
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'inherit',
   }
@@ -41,18 +43,18 @@ function arrowStyle(disabled: boolean): CSSProperties {
 
 // ── Legend ────────────────────────────────────────────────────
 
-export function CalendarLegend({ marks }: { marks: DayMark[] }) {
+export function CalendarLegend({ marks, compact = false }: { marks: DayMark[]; compact?: boolean }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: compact ? '0.375rem 0.875rem' : '0.5rem 1rem', fontSize: compact ? 11 : '0.75rem', color: 'var(--text-muted, #64748b)' }}>
       {marks.map(m => {
         const s = MARK_STYLES[m]
         return (
           <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem' }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              minWidth: 22, height: 18, borderRadius: 4, padding: '0 3px',
+              minWidth: compact ? 20 : 22, height: compact ? 16 : 18, borderRadius: 4, padding: '0 3px',
               background: s.bg, color: s.text, border: s.border ?? '1px solid transparent',
-              fontSize: '0.625rem', fontWeight: 700, boxSizing: 'border-box',
+              fontSize: compact ? 9 : '0.625rem', fontWeight: 700, boxSizing: 'border-box',
             }}>
               {s.code}
             </span>
@@ -74,11 +76,12 @@ const CELL_TAGS: Record<DayMark, string> = {
   present: 'PRESENT', late: 'LATE', absent: 'ABSENT', sunday: '', none: '',
 }
 
-export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick }: {
+export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick, compact = false }: {
   yearMonth: string
   markFor: (date: string) => DayMark
   noteFor?: (date: string) => string | undefined
   onDayClick?: (date: string) => void
+  compact?: boolean   // smaller type and cells for the employee area
 }) {
   const dates = monthDates(yearMonth)
   const leadingBlanks = weekday(dates[0])
@@ -88,7 +91,7 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick }: {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4 }}>
       {WEEKDAYS.map(d => (
         <div key={d} style={{
-          textAlign: 'center', fontSize: '0.6875rem', fontWeight: 600,
+          textAlign: 'center', fontSize: compact ? 10 : '0.6875rem', fontWeight: 600,
           textTransform: 'uppercase', letterSpacing: '0.05em',
           color: d === 'Sun' ? 'var(--text-faint, #94a3b8)' : 'var(--text-muted, #64748b)', padding: '0.25rem 0',
         }}>
@@ -113,7 +116,7 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick }: {
             title={[s.label, note].filter(Boolean).join(' — ') || undefined}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
-              minHeight: 64, padding: '0.375rem', borderRadius: 8, boxSizing: 'border-box',
+              minHeight: compact ? 54 : 64, padding: compact ? '0.3125rem' : '0.375rem', borderRadius: 8, boxSizing: 'border-box',
               background: mark === 'none' ? 'var(--surface, #fff)' : mark === 'sunday' ? 'var(--surface-soft, #f8fafc)' : s.bg,
               border: s.border ?? (date === today ? '2px solid #16a34a' : '1px solid var(--border, #e2e8f0)'),
               color: strong ? '#fff' : '#1e293b',
@@ -121,17 +124,17 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick }: {
               textAlign: 'left', fontFamily: 'inherit', overflow: 'hidden',
             }}
           >
-            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: strong ? '#fff' : mark === 'sunday' ? 'var(--text-faint, #94a3b8)' : mark === 'none' ? 'var(--text-strong, #1e293b)' : '#1e293b' }}>
+            <span style={{ fontSize: compact ? 12 : '0.8125rem', fontWeight: 600, color: strong ? '#fff' : mark === 'sunday' ? 'var(--text-faint, #94a3b8)' : mark === 'none' ? 'var(--text-strong, #1e293b)' : '#1e293b' }}>
               {Number(date.slice(8))}
             </span>
             {CELL_TAGS[mark] && (
-              <span style={{ fontSize: '0.625rem', fontWeight: 700, color: s.text, letterSpacing: '0.03em' }}>
+              <span style={{ fontSize: compact ? 8.5 : '0.625rem', fontWeight: 700, color: s.text, letterSpacing: '0.03em' }}>
                 {CELL_TAGS[mark]}
               </span>
             )}
             {note && (
               <span style={{
-                fontSize: '0.625rem', lineHeight: 1.2, color: strong ? 'rgba(255,255,255,0.9)' : '#64748b',
+                fontSize: compact ? 9 : '0.625rem', lineHeight: 1.2, color: strong ? 'rgba(255,255,255,0.9)' : '#64748b',
                 width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>
                 {note}

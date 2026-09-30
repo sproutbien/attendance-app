@@ -33,24 +33,24 @@ export default function ReportsPage() {
   return (
     <AppLayout>
       <div style={card}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1.25rem' }}>
-          <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-strong, #1e293b)' }}>My Calendar</h2>
-          <MonthPicker yearMonth={yearMonth} onChange={setYearMonth} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text-strong, #1e293b)' }}>My Calendar</h2>
+          <MonthPicker yearMonth={yearMonth} onChange={setYearMonth} compact />
         </div>
 
         {error ? (
-          <p style={{ margin: 0, color: '#ef4444' }}>{error}</p>
+          <p style={{ margin: 0, fontSize: 13, color: '#ef4444' }}>{error}</p>
         ) : loading || !employee ? (
-          <p style={{ margin: 0, color: 'var(--text-faint, #94a3b8)' }}>Loading…</p>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-faint, #94a3b8)' }}>Loading…</p>
         ) : (
           <>
-            <MonthGrid yearMonth={yearMonth} markFor={myMark} noteFor={d => holidays.get(d)} />
+            <MonthGrid yearMonth={yearMonth} markFor={myMark} noteFor={d => holidays.get(d)} compact />
 
-            <div style={{ marginTop: '1rem' }}>
-              <CalendarLegend marks={['leave', 'half_leave', 'leave_pending', 'holiday', 'present', 'late', 'absent', 'sunday']} />
+            <div style={{ marginTop: '0.875rem' }}>
+              <CalendarLegend marks={['leave', 'half_leave', 'leave_pending', 'holiday', 'present', 'late', 'absent', 'sunday']} compact />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.625rem', marginTop: '1.25rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', marginTop: '1rem' }}>
               {COUNTED.map(m => {
                 const s = MARK_STYLES[m]
                 const strong = m === 'leave' || m === 'holiday'
@@ -58,11 +58,11 @@ export default function ReportsPage() {
                   <div key={m} style={{
                     background: s.bg,
                     border: s.border,
-                    borderRadius: 10,
-                    padding: '0.625rem 0.75rem',
+                    borderRadius: 8,
+                    padding: '0.5rem 0.625rem',
                   }}>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700, color: s.text, lineHeight: 1 }}>{counts.get(m) ?? 0}</div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 500, color: s.text, opacity: strong ? 0.9 : 0.8, marginTop: '0.25rem' }}>{s.label}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: s.text, lineHeight: 1 }}>{counts.get(m) ?? 0}</div>
+                    <div style={{ fontSize: 11, fontWeight: 500, color: s.text, opacity: strong ? 0.9 : 0.8, marginTop: '0.25rem' }}>{s.label}</div>
                   </div>
                 )
               })}
@@ -76,7 +76,7 @@ export default function ReportsPage() {
 
 const card: CSSProperties = {
   background: 'var(--surface, #fff)',
-  borderRadius: 16,
-  padding: '1.5rem',
+  borderRadius: 14,
+  padding: '1.25rem',
   boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
 }
