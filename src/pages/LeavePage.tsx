@@ -6,7 +6,7 @@ import type { HalfDaySession, LeaveRequest, LeaveTypeCode } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { useHolidayDates, useLeaveBalances } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
-import { LEAVE_TYPE_LABELS, daysLabel, findLeaveClash, fmtDays, workingDays } from '../lib/leave'
+import { LEAVE_TYPE_LABELS, bookableAsOf, bookableDays, daysLabel, findLeaveClash, fmtDays, workingDays } from '../lib/leave'
 import { localDate } from '../lib/calendar'
 import { SESSION_LABELS, canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 
@@ -51,8 +51,8 @@ export default function LeavePage() {
       setFormError(blocked)
       return
     }
-    if (clashMessage) {
-      setFormError(clashMessage)
+    if (clashMessage ?? balanceBlock) {
+      setFormError(clashMessage ?? balanceBlock)
       return
     }
     const ok = await submit({
@@ -65,6 +65,7 @@ export default function LeavePage() {
     })
     if (ok) {
       current.refresh()
+      booking.refresh()
       setStartDate('')
       setEndDate('')
       setReason('')
@@ -79,15 +80,20 @@ export default function LeavePage() {
   const sameDayBlock = startsToday ? sameDayLeaveBlock(duration, isHalf ? session : null, checkedInToday) : null
   const sessionBlocked = (s: HalfDaySession) => startsToday && sameDayLeaveBlock('half', s, checkedInToday) !== null
 
-  // Estimate how the request splits into paid days and Loss of Pay (the server decides on approval)
+  // Paid leave must fit in what's credited so far, minus pending requests (the server enforces this too)
   const rangeEnd = isHalf ? startDate : endDate
   const holidays = useHolidayDates(startDate, rangeEnd)
-  const atStart = useLeaveBalances(employee?.id, startDate || undefined)
+  const booking = useLeaveBalances(employee?.id, bookableAsOf(startDate || today, today))
   const requested = startDate && rangeEnd && rangeEnd >= startDate ? workingDays(startDate, rangeEnd, isHalf, holidays) : null
-  const typeBalance = atStart.balances.find(b => b.leave_type === leaveType)
-  const available = typeBalance?.available ?? null
-  const estPaid = requested == null ? 0 : leaveType === 'lop' ? 0 : Math.min(requested, Math.max(0, Math.floor((available ?? 0) * 2) / 2))
-  const estLop = requested == null ? 0 : requested - estPaid
+  const typeBalance = booking.balances.find(b => b.leave_type === leaveType)
+  const free = typeBalance?.is_paid ? bookableDays(typeBalance) : null
+  const typeName = LEAVE_TYPE_LABELS[leaveType]
+  const balanceBlock = free == null ? null
+    : free === 0
+      ? `You have no ${typeName} leave left${typeBalance!.pending > 0 ? ` (${daysLabel(typeBalance!.pending)} waiting for approval)` : ''}. Choose another leave type or Loss of Pay.`
+      : requested != null && requested > free
+        ? `Not enough ${typeName} leave: this request needs ${daysLabel(requested)} but only ${daysLabel(free)} ${free === 1 ? 'is' : 'are'} available. Pick fewer days or choose Loss of Pay.`
+        : null
 
   // Days that already have pending or approved leave can't be requested again
   const clash = startDate && rangeEnd && rangeEnd >= startDate
@@ -96,7 +102,7 @@ export default function LeavePage() {
   const clashMessage = clash
     ? `You already have ${clash.status} leave for ${fmtSpan(clash)}. Cancel it first if you want to change it.`
     : null
-  const formBlock = clashMessage ?? sameDayBlock
+  const formBlock = clashMessage ?? sameDayBlock ?? balanceBlock
   // Upcoming booked days, so they know what to avoid
   const booked = requests
     .filter(r => (r.status === 'pending' || r.status === 'approved') && r.end_date >= today)
@@ -121,13 +127,16 @@ export default function LeavePage() {
               onChange={e => { setLeaveType(e.target.value as LeaveTypeCode); setSuccess(false) }}
               style={{ ...inputStyle, maxWidth: 320 }}
             >
-              {current.balances.length === 0
+              {booking.balances.length === 0
                 ? (Object.keys(LEAVE_TYPE_LABELS) as LeaveTypeCode[]).map(c => <option key={c} value={c}>{LEAVE_TYPE_LABELS[c]}</option>)
-                : current.balances.map(b => (
-                  <option key={b.leave_type} value={b.leave_type}>
-                    {b.name}{b.is_paid ? ` (${fmtDays(b.available)} available)` : ' (unpaid)'}
-                  </option>
-                ))}
+                : booking.balances.map(b => {
+                  const left = bookableDays(b)
+                  return (
+                    <option key={b.leave_type} value={b.leave_type} disabled={b.is_paid && left === 0}>
+                      {b.name}{!b.is_paid ? ' (unpaid)' : left === 0 ? ' (none left)' : ` (${fmtDays(left)} available)`}
+                    </option>
+                  )
+                })}
             </select>
           </div>
 
@@ -224,9 +233,7 @@ export default function LeavePage() {
                     {!isHalf && showDayCount && ' (Sundays and holidays not counted)'}
                     {leaveType === 'lop'
                       ? ' · unpaid'
-                      : estLop > 0
-                        ? <> · {fmtDays(estPaid)} from {LEAVE_TYPE_LABELS[leaveType]}, <b style={{ color: 'var(--red, #b91c1c)' }}>{fmtDays(estLop)} as Loss of Pay</b> (balance {fmtDays(available)}; final split on approval)</>
-                        : <> · from {LEAVE_TYPE_LABELS[leaveType]} (balance {fmtDays(available)})</>}
+                      : <> · from {typeName} ({fmtDays(free)} available)</>}
                   </>}
             </p>
           )}

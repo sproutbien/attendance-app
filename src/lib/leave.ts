@@ -1,4 +1,4 @@
-import type { LeaveRequest, LeaveTypeCode } from '../types'
+import type { LeaveBalance, LeaveRequest, LeaveTypeCode } from '../types'
 
 export const LEAVE_TYPE_LABELS: Record<LeaveTypeCode, string> = {
   casual: 'Casual',
@@ -11,6 +11,22 @@ export const LEAVE_TYPE_LABELS: Record<LeaveTypeCode, string> = {
 export function leaveYearOf(date: string) {
   const [y, m] = date.split('-').map(Number)
   return m >= 4 ? y : y - 1
+}
+
+/**
+ * Date whose balance a leave starting on `start` is checked against. Mirrors leave_bookable_as_of() in migration 016:
+ * today for this leave year, 1 April for a later one, 31 March for an earlier one.
+ */
+export function bookableAsOf(start: string, today: string) {
+  const y = leaveYearOf(start)
+  const current = leaveYearOf(today)
+  if (y === current) return today
+  return y > current ? `${y}-04-01` : `${y + 1}-03-31`
+}
+
+/** Paid days still free to request: credited balance minus pending requests (never below 0) */
+export function bookableDays(b: Pick<LeaveBalance, 'available' | 'pending'>) {
+  return Math.max(0, (b.available ?? 0) - b.pending)
 }
 
 export function leaveYearLabel(year: number) {
