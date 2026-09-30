@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  BriefcaseBusiness, CalendarDays, ChevronLeft, ChevronRight, CircleArrowRight,
-  CircleCheck, Clock, Coffee, Leaf, LogOut, Pause, Play,
+  BriefcaseBusiness, CalendarCheck, CalendarClock, CalendarDays, ChartColumn, ChevronLeft, ChevronRight,
+  CircleArrowRight, Clock, Coffee, DoorOpen, LogOut, Pause, Play, Timer,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAttendance } from '../hooks/useAttendance'
@@ -11,7 +12,6 @@ import MyCorrections from '../components/MyCorrections'
 import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import AppLayout from '../components/AppLayout'
-import { HeroLeaves, CornerLeaves } from '../components/Leaves'
 import { currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
 import { fmtClock, fmtHM, totalBreakSeconds, workedSeconds } from '../lib/breaks'
@@ -110,22 +110,17 @@ export default function DashboardPage() {
     if (halfDay === 'afternoon' && clockedIn && pastSplit && !isSubmitting) checkOut(new Date(split!))
   }, [halfDay, clockedIn, pastSplit])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  const log = useMonthLog(yearMonth, monthRecords, calendar, employee?.id, now)
+
   const firstName = employee?.full_name.split(' ')[0] ?? ''
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 
   return (
     <AppLayout wide>
       <section className="sb-hero">
-        <div className="sb-hero-inner">
-          <p className="sb-hero-date"><CalendarDays size={26} strokeWidth={2} />{todayLabel}</p>
-          <h1>Good {greeting()}, <em>{firstName}</em></h1>
-          <p className="sb-hero-sub">{SUBTITLE[state]} <Leaf size={26} strokeWidth={2} /></p>
-          <p className="sb-quote" aria-hidden="true">
-            Better<br />People<br />Build<br />Better<br />Tomorrows
-            <svg width="110" height="14" viewBox="0 0 110 14"><path d="M2 11 Q 48 1 108 4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
-          </p>
-        </div>
-        <HeroLeaves className="sb-hero-leaves" />
+        <p className="sb-hero-date"><CalendarDays size={24} strokeWidth={2} />{todayLabel}</p>
+        <h1>Good {greeting()}, <em>{firstName}</em></h1>
+        <p className="sb-hero-sub">{SUBTITLE[state]}</p>
       </section>
 
       <div className="sb-container">
@@ -149,16 +144,19 @@ export default function DashboardPage() {
             onPause={pauseBreak}
             onResume={resumeBreak}
           />
+          <MonthSummary
+            title={yearMonth === thisMonth ? 'This Month' : monthLabel(yearMonth)}
+            loading={calendar.loading}
+            log={log}
+          />
         </section>
 
         <MonthLog
           yearMonth={yearMonth}
           onMonthChange={setYearMonth}
           maxMonth={thisMonth}
-          records={monthRecords}
+          rows={log.rows}
           calendar={calendar}
-          employeeId={employee?.id}
-          now={now}
           pendingCorrections={corrections.pendingDates}
           onCorrect={(date, rec) => setCorrecting({ date, rec })}
         />
@@ -189,32 +187,26 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
   onCheckIn: () => void
   onCheckOut: () => void
 }) {
+  let Icon = CalendarClock
   let head: React.ReactNode = 'Ready to get started?'
-  let body: React.ReactNode
+  let sub: string | null = null
+  let action: React.ReactNode = null
   let hint: string | null = 'Tap to start your workday'
 
   if (state === 'done') {
-    head = 'Great work today!'
+    Icon = CalendarCheck
+    head = 'Done for today'
+    sub = `${fmtTime(record?.check_in_time)} – ${fmtTime(record?.check_out_time)}`
     hint = null
-    body = (
-      <div className="sb-done">
-        <CircleCheck size={44} strokeWidth={2} color="var(--green-dark)" />
-        <strong>Done for today</strong>
-        <span>{fmtTime(record?.check_in_time)} – {fmtTime(record?.check_out_time)}</span>
-      </div>
-    )
   } else if (state === 'working' || state === 'break') {
-    head = (
-      <>
-        Checked in at {fmtTime(record?.check_in_time)}
-        {record?.status === 'late' && <span className="sb-late-tag">Late</span>}
-      </>
-    )
+    Icon = Timer
+    head = state === 'break' ? 'On a break' : 'Currently working'
+    sub = `Checked in at ${fmtTime(record?.check_in_time)}`
     hint = state === 'break' ? 'Checking out will also end your break' : 'Tap to end your workday'
     if (halfDay === 'afternoon') hint = 'Half-day leave this afternoon — you’ll be checked out automatically at 1:30 PM'
-    body = (
+    action = (
       <button className="sb-bigbtn is-out" onClick={onCheckOut} disabled={isSubmitting}>
-        <LogOut size={54} strokeWidth={2.2} />
+        <LogOut size={26} strokeWidth={2.2} />
         {isSubmitting ? '…' : 'Check Out'}
       </button>
     )
@@ -234,22 +226,44 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
       const d = new Date()
       if (d.getHours() * 60 + d.getMinutes() > 11 * 60 + 30) hint = 'Checking in after 11:30 AM counts as a morning half-day leave'
     }
-    body = (
+    action = (
       <button className="sb-bigbtn" onClick={onCheckIn} disabled={isSubmitting || state === 'loading' || locked}>
-        <CircleArrowRight size={62} strokeWidth={2.2} />
+        <CircleArrowRight size={28} strokeWidth={2.2} />
         {isSubmitting ? '…' : 'Check In'}
       </button>
     )
   }
 
+  const mark = todayMark(record)
+
   return (
-    <div className="sb-checkin">
-      <CornerLeaves className="sb-checkin-leaves" />
-      <p className="sb-panel-head"><Clock size={44} strokeWidth={2} />{head}</p>
-      {body}
-      {hint && <p className="sb-hint">{hint}</p>}
+    <div className="sb-card sb-att">
+      <div className="sb-checkin">
+        <div className="sb-card-head">
+          <Clock size={30} strokeWidth={2.2} />
+          <h2>Today’s Attendance</h2>
+          {mark && <span className={`sb-status s-${mark}`}><i />{MARK_LABELS[mark]}</span>}
+        </div>
+        <div className="sb-att-body">
+          <span className="sb-att-ring"><Icon size={48} strokeWidth={2} /></span>
+          <div className="sb-att-main">
+            <strong>{head}</strong>
+            {sub && <span>{sub}</span>}
+          </div>
+        </div>
+        {action}
+        {hint && <p className="sb-hint">{hint}</p>}
+      </div>
     </div>
   )
+}
+
+/** Today's status pill: what the day counts as so far (none until something happens) */
+function todayMark(record: AttendanceRecord | null): DayMark | null {
+  if (record?.half_day_session) return 'half_leave'
+  if (record?.check_in_time) return record.status === 'late' ? 'late' : 'present'
+  if (record?.status === 'on_leave') return 'leave'
+  return null
 }
 
 // ── Today's Time panel (right) ────────────────────────────────
@@ -274,9 +288,9 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
   }
 
   return (
-    <div className="sb-time">
-      <div className="sb-time-head">
-        <Clock size={36} strokeWidth={2.2} />
+    <div className="sb-card sb-time">
+      <div className="sb-card-head">
+        <Clock size={30} strokeWidth={2.2} />
         <h2>Today’s Time</h2>
         <span className={`sb-chip ${chip.cls}`}><i />{chip.label}</span>
       </div>
@@ -318,6 +332,41 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
   )
 }
 
+// ── This Month card (right) ───────────────────────────────────
+
+function MonthSummary({ title, loading, log }: {
+  title: string
+  loading: boolean
+  log: ReturnType<typeof useMonthLog>
+}) {
+  const { workedTotal, presentDays, workingDays, leaveDays } = log
+  const items = [
+    { Icon: Clock,          tone: '',         label: 'Total Work Hours', value: fmtHM(workedTotal) },
+    { Icon: ChartColumn,    tone: 'is-blue',  label: 'Avg. Per Day',     value: fmtHM(presentDays ? workedTotal / presentDays : 0) },
+    { Icon: CalendarDays,   tone: '',         label: 'Days Present',     value: `${presentDays} / ${workingDays}` },
+    { Icon: DoorOpen,       tone: 'is-amber', label: 'Leaves',           value: `${leaveDays} ${leaveDays === 1 ? 'day' : 'days'}` },
+  ]
+
+  return (
+    <div className="sb-card sb-month">
+      <Link to="/reports" className="sb-card-head sb-month-head">
+        <ChartColumn size={30} strokeWidth={2.2} />
+        <h2>{title}</h2>
+        <ChevronRight size={22} strokeWidth={2.2} className="sb-month-go" />
+      </Link>
+      <ul className="sb-month-list">
+        {items.map(({ Icon, tone, label, value }) => (
+          <li key={label}>
+            <span className={`sb-month-icon ${tone}`}><Icon size={20} strokeWidth={2.2} /></span>
+            <span className="sb-month-label">{label}</span>
+            <b>{loading ? '—' : value}</b>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 // ── This Month's Log ──────────────────────────────────────────
 
 type LogRow = {
@@ -329,21 +378,17 @@ type LogRow = {
   brk: number
 }
 
-function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, employeeId, now, pendingCorrections, onCorrect }: {
-  yearMonth: string
-  onMonthChange: (ym: string) => void
-  maxMonth: string
-  records: AttendanceRecord[]
-  calendar: ReturnType<typeof useMonthCalendar>
-  employeeId: string | undefined
-  now: number
-  pendingCorrections: Set<string>
-  onCorrect: (date: string, rec?: AttendanceRecord) => void
-}) {
+/** The month's rows (newest first, up to today) plus the totals the This Month card shows */
+function useMonthLog(
+  yearMonth: string,
+  records: AttendanceRecord[],
+  calendar: ReturnType<typeof useMonthCalendar>,
+  employeeId: string | undefined,
+  now: number,
+) {
   const today = localDate()
-  const isThisMonth = yearMonth === maxMonth
 
-  const { rows, presentDays, workingDays } = useMemo(() => {
+  return useMemo(() => {
     const recMap = new Map(records.map(r => [r.date, r]))
     const leave = employeeId ? calendar.leave.get(employeeId) : undefined
     const halfDay = employeeId ? calendar.halfDay.get(employeeId) : undefined
@@ -377,8 +422,24 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
       !isSunday(r.date) && !calendar.holidays.has(r.date) && r.mark !== 'leave' &&
       (r.date < today || cameIn(r)),
     ).reduce((n, r) => n + weight(r), 0)
-    return { rows, presentDays, workingDays }
+
+    const workedTotal = rows.reduce((n, r) => n + (r.worked ?? 0), 0)
+    const leaveDays = rows.reduce((n, r) => n + (r.mark === 'leave' ? 1 : r.mark === 'half_leave' ? 0.5 : 0), 0)
+    return { rows, presentDays, workingDays, workedTotal, leaveDays }
   }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now])
+}
+
+function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingCorrections, onCorrect }: {
+  yearMonth: string
+  onMonthChange: (ym: string) => void
+  maxMonth: string
+  rows: LogRow[]
+  calendar: ReturnType<typeof useMonthCalendar>
+  pendingCorrections: Set<string>
+  onCorrect: (date: string, rec?: AttendanceRecord) => void
+}) {
+  const today = localDate()
+  const isThisMonth = yearMonth === maxMonth
 
   // Last 7 days: "Correct" button, or a marker while a request is open
   const fix = (r: LogRow) => !isCorrectable(r.date) ? null
@@ -419,7 +480,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
           <div className="sb-table-wrap">
             <table className="sb-table">
               <thead>
-                <tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th>Break</th><th>Total Work Hours</th><th><span className="sb-sr">Actions</span></th></tr>
+                <tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th>Break</th><th>Total Work Hours</th><th className="sb-fix-cell">Action</th></tr>
               </thead>
               <tbody>
                 {rows.map(r => (
@@ -458,11 +519,6 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, records, calendar, emplo
           </ul>
         </>
       )}
-
-      <div className="sb-log-foot">
-        <span><CalendarDays size={22} strokeWidth={2} />Present days {isThisMonth ? 'this month' : 'in ' + monthLabel(yearMonth)}: <b>{presentDays} / {workingDays}</b></span>
-        <em>Consistency builds success <Leaf size={18} strokeWidth={2} style={{ verticalAlign: '-3px' }} /></em>
-      </div>
     </section>
   )
 }
