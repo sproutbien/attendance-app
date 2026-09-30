@@ -9,6 +9,7 @@ export type Employee = {
   monthly_salary: number | null
   phone: string | null            // WhatsApp number, digits with country code
   joining_date: string | null     // leave accrues from this month; null = full year
+  deleted_at: string | null       // set while in the bin; purged 6 months later
   created_at: string
 }
 

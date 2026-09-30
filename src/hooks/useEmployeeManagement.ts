@@ -78,5 +78,19 @@ export function useEmployeeManagement() {
     await updateEmployee(employee.id, { status: next })
   }
 
-  return { employees, loading, saving, error, setError, addEmployee, updateEmployee, toggleStatus, refetch: fetchEmployees }
+  /** Calls one of the bin RPCs, then refetches. Returns an error message or null. */
+  async function binAction(fn: 'bin_employee' | 'restore_employee' | 'purge_employee', id: string): Promise<string | null> {
+    setSaving(true)
+    const { error } = await supabase.rpc(fn, { p_employee: id })
+    if (!error) await fetchEmployees()
+    setSaving(false)
+    return error?.message ?? null
+  }
+
+  return {
+    employees, loading, saving, error, setError, addEmployee, updateEmployee, toggleStatus, refetch: fetchEmployees,
+    binEmployee:     (id: string) => binAction('bin_employee', id),
+    restoreEmployee: (id: string) => binAction('restore_employee', id),
+    purgeEmployee:   (id: string) => binAction('purge_employee', id),
+  }
 }

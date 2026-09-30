@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
 import { useEmployeeManagement } from '../../hooks/useEmployeeManagement'
 import type { EmployeeFormData } from '../../hooks/useEmployeeManagement'
 import type { Employee } from '../../types'
@@ -7,6 +8,7 @@ import type { Employee } from '../../types'
 // ── Types ────────────────────────────────────────────────────
 
 type ModalMode = { type: 'add' } | { type: 'edit'; employee: Employee }
+type ConfirmMode = { type: 'bin' | 'purge'; employee: Employee }
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -24,6 +26,19 @@ function fmtPhone(phone: string) {
     : `+${phone}`
 }
 
+/** Binned employees are permanently deleted this long after deletion (see migration 018) */
+const BIN_MONTHS = 6
+
+function purgeDate(deletedAt: string) {
+  const d = new Date(deletedAt)
+  d.setMonth(d.getMonth() + BIN_MONTHS)
+  return d
+}
+
+function fmtDate(d: Date) {
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 function initials(name: string) {
   return name.split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
 }
@@ -38,12 +53,20 @@ const ROLE_COLORS = {
 // ── Page ─────────────────────────────────────────────────────
 
 export default function AdminEmployeesPage() {
-  const { employees, loading, saving, error, setError, addEmployee, updateEmployee, toggleStatus } = useEmployeeManagement()
+  const { employee: me } = useAuth()
+  const {
+    employees, loading, saving, error, setError, addEmployee, updateEmployee, toggleStatus,
+    binEmployee, restoreEmployee, purgeEmployee,
+  } = useEmployeeManagement()
   const [modal, setModal] = useState<ModalMode | null>(null)
+  const [confirm, setConfirm] = useState<ConfirmMode | null>(null)
+  const [confirmError, setConfirmError] = useState<string | null>(null)
+  const [showBin, setShowBin] = useState(false)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
 
-  const active   = employees.filter(e => e.status === 'active')
-  const inactive = employees.filter(e => e.status === 'inactive')
+  const binned   = employees.filter(e => e.deleted_at)
+  const active   = employees.filter(e => !e.deleted_at && e.status === 'active')
+  const inactive = employees.filter(e => !e.deleted_at && e.status === 'inactive')
   const designations = [...new Set(employees.map(e => e.designation).filter((d): d is string => !!d))].sort()
 
   async function handleSave(data: EmployeeFormData) {
@@ -72,6 +95,32 @@ export default function AdminEmployeesPage() {
     }
   }
 
+  function flash(msg: string) {
+    setSuccessMsg(msg)
+    setTimeout(() => setSuccessMsg(null), 4000)
+  }
+
+  function askConfirm(type: ConfirmMode['type'], employee: Employee) {
+    setConfirmError(null)
+    setConfirm({ type, employee })
+  }
+
+  async function handleConfirm() {
+    if (!confirm) return
+    const { type, employee } = confirm
+    const err = type === 'bin' ? await binEmployee(employee.id) : await purgeEmployee(employee.id)
+    if (err) { setConfirmError(err); return }
+    setConfirm(null)
+    flash(type === 'bin'
+      ? `${employee.full_name} moved to the bin.`
+      : `${employee.full_name} permanently deleted.`)
+  }
+
+  async function handleRestore(employee: Employee) {
+    const err = await restoreEmployee(employee.id)
+    flash(err ?? `${employee.full_name} restored.`)
+  }
+
   function openEdit(employee: Employee) {
     setError(null)
     setModal({ type: 'edit', employee })
@@ -88,13 +137,22 @@ export default function AdminEmployeesPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Employees</h1>
-          {!loading && (
+          {!loading && !showBin && (
             <span style={{ background: '#f1f5f9', color: '#64748b', fontSize: '0.8125rem', fontWeight: 600, padding: '2px 10px', borderRadius: 99 }}>
               {active.length} active
             </span>
           )}
         </div>
-        <button onClick={openAdd} style={primaryBtn}>+ Add Employee</button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {showBin ? (
+            <button onClick={() => setShowBin(false)} style={ghostBtn}>← Back to employees</button>
+          ) : (
+            <>
+              <button onClick={() => setShowBin(true)} style={ghostBtn}>Bin ({binned.length})</button>
+              <button onClick={openAdd} style={primaryBtn}>+ Add Employee</button>
+            </>
+          )}
+        </div>
       </div>
 
       {successMsg && (
@@ -105,6 +163,13 @@ export default function AdminEmployeesPage() {
 
       {loading ? (
         <div style={{ ...card, color: '#94a3b8', padding: '2rem' }}>Loading…</div>
+      ) : showBin ? (
+        <BinList
+          employees={binned}
+          saving={saving}
+          onRestore={handleRestore}
+          onPurge={e => askConfirm('purge', e)}
+        />
       ) : (
         <>
           {/* Active employees */}
@@ -128,6 +193,7 @@ export default function AdminEmployeesPage() {
                       employee={e}
                       onEdit={() => openEdit(e)}
                       onToggle={() => toggleStatus(e)}
+                      onDelete={e.id === me?.id ? undefined : () => askConfirm('bin', e)}
                     />
                   ))}
                 </tbody>
@@ -154,6 +220,7 @@ export default function AdminEmployeesPage() {
                       employee={e}
                       onEdit={() => openEdit(e)}
                       onToggle={() => toggleStatus(e)}
+                      onDelete={e.id === me?.id ? undefined : () => askConfirm('bin', e)}
                     />
                   ))}
                 </tbody>
@@ -174,16 +241,128 @@ export default function AdminEmployeesPage() {
           onClose={() => { setModal(null); setError(null) }}
         />
       )}
+
+      {confirm && (
+        <ConfirmModal
+          title={confirm.type === 'bin' ? 'Delete employee?' : 'Delete permanently?'}
+          confirmLabel={confirm.type === 'bin' ? 'Move to bin' : 'Delete forever'}
+          saving={saving}
+          error={confirmError}
+          onConfirm={handleConfirm}
+          onClose={() => setConfirm(null)}
+        >
+          {confirm.type === 'bin' ? (
+            <>
+              <strong>{confirm.employee.full_name}</strong> will be moved to the bin and can no longer log in.
+              You can restore them from the bin within {BIN_MONTHS} months; after that they are deleted permanently.
+            </>
+          ) : (
+            <>
+              <strong>{confirm.employee.full_name}</strong> and all of their attendance, leave and correction
+              records will be deleted permanently. This cannot be undone.
+            </>
+          )}
+        </ConfirmModal>
+      )}
+    </div>
+  )
+}
+
+// ── Bin ───────────────────────────────────────────────────────
+
+function BinList({ employees, saving, onRestore, onPurge }: {
+  employees: Employee[]
+  saving: boolean
+  onRestore: (e: Employee) => void
+  onPurge: (e: Employee) => void
+}) {
+  return (
+    <div style={card}>
+      <h2 style={{ ...sectionHeading, marginBottom: '0.25rem' }}>Bin ({employees.length})</h2>
+      <p style={{ ...hintStyle, margin: '0 0 1.25rem', fontSize: '0.8125rem' }}>
+        Deleted employees stay here for {BIN_MONTHS} months, then are deleted permanently with all their records.
+      </p>
+      {employees.length === 0 ? (
+        <p style={{ color: '#94a3b8', margin: 0 }}>The bin is empty.</p>
+      ) : (
+        <table style={tableStyle}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+              {['Employee', 'Deleted on', 'Deleted permanently on', ''].map(h => (
+                <th key={h} style={thStyle}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map(e => {
+              const purge = purgeDate(e.deleted_at!)
+              const daysLeft = Math.max(0, Math.ceil((purge.getTime() - Date.now()) / 86_400_000))
+              return (
+                <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={tdStyle}>
+                    <div style={{ fontWeight: 600, color: '#1e293b', fontSize: '0.9375rem' }}>{e.full_name}</div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>{e.email}</div>
+                  </td>
+                  <td style={{ ...tdStyle, color: '#64748b' }}>{fmtDate(new Date(e.deleted_at!))}</td>
+                  <td style={{ ...tdStyle, color: '#64748b' }}>
+                    {fmtDate(purge)} <span style={{ color: '#94a3b8' }}>({daysLeft} day{daysLeft === 1 ? '' : 's'} left)</span>
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <button onClick={() => onRestore(e)} disabled={saving} style={{ ...ghostBtn, color: '#16a34a', borderColor: '#bbf7d0' }}>Restore</button>
+                    <button onClick={() => onPurge(e)} disabled={saving} style={{ ...ghostBtn, marginLeft: '0.5rem', color: '#dc2626', borderColor: '#fecaca' }}>Delete forever</button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
+function ConfirmModal({ title, confirmLabel, saving, error, onConfirm, onClose, children }: {
+  title: string
+  confirmLabel: string
+  saving: boolean
+  error: string | null
+  onConfirm: () => void
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ ...modalStyle, maxWidth: 420 }}>
+        <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.125rem', fontWeight: 700, color: '#1e293b' }}>{title}</h2>
+        <p style={{ margin: '0 0 1.25rem', fontSize: '0.875rem', color: '#475569', lineHeight: 1.5 }}>{children}</p>
+        {error && (
+          <div style={{ marginBottom: '1rem', padding: '0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: '0.875rem' }}>
+            {error}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+          <button type="button" onClick={onClose} style={{ ...ghostBtn, padding: '0.625rem 1.25rem' }}>Cancel</button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={saving}
+            style={{ ...primaryBtn, background: '#dc2626', opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
+          >
+            {saving ? 'Deleting…' : confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
 
 // ── Employee table row ────────────────────────────────────────
 
-function EmployeeRow({ employee: e, onEdit, onToggle }: {
+function EmployeeRow({ employee: e, onEdit, onToggle, onDelete }: {
   employee: Employee
   onEdit: () => void
   onToggle: () => void
+  onDelete?: () => void             // absent for the signed-in admin's own row
 }) {
   const roleColor = ROLE_COLORS[e.role as keyof typeof ROLE_COLORS] ?? ROLE_COLORS.employee
   const isActive = e.status === 'active'
@@ -231,6 +410,11 @@ function EmployeeRow({ employee: e, onEdit, onToggle }: {
         >
           {isActive ? 'Deactivate' : 'Reactivate'}
         </button>
+        {onDelete && (
+          <button onClick={onDelete} style={{ ...ghostBtn, marginLeft: '0.5rem', color: '#dc2626', borderColor: '#fecaca' }}>
+            Delete
+          </button>
+        )}
       </td>
     </tr>
   )
@@ -272,19 +456,8 @@ function EmployeeModal({ mode, designations, saving, error, onSave, onClose }: {
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 50,
-      background: 'rgba(15,23,42,0.4)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '1rem',
-    }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={{
-        background: '#fff', borderRadius: 16,
-        padding: '1.75rem', width: '100%', maxWidth: 480,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-      }}>
+    <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={modalStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
           <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#1e293b' }}>
             {isEdit ? 'Edit Employee' : 'Add Employee'}
@@ -416,4 +589,6 @@ const tdStyle: CSSProperties = { padding: '0.875rem 0.75rem', verticalAlign: 'mi
 const primaryBtn: CSSProperties = { padding: '0.5rem 1.125rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }
 const ghostBtn: CSSProperties = { padding: '0.375rem 0.75rem', background: '#fff', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: '0.8125rem', cursor: 'pointer', fontWeight: 500 }
 const inputStyle: CSSProperties = { width: '100%', padding: '0.625rem 0.75rem', border: '1px solid #d1d5db', borderRadius: 8, fontSize: '0.9375rem', outline: 'none', boxSizing: 'border-box', color: '#1e293b', fontFamily: 'inherit' }
+const overlayStyle: CSSProperties = { position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(15,23,42,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }
+const modalStyle: CSSProperties = { background: '#fff', borderRadius: 16, padding: '1.75rem', width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }
 const hintStyle: CSSProperties = { margin: '0.25rem 0 0', fontSize: '0.75rem', color: '#94a3b8' }
