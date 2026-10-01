@@ -8,6 +8,8 @@ type AuthContextValue = {
   employee: Employee | null
   loading: boolean
   signOut: () => Promise<void>
+  /** Re-reads the signed-in employee's row, e.g. after they change their photo. */
+  refreshEmployee: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -34,16 +36,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!userId) return
     let cancelled = false
-    supabase
-      .from('employees')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) setProfile({ userId, employee: data ?? null })
-      })
+    fetchEmployee(userId).then(employee => {
+      if (!cancelled) setProfile({ userId, employee })
+    })
     return () => { cancelled = true }
   }, [userId])
+
+  async function refreshEmployee() {
+    if (!userId) return
+    const employee = await fetchEmployee(userId)
+    setProfile({ userId, employee })
+  }
 
   const employee = profile && profile.userId === userId ? profile.employee : null
   // Loading until the session is known AND the profile for this exact user has arrived —
@@ -56,10 +59,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       employee,
       loading,
       signOut: () => supabase.auth.signOut(),
+      refreshEmployee,
     }}>
       {children}
     </AuthContext.Provider>
   )
+}
+
+async function fetchEmployee(userId: string): Promise<Employee | null> {
+  const { data } = await supabase.from('employees').select('*').eq('id', userId).maybeSingle()
+  return data ?? null
 }
 
 export function useAuth() {

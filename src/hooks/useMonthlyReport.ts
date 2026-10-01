@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Employee } from '../types'
 import { TRACKING_START, isSunday, monthDates } from '../lib/calendar'
+import { TRACKED_STATUSES } from '../lib/employees'
 
 export type EmployeeSummary = {
   employee: Pick<Employee, 'id' | 'full_name' | 'email' | 'department' | 'monthly_salary'>
@@ -63,10 +64,12 @@ export function useMonthlyReport(yearMonth: string) {
         { data: records, error: recErr },
         { data: settings, error: setErr },
       ] = await Promise.all([
+        // Current staff, plus anyone whose last working day falls in or after this month (final pay)
         supabase
           .from('employees')
-          .select('id, full_name, email, department, monthly_salary')
-          .eq('status', 'active')
+          .select('id, full_name, email, department, monthly_salary, status, last_working_day')
+          .or(`status.in.(${TRACKED_STATUSES.join(',')}),last_working_day.gte.${start}`)
+          .is('deleted_at', null)
           .order('full_name'),
         supabase
           .from('attendance_records')
@@ -82,7 +85,7 @@ export function useMonthlyReport(yearMonth: string) {
       const { data: holidays } = await supabase.from('public_holidays').select('date').gte('date', start).lte('date', end)
       const holidaySet = new Set((holidays ?? []).map(h => h.date))
       // Working days so far this month (from TRACKING_START): absent is counted against these, not calendar days
-      const totalDays = monthDates(yearMonth).filter(d => d >= start && d >= TRACKING_START && d <= end && !isSunday(d) && !holidaySet.has(d)).length
+      const workingDates = monthDates(yearMonth).filter(d => d >= start && d >= TRACKING_START && d <= end && !isSunday(d) && !holidaySet.has(d))
 
       if (cancelled) return
       if (empErr || recErr || setErr) {
@@ -115,7 +118,12 @@ export function useMonthlyReport(yearMonth: string) {
 
       const result: EmployeeSummary[] = (employees ?? []).map(emp => {
         const t = tally.get(emp.id) ?? empty()
-        const absent = Math.max(0, totalDays - t.present - t.late - t.on_leave)
+        const lwd = emp.last_working_day as string | null
+        const totalDays = lwd ? workingDates.filter(d => d <= lwd).length : workingDates.length
+        const missing = Math.max(0, totalDays - t.present - t.late - t.on_leave)
+        // Long leave: days without a record count as (unpaid) leave, not absent
+        if (emp.status === 'on_long_leave') t.on_leave += missing
+        const absent = emp.status === 'on_long_leave' ? 0 : missing
         const salary = (emp.monthly_salary as number | null) ?? null
         return {
           employee: { id: emp.id, full_name: emp.full_name, email: emp.email, department: emp.department, monthly_salary: salary },

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
-import { House, CalendarDays, ChartColumn, ChevronDown, User, LogOut, Sun, Moon, Monitor } from 'lucide-react'
+import { House, CalendarDays, ChartColumn, ChevronDown, User, LogOut, Sun, Moon, Monitor, Camera } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { photoUrl, savePhoto } from '../lib/employees'
 import { useTheme } from '../lib/theme'
 import type { ThemeChoice } from '../lib/theme'
 import '../styles/app.css'
@@ -57,9 +58,26 @@ function Header({ theme }: { theme: Theme }) {
 }
 
 function UserMenu({ theme }: { theme: Theme }) {
-  const { employee, signOut } = useAuth()
+  const { employee, signOut, refreshEmployee } = useAuth()
   const [open, setOpen] = useState(false)
+  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
+  const photo = employee ? photoUrl(employee) : null
+
+  async function changePhoto(file: File | null) {
+    if (!employee) return
+    setPhotoBusy(true)
+    setPhotoError(null)
+    try {
+      await savePhoto(employee, file)
+      await refreshEmployee()
+    } catch (e) {
+      setPhotoError((e as Error).message)
+    }
+    setPhotoBusy(false)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -76,7 +94,9 @@ function UserMenu({ theme }: { theme: Theme }) {
   return (
     <div className="sb-user" ref={ref}>
       <button className="sb-user-btn" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="Account menu">
-        <span className="sb-avatar"><User size={20} strokeWidth={2.2} fill="currentColor" /></span>
+        <span className="sb-avatar">
+          {photo ? <img src={photo} alt="" /> : <User size={20} strokeWidth={2.2} fill="currentColor" />}
+        </span>
         <ChevronDown size={18} strokeWidth={2.4} />
       </button>
       {open && (
@@ -93,6 +113,19 @@ function UserMenu({ theme }: { theme: Theme }) {
               </button>
             ))}
           </div>
+          <button className="sb-menu-item" role="menuitem" disabled={photoBusy} onClick={() => fileInput.current?.click()}>
+            <Camera size={18} /> {photoBusy ? 'Saving photo…' : photo ? 'Change photo' : 'Add photo'}
+          </button>
+          {photo && !photoBusy && (
+            <button className="sb-menu-item sb-menu-item-quiet" role="menuitem" onClick={() => changePhoto(null)}>
+              Remove photo
+            </button>
+          )}
+          {photoError && <p className="sb-menu-error">{photoError}</p>}
+          <input
+            ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" hidden
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) changePhoto(f) }}
+          />
           <button className="sb-menu-item" role="menuitem" onClick={signOut}>
             <LogOut size={18} /> Sign out
           </button>

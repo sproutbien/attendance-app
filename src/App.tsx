@@ -11,6 +11,7 @@ import ReportsPage from './pages/ReportsPage'
 import AdminAttendancePage from './pages/admin/AdminAttendancePage'
 import AdminLeavePage from './pages/admin/AdminLeavePage'
 import AdminEmployeesPage from './pages/admin/AdminEmployeesPage'
+import AdminEmployeeProfilePage from './pages/admin/AdminEmployeeProfilePage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
 import AdminCalendarPage from './pages/admin/AdminCalendarPage'
 import AdminCorrectionsPage from './pages/admin/AdminCorrectionsPage'
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="leave"      element={<AdminLeavePage />} />
             <Route path="corrections" element={<AdminCorrectionsPage />} />
             <Route path="employees"  element={<AdminEmployeesPage />} />
+            <Route path="employees/:id" element={<AdminEmployeeProfilePage />} />
             <Route path="reports"    element={<AdminReportsPage />} />
             <Route path="calendar"   element={<AdminCalendarPage />} />
           </Route>

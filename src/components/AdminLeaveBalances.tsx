@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { localDate } from '../lib/calendar'
 import { fmtDays, leaveYearLabel, leaveYearOf } from '../lib/leave'
 import { useLeaveBalances } from '../hooks/useLeaveBalances'
+import { TRACKED_STATUSES } from '../lib/employees'
 import LeaveBalanceCards from './LeaveBalanceCards'
 import type { Employee, LeaveAdjustment, LeaveBalance, LeaveTypeCode } from '../types'
 
@@ -28,7 +29,7 @@ export default function AdminLeaveBalances() {
     const { data: employees, error } = await supabase
       .from('employees')
       .select('id, full_name, department, joining_date')
-      .eq('status', 'active')
+      .in('status', TRACKED_STATUSES)
       .order('full_name')
     if (error) { setError(error.message); setLoading(false); return }
     const results = await Promise.all((employees ?? []).map(async e => {

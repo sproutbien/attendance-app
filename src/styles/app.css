@@ -270,6 +270,9 @@
   text-align: left;
 }
 .sb-menu-item:hover { background: var(--surface-soft); filter: none !important; }
+.sb-menu-item-quiet { padding-left: 40px; font-weight: 500; color: var(--text-muted); font-size: 13px; }
+.sb-menu-error { margin: 0 12px 8px; color: #dc2626; font-size: 12px; }
+.sb-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* Bottom tab bar (phones) */
 .sb-tabbar { display: none; }

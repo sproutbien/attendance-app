@@ -1,16 +1,37 @@
+export type EmployeeStatus =
+  | 'active' | 'probation' | 'on_notice' | 'on_long_leave'
+  | 'resigned' | 'terminated' | 'inactive'
+
 export type Employee = {
   id: string
+  employee_code: string           // "SB001"; auto-assigned, editable by admins
   full_name: string
   email: string
   role: 'employee' | 'admin'
   department: string | null
   designation: string | null      // job title, e.g. "Senior Designer"
-  status: 'active' | 'inactive'
+  status: EmployeeStatus
   monthly_salary: number | null
   phone: string | null            // WhatsApp number, digits with country code
   joining_date: string | null     // leave accrues from this month; null = full year
+  photo_path: string | null       // object path in the 'avatars' storage bucket
+  employment_type: string | null
+  work_location: string | null
+  reporting_manager_id: string | null
+  last_working_day: string | null // on notice / resigned / terminated
+  emergency_contact_name: string | null
+  emergency_contact_relation: string | null
+  emergency_contact_phone: string | null
   deleted_at: string | null       // set while in the bin; purged 6 months later
   created_at: string
+}
+
+export type EmployeeOptionKind = 'department' | 'work_location' | 'employment_type'
+
+export type EmployeeOption = {
+  id: string
+  kind: EmployeeOptionKind
+  name: string
 }
 
 export type HalfDaySession = 'morning' | 'afternoon'

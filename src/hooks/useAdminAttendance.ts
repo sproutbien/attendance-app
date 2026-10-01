@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { TRACKED_STATUSES } from '../lib/employees'
 import type { Employee, AttendanceRecord } from '../types'
 
 export type AdminAttendanceRow = {
@@ -23,8 +24,8 @@ export function useAdminAttendance(selectedDate: string) {
       const [{ data: employees, error: empErr }, { data: records, error: recErr }] = await Promise.all([
         supabase
           .from('employees')
-          .select('id, full_name, department')
-          .eq('status', 'active')
+          .select('id, full_name, department, status')
+          .in('status', TRACKED_STATUSES)
           .order('full_name'),
         supabase
           .from('attendance_records')
@@ -42,12 +43,13 @@ export function useAdminAttendance(selectedDate: string) {
 
       const recordMap = new Map((records ?? []).map(r => [r.employee_id, r]))
 
-      const combined: AdminAttendanceRow[] = (employees ?? []).map(emp => {
+      const combined: AdminAttendanceRow[] = (employees ?? []).map(({ status, ...emp }) => {
         const record = recordMap.get(emp.id) ?? null
         return {
           employee: emp,
           record,
-          effectiveStatus: record?.status ?? 'absent',
+          // Staff on long leave aren't marked absent
+          effectiveStatus: record?.status ?? (status === 'on_long_leave' ? 'on_leave' : 'absent'),
         }
       })
 
