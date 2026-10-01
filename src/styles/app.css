@@ -280,6 +280,7 @@
 /* ── Page containers ───────────────────────────────────────── */
 
 .sb-narrow { max-width: 600px; margin: 0 auto; padding: 2rem 1.25rem; }
+.sb-narrow.sb-medium { max-width: 1040px; }
 .sb-container { max-width: 1280px; margin: 0 auto; padding: 0 28px 40px; position: relative; z-index: 1; }
 
 /* ── Hero ──────────────────────────────────────────────────── */

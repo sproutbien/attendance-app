@@ -19,13 +19,16 @@ const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
   { value: 'system', label: 'System', Icon: Monitor },
 ]
 
-/** Employee shell. `wide` lets the page lay out its own full-width sections (Dashboard). */
-export default function AppLayout({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
+/**
+ * Employee shell. `wide` lets the page lay out its own full-width sections (Dashboard);
+ * `medium` is a roomier single column (Leaves).
+ */
+export default function AppLayout({ children, wide = false, medium = false }: { children: React.ReactNode; wide?: boolean; medium?: boolean }) {
   const theme = useTheme()
   return (
     <div className="sb-app" data-theme={theme.dataTheme}>
       <Header theme={theme} />
-      {wide ? children : <div className="sb-narrow">{children}</div>}
+      {wide ? children : <div className={medium ? 'sb-narrow sb-medium' : 'sb-narrow'}>{children}</div>}
       <nav className="sb-tabbar" aria-label="Main">
         {NAV.map(({ to, label, Icon }) => (
           <NavLink key={to} to={to}><Icon size={22} strokeWidth={2} />{label}</NavLink>

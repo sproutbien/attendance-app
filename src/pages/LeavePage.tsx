@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useHolidayDates, useLeaveBalances } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
 import { LEAVE_TYPE_LABELS, addDays, bookableAsOf, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, workingDays } from '../lib/leave'
-import { localDate } from '../lib/calendar'
+import { localDate, monthLabel } from '../lib/calendar'
 import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 import { fmtClock, sessionLabel } from '../lib/shifts'
 import { useMyShift } from '../hooks/useShifts'
@@ -140,7 +140,7 @@ export default function LeavePage() {
     .slice(0, 6)
 
   return (
-    <AppLayout>
+    <AppLayout medium>
       <LeaveBalanceCards balances={current.balances} loading={current.loading} error={current.error} />
 
       {cancelledToday && (
@@ -381,34 +381,65 @@ export default function LeavePage() {
         ) : requests.length === 0 ? (
           <p style={{ color: 'var(--text-faint, #94a3b8)', margin: 0 }}>No leave requests yet.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {requests.map(r => (
-              <RequestRow
-                key={r.id}
-                r={r}
-                shift={todayShift}
-                today={today}
-                todayCancel={coversToday(r, today) && !checkedInToday}
-                autoOpen={r.id === cancelId}
-                onCancel={() => cancel(r.id)}
-                onCancelToday={async mode => {
-                  const err = await cancelToday(r.id, mode)
-                  if (!err) {
-                    setCancelledToday(true)
-                    setParams({}, { replace: true })
-                    current.refresh()
-                    booking.refresh()
-                    window.scrollTo({ top: 0, behavior: 'smooth' })
-                  }
-                  return err
-                }}
-              />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {byMonth(requests).map(([ym, list]) => (
+              <section key={ym} aria-label={monthLabel(ym)}>
+                <h4 style={monthHeading}>
+                  {monthLabel(ym)}
+                  <span style={{ fontWeight: 500, color: 'var(--text-faint, #94a3b8)' }}> · {list.length} request{list.length === 1 ? '' : 's'}</span>
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {list.map(r => (
+                    <RequestRow
+                      key={r.id}
+                      r={r}
+                      shift={todayShift}
+                      today={today}
+                      todayCancel={coversToday(r, today) && !checkedInToday}
+                      autoOpen={r.id === cancelId}
+                      onCancel={() => cancel(r.id)}
+                      onCancelToday={async mode => {
+                        const err = await cancelToday(r.id, mode)
+                        if (!err) {
+                          setCancelledToday(true)
+                          setParams({}, { replace: true })
+                          current.refresh()
+                          booking.refresh()
+                          window.scrollTo({ top: 0, behavior: 'smooth' })
+                        }
+                        return err
+                      }}
+                    />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
         )}
       </div>
     </AppLayout>
   )
+}
+
+/** Requests grouped by the month their leave starts in: newest month first, latest dates first within it. */
+function byMonth(requests: LeaveRequest[]): [string, LeaveRequest[]][] {
+  const groups = new Map<string, LeaveRequest[]>()
+  for (const r of [...requests].sort((a, b) => b.start_date.localeCompare(a.start_date) || b.requested_at.localeCompare(a.requested_at))) {
+    const ym = r.start_date.slice(0, 7)
+    groups.set(ym, [...(groups.get(ym) ?? []), r])
+  }
+  return [...groups]
+}
+
+const monthHeading: CSSProperties = {
+  margin: '0 0 0.625rem',
+  paddingBottom: '0.375rem',
+  borderBottom: '1px solid var(--border, #e2e8f0)',
+  fontSize: '0.8125rem',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  color: 'var(--text-muted, #64748b)',
 }
 
 /** "3 Oct" / "3 Oct (morning half)" / "10 Oct – 12 Oct" */
