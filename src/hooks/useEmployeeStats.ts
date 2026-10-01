@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 import { TRACKING_START, daysInMonth, localDate, shiftMonth } from '../lib/calendar'
 import { computeMonthStats } from '../lib/stats'
 import type { MonthStats, StatsInput } from '../lib/stats'
@@ -8,9 +7,8 @@ import type { MonthStats, StatsInput } from '../lib/stats'
 /** How many months the trend covers, ending at the selected month. */
 export const TREND_MONTHS = 6
 
-/** The selected month's statistics plus a month-by-month trend (oldest first). */
-export function useMyStats(yearMonth: string) {
-  const { employee } = useAuth()
+/** One employee's statistics for the selected month plus a month-by-month trend (oldest first). */
+export function useEmployeeStats(employeeId: string | undefined, yearMonth: string) {
   const [input, setInput] = useState<StatsInput | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -27,7 +25,7 @@ export function useMyStats(yearMonth: string) {
   }, [yearMonth])
 
   useEffect(() => {
-    if (!employee) return
+    if (!employeeId) return
     let cancelled = false
     const start = `${months[0]}-01`
     const end = `${yearMonth}-${String(daysInMonth(yearMonth)).padStart(2, '0')}`
@@ -36,12 +34,12 @@ export function useMyStats(yearMonth: string) {
       setLoading(true)
       setError(null)
       const [rec, hol, lv, sh, asg] = await Promise.all([
-        supabase.from('attendance_records').select('*').eq('employee_id', employee!.id).gte('date', start).lte('date', end),
+        supabase.from('attendance_records').select('*').eq('employee_id', employeeId).gte('date', start).lte('date', end),
         supabase.from('public_holidays').select('date').gte('date', start).lte('date', end),
-        supabase.from('leave_requests').select('*').eq('employee_id', employee!.id).eq('status', 'approved')
+        supabase.from('leave_requests').select('*').eq('employee_id', employeeId).eq('status', 'approved')
           .lte('start_date', end).gte('end_date', start),
         supabase.from('shifts').select('*'),
-        supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').eq('employee_id', employee!.id).order('effective_from'),
+        supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').eq('employee_id', employeeId).order('effective_from'),
       ])
       if (cancelled) return
       const err = rec.error ?? hol.error ?? lv.error ?? sh.error ?? asg.error
@@ -58,7 +56,7 @@ export function useMyStats(yearMonth: string) {
 
     load()
     return () => { cancelled = true }
-  }, [employee, months, yearMonth])
+  }, [employeeId, months, yearMonth])
 
   const stats = useMemo(() => {
     if (!input) return null

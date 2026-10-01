@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Camera } from 'lucide-react'
+import { ArrowLeft, Camera, ChartColumn } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { profileUpdates, useEmployeeManagement, useEmployeeOptions, useHrNotes } from '../../hooks/useEmployeeManagement'
 import type { EmployeeFormData } from '../../hooks/useEmployeeManagement'
@@ -86,7 +86,12 @@ export default function AdminEmployeeProfilePage() {
             <div style={{ color: '#92400e', fontSize: '0.8125rem', marginTop: 6 }}>Last working day {fmtDate(e.last_working_day)}.</div>
           )}
         </div>
-        <button onClick={() => { setError(null); setEditing(true) }} style={primaryBtn}>Edit profile</button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <Link to={`/admin/employees/${e.id}/stats`} style={{ ...ghostBtn, padding: '0.5rem 0.875rem', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+            <ChartColumn size={16} /> Statistics
+          </Link>
+          <button onClick={() => { setError(null); setEditing(true) }} style={primaryBtn}>Edit profile</button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>

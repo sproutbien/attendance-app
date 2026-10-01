@@ -5,19 +5,20 @@ import { localDate } from '../lib/calendar'
 import { FALLBACK_SHIFT } from '../lib/shifts'
 import type { EmployeeShift, Shift } from '../types'
 
-/** The signed-in employee's shift on `date` (today by default). */
-export function useMyShift(date = localDate()) {
+/** The signed-in employee's shift on `date` (today by default), or another employee's (admins). */
+export function useMyShift(date = localDate(), employeeId?: string) {
   const { employee } = useAuth()
+  const id = employeeId ?? employee?.id
   const [shift, setShift] = useState<Shift | null>(null)
 
   useEffect(() => {
-    if (!employee) return
+    if (!id) return
     let cancelled = false
-    supabase.rpc('shift_for', { p_employee: employee.id, p_date: date }).then(({ data }) => {
+    supabase.rpc('shift_for', { p_employee: id, p_date: date }).then(({ data }) => {
       if (!cancelled && data?.id) setShift(data as Shift)
     })
     return () => { cancelled = true }
-  }, [employee, date])
+  }, [id, date])
 
   return { shift: shift ?? FALLBACK_SHIFT, loaded: shift !== null }
 }

@@ -52,7 +52,7 @@ export default function AdminLayout() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
-      <header style={{
+      <header className="st-no-print" style={{
         background: '#14532d',
         padding: '0 1.5rem',
         display: 'flex',
@@ -110,7 +110,7 @@ export default function AdminLayout() {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: '#f0fdf4', minHeight: 'calc(100vh - 56px)' }}>
+      <div className="admin-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: '#f0fdf4', minHeight: 'calc(100vh - 56px)' }}>
         <Outlet />
       </div>
     </div>

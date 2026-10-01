@@ -37,6 +37,10 @@
 }
 
 .st-page { padding-top: 24px; }
+
+/* Admin: stats screen inside the admin layout */
+.sb-app.st-admin { min-height: 0; background: transparent; }
+.st-admin .st-page { padding-top: 12px; }
 .st-top { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 18px; }
 .st-top h1 { margin: 0; font-size: 20px; font-weight: 800; color: var(--text-strong); letter-spacing: -0.01em; }
 .st-top .st-sub { color: var(--text-muted); font-size: 13px; }
@@ -174,7 +178,8 @@
   }
   .sb-header, .sb-tabbar, .st-no-print, .st-tip { display: none !important; }
   .st-print-only { display: block; }
-  .sb-container { padding: 0 !important; max-width: none !important; }
+  .sb-container, .admin-main { padding: 0 !important; max-width: none !important; background: #fff !important; min-height: 0 !important; }
+  body, #root, #root > div { background: #fff !important; }
   .st-page { padding-top: 0; }
   .st-kpis { grid-template-columns: repeat(3, 1fr); }
   .st-grid-2, .st-grid-32 { grid-template-columns: 1fr 1fr; }
