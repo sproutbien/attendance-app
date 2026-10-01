@@ -16,6 +16,7 @@ import { LEAVE_TYPE_LABELS } from '../../lib/leave'
 import type { Employee, LeaveTypeCode } from '../../types'
 import '../../styles/stats.css'
 import { usePrintSetup } from './print'
+import { PrintFooter, PrintHeader } from './PrintHeader'
 
 const PAID_TYPES: LeaveTypeCode[] = ['casual', 'sick', 'earned']
 
@@ -48,20 +49,7 @@ export default function StatsView({ employee, title, actions }: {
   return (
     <div className="st-page">
         {/* Shown only when printing / saving as PDF */}
-        <div className="st-print-only" style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid var(--green-dark)', paddingBottom: 10 }}>
-            <img src="/logo.jpg" alt="" style={{ height: 34 }} />
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-strong)' }}>Attendance report · {monthLabel(yearMonth)}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                {employee?.full_name}{employee?.employee_code ? ` (${employee.employee_code})` : ''}
-                {employee?.designation ? ` · ${employee.designation}` : ''}
-                {` · ${shift.name} shift ${shiftHours(shift)}`}
-                {` · Generated ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`}
-              </div>
-            </div>
-          </div>
-        </div>
+        <PrintHeader employee={employee} shift={shift} yearMonth={yearMonth} m={m} />
 
         <div className="st-top st-no-print">
           <div>
@@ -193,6 +181,8 @@ export default function StatsView({ employee, title, actions }: {
               </>
             )}
         </section>
+
+        <PrintFooter />
     </div>
   )
 }
@@ -222,7 +212,7 @@ function Kpis({ m, prev }: { m: MonthStats; prev: MonthStats | null }) {
       delta: m.expected ? { text: vsShift >= 0 ? 'Above shift hours' : 'Below shift hours', tone: vsShift >= 0 ? 'is-good' : 'is-bad' } : null },
   ]
   return (
-    <div className="st-kpis">
+    <div className="st-kpis st-kpis-me">
       {tiles.map(t => (
         <div className="st-kpi" key={t.label}>
           <div className="st-kpi-label">{t.icon}{t.label}</div>
