@@ -710,7 +710,7 @@ const card: CSSProperties = {
 
 // Soft brand-green tint so the form stands out from the other cards
 const requestCard: CSSProperties = {
-  background: 'linear-gradient(180deg, var(--green-soft, #e6f2e1) 0%, var(--surface, #fff) 70%)',
+  background: 'var(--green-soft, #e6f2e1)',
   border: '1px solid color-mix(in srgb, var(--green, #3d7f1f) 22%, transparent)',
 }
 
