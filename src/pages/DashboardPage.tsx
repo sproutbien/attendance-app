@@ -14,10 +14,10 @@ import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import AppLayout from '../components/AppLayout'
 import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
-import { fmtClock, fmtHM, totalBreakSeconds, workedSeconds } from '../lib/breaks'
+import { fmtClock, fmtHM, minBreakTopUp, totalBreakSeconds, workedSeconds } from '../lib/breaks'
 import { halfDaySplit } from '../lib/halfDay'
 import { fmtClock as clock, minutesOf, shiftHours } from '../lib/shifts'
-import { useMyShift } from '../hooks/useShifts'
+import { useMyShift, useShiftHistory } from '../hooks/useShifts'
 import type { AttendanceRecord, HalfDaySession, Shift } from '../types'
 
 type DayState = 'loading' | 'idle' | 'working' | 'break' | 'done'
@@ -114,7 +114,8 @@ export default function DashboardPage() {
     if (halfDay === 'afternoon' && clockedIn && pastSplit && !isSubmitting) checkOut(new Date(split!))
   }, [halfDay, clockedIn, pastSplit])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  const log = useMonthLog(yearMonth, monthRecords, calendar, employee?.id, now)
+  const shiftOn = useShiftHistory(employee?.id)
+  const log = useMonthLog(yearMonth, monthRecords, calendar, employee?.id, now, shiftOn)
 
   const firstName = employee?.full_name.split(' ')[0] ?? ''
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -148,6 +149,7 @@ export default function DashboardPage() {
             state={state}
             record={todayRecord ?? null}
             now={now}
+            shift={shiftLoaded ? shift : null}
             isSubmitting={isSubmitting}
             onPause={pauseBreak}
             onResume={resumeBreak}
@@ -304,16 +306,19 @@ function todayMark(record: AttendanceRecord | null): DayMark | null {
 
 // ── Today's Time panel (right) ────────────────────────────────
 
-function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
+function TodayTime({ state, record, now, shift, isSubmitting, onPause, onResume }: {
   state: DayState
   record: AttendanceRecord | null
   now: number
+  shift: Shift | null
   isSubmitting: boolean
   onPause: () => void
   onResume: () => void
 }) {
   const chip = CHIP[state]
   const active = state === 'working' || state === 'break'
+  const topUp = minBreakTopUp(record, shift)
+  const minBreak = shift && !record?.half_day_session ? shift.min_break_minutes : 0
 
   let barTitle = 'Pause / Resume'
   let barSub = state === 'done' ? 'Your day is complete' : 'Available after check-in'
@@ -336,7 +341,7 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
           <span className="sb-stat-icon"><BriefcaseBusiness size={22} strokeWidth={2} /></span>
           <div>
             <div className="sb-stat-label">Work Time</div>
-            <div className="sb-stat-value">{fmtHM(workedSeconds(record, now))}</div>
+            <div className="sb-stat-value">{fmtHM(workedSeconds(record, now, shift))}</div>
           </div>
         </div>
         <span className="sb-stats-divider" />
@@ -344,10 +349,15 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
           <span className="sb-stat-icon is-break"><Coffee size={22} strokeWidth={2} /></span>
           <div>
             <div className="sb-stat-label">Break Time</div>
-            <div className="sb-stat-value">{fmtHM(totalBreakSeconds(record, now))}</div>
+            <div className="sb-stat-value">{fmtHM(totalBreakSeconds(record, now) + topUp)}</div>
           </div>
         </div>
       </div>
+      {topUp > 0 ? (
+        <p className="sb-minbreak-note">Includes {fmtMins(topUp)} added to reach your shift’s {minBreak}-minute minimum break.</p>
+      ) : minBreak > 0 && active && (
+        <p className="sb-minbreak-note">A {minBreak}-minute minimum break is deducted on full days, so pause whenever you step away.</p>
+      )}
 
       <button
         className={`sb-pausebar ${state === 'break' ? 'is-break' : ''}`}
@@ -413,6 +423,7 @@ type LogRow = {
   rec?: AttendanceRecord
   worked: number | null   // null → no complete work span to show
   brk: number
+  topUp: number           // added to reach the shift's minimum break
 }
 
 /** The month's rows (newest first, up to today) plus the totals the This Month card shows */
@@ -422,6 +433,7 @@ function useMonthLog(
   calendar: ReturnType<typeof useMonthCalendar>,
   employeeId: string | undefined,
   now: number,
+  shiftOn: (date: string) => Shift | null,
 ) {
   const today = localDate()
 
@@ -442,11 +454,13 @@ function useMonthLog(
           ? (rec.status === 'late' ? 'late' : 'present')
           : resolveMark(date, today, { holiday, attendance: rec?.status, leave: leave?.get(date) })
         const complete = !!rec?.check_in_time && (!!rec.check_out_time || date === today)
+        const shift = rec?.check_in_time ? shiftOn(date) : null
         return {
           date, mark, rec,
           note: calendar.holidays.get(date),
-          worked: complete ? workedSeconds(rec, now) : null,
+          worked: complete ? workedSeconds(rec, now, shift) : null,
           brk: totalBreakSeconds(rec, now),
+          topUp: minBreakTopUp(rec, shift),
         }
       })
 
@@ -464,7 +478,23 @@ function useMonthLog(
     const workedTotal = rows.reduce((n, r) => n + (r.worked ?? 0), 0)
     const leaveDays = rows.reduce((n, r) => n + (r.mark === 'leave' ? 1 : r.mark === 'half_leave' ? 0.5 : 0), 0)
     return { rows, presentDays, workingDays, workedTotal, leaveDays }
-  }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now])
+  }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now, shiftOn])
+}
+
+/** Break for the day; marks days where the shift's minimum break was applied. */
+function BreakCell({ r }: { r: LogRow }) {
+  if (r.brk + r.topUp <= 0) return <>—</>
+  if (!r.topUp) return <>{fmtHM(r.brk)}</>
+  return (
+    <span title={`You paused for ${r.brk ? fmtMins(r.brk) : 'no time'}; the minimum break was applied`}>
+      {fmtHM(r.brk + r.topUp)} <small className="sb-minbreak-tag">min</small>
+    </span>
+  )
+}
+
+/** 1680 → "28 min" */
+function fmtMins(seconds: number) {
+  return `${Math.round(seconds / 60)} min`
 }
 
 function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingCorrections, onCorrect }: {
@@ -527,7 +557,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingC
                     <td>{status(r)}</td>
                     <td>{fmtTime(r.rec?.check_in_time)}</td>
                     <td>{fmtTime(r.rec?.check_out_time)}</td>
-                    <td>{r.brk > 0 ? fmtHM(r.brk) : '—'}</td>
+                    <td><BreakCell r={r} /></td>
                     <td>{r.worked != null ? fmtHM(r.worked) : '—'}</td>
                     <td className="sb-fix-cell">{fix(r)}</td>
                   </tr>
@@ -547,7 +577,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingC
                   <dl>
                     <div><dt>In</dt><dd>{fmtTime(r.rec.check_in_time)}</dd></div>
                     <div><dt>Out</dt><dd>{fmtTime(r.rec.check_out_time)}</dd></div>
-                    <div><dt>Break</dt><dd>{r.brk > 0 ? fmtHM(r.brk) : '—'}</dd></div>
+                    <div><dt>Break</dt><dd><BreakCell r={r} /></dd></div>
                     <div><dt>Worked</dt><dd>{r.worked != null ? fmtHM(r.worked) : '—'}</dd></div>
                   </dl>
                 )}

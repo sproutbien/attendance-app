@@ -5,7 +5,7 @@ import type { HalfDaySession, Shift } from '../types'
 /** The original fixed rules — used only until the employee's real shift has loaded. */
 export const FALLBACK_SHIFT: Shift = {
   id: '', name: 'General', is_default: true,
-  start_time: '09:30:00', end_time: '17:30:00', late_after: '09:40:00', half_day_after: '11:30:00', split_time: '13:30:00',
+  start_time: '09:30:00', end_time: '17:30:00', late_after: '09:40:00', half_day_after: '11:30:00', split_time: '13:30:00', min_break_minutes: 40,
 }
 
 /** Minutes since midnight. */

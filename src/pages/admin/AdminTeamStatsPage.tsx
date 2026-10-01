@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowDown, ArrowUp, CalendarCheck, ChartColumn, DoorOpen, Download, Timer, TriangleAlert, Users } from 'lucide-react'
+import { ArrowDown, ArrowUp, CalendarCheck, ChartColumn, Coffee, DoorOpen, Download, Timer, TriangleAlert, Users } from 'lucide-react'
 import { MonthPicker } from '../../components/MonthCalendar'
 import { KIND_META } from '../../components/stats/Charts'
 import { BreakdownBars, MonthColumns, RankBars } from '../../components/stats/TeamCharts'
@@ -11,11 +11,11 @@ import { useTeamStats } from '../../hooks/useTeamStats'
 import type { MemberStats, TeamMember } from '../../hooks/useTeamStats'
 import { TRACKING_START, currentYearMonth, monthLabel } from '../../lib/calendar'
 import { fmtHM } from '../../lib/breaks'
-import { fmtDays, fmtMinutes, fmtPct, teamTotals } from '../../lib/stats'
+import { breakFlags, fmtDays, fmtMinutes, fmtPct, teamTotals } from '../../lib/stats'
 import type { DayKind, MonthStats } from '../../lib/stats'
 import '../../styles/stats.css'
 
-type SortKey = 'name' | 'attendance' | 'onTime' | 'avgWorked' | 'worked' | 'present' | 'late' | 'leave' | 'absent' | 'vsShift' | 'checkIn'
+type SortKey = 'name' | 'attendance' | 'onTime' | 'avgWorked' | 'worked' | 'present' | 'late' | 'leave' | 'absent' | 'vsShift' | 'checkIn' | 'minBreak'
 
 const COLUMNS: { key: SortKey; label: string; title?: string }[] = [
   { key: 'name', label: 'Employee' },
@@ -29,6 +29,7 @@ const COLUMNS: { key: SortKey; label: string; title?: string }[] = [
   { key: 'avgWorked', label: 'Avg. / day' },
   { key: 'vsShift', label: 'Vs shift', title: 'Hours worked minus shift hours on days they came in' },
   { key: 'checkIn', label: 'Avg. check-in' },
+  { key: 'minBreak', label: 'Min. break days', title: 'Full days where less than the shift’s minimum break was recorded (days with no break at all in brackets)' },
 ]
 
 const sortValue = (s: MemberStats, k: SortKey): number | string => {
@@ -45,6 +46,7 @@ const sortValue = (s: MemberStats, k: SortKey): number | string => {
     case 'absent': return m.absent
     case 'vsShift': return m.expected ? m.worked - m.expected : -Infinity
     case 'checkIn': return m.avgCheckIn ?? Infinity
+    case 'minBreak': return m.topUpDays + m.noBreakDays / 100
   }
 }
 
@@ -77,6 +79,10 @@ export default function AdminTeamStatsPage() {
     const c = va < vb ? -1 : va > vb ? 1 : 0
     return (sort.asc ? c : -c) || a.employee.full_name.localeCompare(b.employee.full_name)
   })
+  const flagged = shown
+    .map(s => ({ s, flags: breakFlags(s.month) }))
+    .filter(f => f.flags.length > 0)
+    .sort((a, b) => b.s.month.noBreakDays - a.s.month.noBreakDays || b.s.month.topUpDays - a.s.month.topUpDays)
   const byAttendance = [...shown].sort((a, b) => (b.month.attendanceRate ?? -1) - (a.month.attendanceRate ?? -1))
   const byHours = [...shown].sort((a, b) => b.month.avgWorked - a.month.avgWorked)
   const byOnTime = [...shown].sort((a, b) => (b.month.onTimeRate ?? -1) - (a.month.onTimeRate ?? -1))
@@ -154,6 +160,27 @@ export default function AdminTeamStatsPage() {
                 </div>
               ))}
             </div>
+
+            {flagged.length > 0 && (
+              <section className="st-card st-flags" style={{ marginBottom: 16 }}>
+                <div className="st-card-head">
+                  <Coffee size={18} style={{ color: '#b45309', alignSelf: 'center' }} />
+                  <h2>Worth a look</h2>
+                  <p>Break and timer patterns this month · the minimum break is already deducted, so this is for a friendly check-in</p>
+                </div>
+                <ul>
+                  {flagged.map(({ s, flags }) => (
+                    <li key={s.employee.id}>
+                      <Link to={`/admin/employees/${s.employee.id}/stats?month=${yearMonth}`} className="st-person">
+                        <EmployeeAvatar employee={s.employee} size={26} />
+                        <span>{s.employee.full_name}</span>
+                      </Link>
+                      <span>{flags.join(' · ')}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <section className="st-card" style={{ marginBottom: 16 }}>
               <div className="st-card-head">
@@ -261,6 +288,7 @@ export default function AdminTeamStatsPage() {
                       <td>{fmtHM(team.avgWorked)}</td>
                       <td>{team.expected ? signedHM(team.worked - team.expected) : '—'}</td>
                       <td>—</td>
+                      <td>{team.topUpDays}{team.noBreakDays ? ` (${team.noBreakDays})` : ''}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -297,6 +325,7 @@ function MemberRow({ s, yearMonth }: { s: MemberStats; yearMonth: string }) {
       <td>{fmtHM(m.avgWorked)}</td>
       <td>{m.expected ? signedHM(m.worked - m.expected) : '—'}</td>
       <td>{m.avgCheckIn != null ? fmtMinutes(m.avgCheckIn) : '—'}</td>
+      <td>{m.topUpDays}{m.noBreakDays ? ` (${m.noBreakDays})` : ''}</td>
     </tr>
   )
 }

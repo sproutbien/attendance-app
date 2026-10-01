@@ -152,6 +152,7 @@ export type Shift = {
   late_after: string       // check-in after this is Late
   half_day_after: string   // check-in after this makes the morning a half-day leave
   split_time: string       // morning / afternoon boundary
+  min_break_minutes: number  // full days: at least this much break is deducted from worked hours
   is_default: boolean
 }
 

@@ -1,6 +1,6 @@
 import type { AttendanceRecord, EmployeeShift, LeaveRequest, LeaveTypeCode, Shift } from '../types'
 import { TRACKING_START, isSunday, monthDates } from './calendar'
-import { totalBreakSeconds, workedSeconds } from './breaks'
+import { minBreakTopUp, shiftSeconds, spanSeconds, totalBreakSeconds, workedSeconds } from './breaks'
 import { FALLBACK_SHIFT, minutesOf } from './shifts'
 
 // Month statistics for one employee — powers the Reports screen.
@@ -14,7 +14,10 @@ export type DayStat = {
   date: string
   worked: number              // seconds, completed days (and today so far)
   expected: number            // shift seconds for the part of the day they were due in
-  breaks: number              // seconds
+  breaks: number              // seconds actually paused
+  topUp: number               // seconds added to reach the shift's minimum break (full days)
+  noBreak: boolean            // full day checked out with no break recorded at all
+  longDay: boolean            // checked in for 2+ hours longer than the shift (timer left running?)
   checkIn: number | null      // minutes since midnight (full / afternoon-leave days only)
   checkOut: number | null     // minutes since midnight (full / morning-leave days only)
   lateAfter: number           // the shift's late threshold, minutes
@@ -38,6 +41,10 @@ export type MonthStats = {
   expected: number            // shift seconds on days they came in
   breaks: number
   avgBreak: number            // per present day
+  topUpDays: number           // full days where the minimum break was applied
+  topUp: number               // seconds deducted beyond recorded breaks
+  noBreakDays: number
+  longDays: number
   avgCheckIn: number | null   // minutes since midnight
   avgCheckOut: number | null
   leaveByType: Record<LeaveTypeCode, number>
@@ -59,6 +66,9 @@ export function shiftOnDate(input: Pick<StatsInput, 'shifts' | 'assignments'>, d
   return input.shifts.find(s => s.id === id) ?? input.shifts.find(s => s.is_default) ?? FALLBACK_SHIFT
 }
 
+/** Checked in this much longer than the shift → flagged as a possible timer left running. */
+export const LONG_DAY_EXTRA = 2 * 3600
+
 const localMinutes = (iso: string) => {
   const d = new Date(iso)
   return d.getHours() * 60 + d.getMinutes()
@@ -71,6 +81,7 @@ export function computeMonthStats(yearMonth: string, input: StatsInput, today: s
   const s: MonthStats = {
     yearMonth, days: [], workingDays: 0, onTime: 0, late: 0, leave: 0, absent: 0, present: 0,
     attendanceRate: null, onTimeRate: null, worked: 0, avgWorked: 0, expected: 0, breaks: 0, avgBreak: 0,
+    topUpDays: 0, topUp: 0, noBreakDays: 0, longDays: 0,
     avgCheckIn: null, avgCheckOut: null, leaveByType: { casual: 0, sick: 0, earned: 0, lop: 0 },
   }
   const ins: number[] = []
@@ -91,7 +102,7 @@ export function computeMonthStats(yearMonth: string, input: StatsInput, today: s
     const offDay = isSunday(date) || input.holidays.has(date)
 
     const day: DayStat = {
-      date, worked: 0, expected: 0, breaks: totalBreakSeconds(rec, now), checkIn: null, checkOut: null,
+      date, worked: 0, expected: 0, breaks: totalBreakSeconds(rec, now), topUp: 0, noBreak: false, longDay: false, checkIn: null, checkOut: null,
       lateAfter: minutesOf(shift.late_after), kind: null, half: !!session,
     }
 
@@ -119,7 +130,13 @@ export function computeMonthStats(yearMonth: string, input: StatsInput, today: s
     // Hours
     if (cameIn) {
       const complete = !!rec!.check_out_time || date === today
-      if (complete) day.worked = workedSeconds(rec, now)
+      if (complete) day.worked = workedSeconds(rec, now, shift)
+      day.topUp = minBreakTopUp(rec, shift)
+      day.noBreak = day.topUp > 0 && day.breaks === 0
+      day.longDay = !!rec!.check_out_time && spanSeconds(rec) >= shiftSeconds(shift) + LONG_DAY_EXTRA
+      if (day.topUp > 0) { s.topUpDays++; s.topUp += day.topUp }
+      if (day.noBreak) s.noBreakDays++
+      if (day.longDay) s.longDays++
       day.expected = 60 * (session === 'morning' ? end - split : session === 'afternoon' ? split - start : end - start)
       if (session !== 'morning') { day.checkIn = localMinutes(rec!.check_in_time!); ins.push(day.checkIn) }
       if (session !== 'afternoon' && rec!.check_out_time) { day.checkOut = localMinutes(rec!.check_out_time); outs.push(day.checkOut) }
@@ -152,6 +169,20 @@ function addLeave(s: MonthStats, req: LeaveRequest | undefined, rec: AttendanceR
   s.leaveByType.lop += weight - paid
 }
 
+/** Thresholds for the admin's "Worth a look" list. */
+const FLAG_NO_BREAK_DAYS = 3
+const FLAG_TOP_UP_DAYS = 5
+
+/** Break / timer patterns an admin may want to ask about (empty when nothing stands out). */
+export function breakFlags(m: Pick<MonthStats, 'noBreakDays' | 'topUpDays' | 'longDays'>): string[] {
+  const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
+  const flags: string[] = []
+  if (m.noBreakDays >= FLAG_NO_BREAK_DAYS) flags.push(`No break recorded on ${days(m.noBreakDays)}`)
+  else if (m.topUpDays >= FLAG_TOP_UP_DAYS) flags.push(`Paused less than the minimum break on ${days(m.topUpDays)}`)
+  if (m.longDays > 0) flags.push(`${days(m.longDays)} 2+ hours longer than the shift (timer left running?)`)
+  return flags
+}
+
 /** 570 → "9:30 AM" */
 export function fmtMinutes(m: number) {
   const h = Math.floor(m / 60)
@@ -169,16 +200,18 @@ export function fmtPct(r: number | null) {
 
 export type TeamTotals = Pick<MonthStats,
   'onTime' | 'late' | 'leave' | 'absent' | 'present' | 'workingDays' | 'worked' | 'expected' | 'breaks'
-  | 'attendanceRate' | 'onTimeRate' | 'avgWorked'
+  | 'attendanceRate' | 'onTimeRate' | 'avgWorked' | 'topUpDays' | 'noBreakDays' | 'longDays'
 > & { people: number }
 
 /** Adds up several people's month stats; rates are worked out from the sums, not averaged. */
 export function teamTotals(list: MonthStats[]): TeamTotals {
-  const sum = (k: 'onTime' | 'late' | 'leave' | 'absent' | 'present' | 'workingDays' | 'worked' | 'expected' | 'breaks') =>
+  const sum = (k: 'onTime' | 'late' | 'leave' | 'absent' | 'present' | 'workingDays' | 'worked' | 'expected' | 'breaks'
+    | 'topUpDays' | 'noBreakDays' | 'longDays') =>
     list.reduce((n, m) => n + m[k], 0)
   const t = {
     onTime: sum('onTime'), late: sum('late'), leave: sum('leave'), absent: sum('absent'), present: sum('present'),
     workingDays: sum('workingDays'), worked: sum('worked'), expected: sum('expected'), breaks: sum('breaks'),
+    topUpDays: sum('topUpDays'), noBreakDays: sum('noBreakDays'), longDays: sum('longDays'),
     people: list.filter(m => m.workingDays > 0).length,
   }
   const due = t.workingDays - t.leave

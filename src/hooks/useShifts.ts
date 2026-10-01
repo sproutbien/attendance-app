@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { localDate } from '../lib/calendar'
 import { FALLBACK_SHIFT } from '../lib/shifts'
 import type { EmployeeShift, Shift } from '../types'
+import { shiftOnDate } from '../lib/stats'
 
 /** The signed-in employee's shift on `date` (today by default), or another employee's (admins). */
 export function useMyShift(date = localDate(), employeeId?: string) {
@@ -21,6 +22,25 @@ export function useMyShift(date = localDate(), employeeId?: string) {
   }, [id, date])
 
   return { shift: shift ?? FALLBACK_SHIFT, loaded: shift !== null }
+}
+
+/** An employee's shift on any date (from their dated assignments), for per-day rules like the minimum break. */
+export function useShiftHistory(employeeId: string | undefined) {
+  const [data, setData] = useState<{ shifts: Shift[]; assignments: EmployeeShift[] } | null>(null)
+
+  useEffect(() => {
+    if (!employeeId) return
+    let cancelled = false
+    Promise.all([
+      supabase.from('shifts').select('*'),
+      supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').eq('employee_id', employeeId).order('effective_from'),
+    ]).then(([s, a]) => {
+      if (!cancelled) setData({ shifts: s.data ?? [], assignments: a.data ?? [] })
+    })
+    return () => { cancelled = true }
+  }, [employeeId])
+
+  return useCallback((date: string): Shift | null => data ? shiftOnDate(data, date) : null, [data])
 }
 
 export type ShiftInput = Omit<Shift, 'id' | 'is_default'>

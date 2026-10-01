@@ -1,6 +1,8 @@
-import type { AttendanceRecord } from '../types'
+import type { AttendanceRecord, Shift } from '../types'
+import { minutesOf } from './shifts'
 
-type TimedRecord = Pick<AttendanceRecord, 'check_in_time' | 'check_out_time' | 'break_started_at' | 'break_seconds'>
+type TimedRecord = Pick<AttendanceRecord, 'check_in_time' | 'check_out_time' | 'break_started_at' | 'break_seconds' | 'half_day_session'>
+export type BreakRule = Pick<Shift, 'start_time' | 'end_time' | 'min_break_minutes'>
 
 /** Total break time for the day, including a break that is still running. */
 export function totalBreakSeconds(rec: TimedRecord | null | undefined, now = Date.now()) {
@@ -11,12 +13,33 @@ export function totalBreakSeconds(rec: TimedRecord | null | undefined, now = Dat
   return (rec.break_seconds ?? 0) + running
 }
 
-/** Time between check-in and check-out (or now), minus breaks. */
-export function workedSeconds(rec: TimedRecord | null | undefined, now = Date.now()) {
+/** Seconds from check-in to check-out (or now). */
+export function spanSeconds(rec: TimedRecord | null | undefined, now = Date.now()) {
   if (!rec?.check_in_time) return 0
   const end = rec.check_out_time ? new Date(rec.check_out_time).getTime() : now
-  const span = Math.floor((end - new Date(rec.check_in_time).getTime()) / 1000)
-  return Math.max(0, span - totalBreakSeconds(rec, now))
+  return Math.max(0, Math.floor((end - new Date(rec.check_in_time).getTime()) / 1000))
+}
+
+/** Length of the shift in seconds. */
+export function shiftSeconds(shift: Pick<Shift, 'start_time' | 'end_time'>) {
+  return (minutesOf(shift.end_time) - minutesOf(shift.start_time)) * 60
+}
+
+/**
+ * Extra break deducted because they paused for less than the shift's minimum.
+ * Full days only, once checked out, and only if they stayed at least half the shift.
+ */
+export function minBreakTopUp(rec: TimedRecord | null | undefined, shift: BreakRule | null | undefined) {
+  if (!shift || !rec?.check_in_time || !rec.check_out_time || rec.half_day_session) return 0
+  const min = (shift.min_break_minutes ?? 0) * 60
+  if (min <= 0 || spanSeconds(rec) < shiftSeconds(shift) / 2) return 0
+  return Math.max(0, min - totalBreakSeconds(rec))
+}
+
+/** Time between check-in and check-out (or now), minus breaks — at least the shift's minimum break when given. */
+export function workedSeconds(rec: TimedRecord | null | undefined, now = Date.now(), shift?: BreakRule | null) {
+  if (!rec?.check_in_time) return 0
+  return Math.max(0, spanSeconds(rec, now) - totalBreakSeconds(rec, now) - minBreakTopUp(rec, shift))
 }
 
 /** 3725 → "1h 02m", 1500 → "25m", 0 → "—" */

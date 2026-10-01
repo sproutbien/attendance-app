@@ -6,10 +6,10 @@ import type { Shift } from '../../types'
 import { dangerBtn, errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn, tableStyle, tdStyle, thStyle } from './styles'
 
 const EMPTY: ShiftInput = {
-  name: '', start_time: '09:30', end_time: '17:30', late_after: '09:40', half_day_after: '11:30', split_time: '13:30',
+  name: '', start_time: '09:30', end_time: '17:30', late_after: '09:40', half_day_after: '11:30', split_time: '13:30', min_break_minutes: 40,
 }
 
-const TIME_FIELDS: { key: keyof Omit<ShiftInput, 'name'>; label: string; hint: string }[] = [
+const TIME_FIELDS: { key: keyof Omit<ShiftInput, 'name' | 'min_break_minutes'>; label: string; hint: string }[] = [
   { key: 'start_time',     label: 'Start',          hint: 'Full-day leave for today can be requested until an hour after this.' },
   { key: 'late_after',     label: 'Late after',     hint: 'Checking in after this is Late.' },
   { key: 'half_day_after', label: 'Half day after', hint: 'Checking in after this makes the morning a half-day leave.' },
@@ -39,7 +39,7 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
   function startEdit(shift: Shift | null) {
     setError(null)
     setEditing(shift
-      ? { id: shift.id, form: { name: shift.name, start_time: toInput(shift.start_time), end_time: toInput(shift.end_time), late_after: toInput(shift.late_after), half_day_after: toInput(shift.half_day_after), split_time: toInput(shift.split_time) } }
+      ? { id: shift.id, form: { name: shift.name, start_time: toInput(shift.start_time), end_time: toInput(shift.end_time), late_after: toInput(shift.late_after), half_day_after: toInput(shift.half_day_after), split_time: toInput(shift.split_time), min_break_minutes: shift.min_break_minutes } }
       : { id: null, form: EMPTY })
   }
 
@@ -63,7 +63,7 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
           <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#94a3b8', lineHeight: 1 }}>✕</button>
         </div>
         <p style={{ ...hintStyle, fontSize: '0.8125rem', margin: '0 0 1rem' }}>
-          Each employee's late, half-day and leave timings follow their shift. Anyone without a shift is on the default.
+          Each employee's late, half-day, leave and minimum-break rules follow their shift. Anyone without a shift is on the default.
           Editing a shift's times applies from now on; days already recorded keep their status.
         </p>
 
@@ -91,6 +91,15 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
                   {t.hint && <p style={hintStyle}>{t.hint}</p>}
                 </div>
               ))}
+              <div>
+                <label style={label}>Minimum break (min)</label>
+                <input
+                  type="number" required min={0} max={240} step={5} value={editing.form.min_break_minutes}
+                  onChange={e => setEditing({ ...editing, form: { ...editing.form, min_break_minutes: Number(e.target.value) } })}
+                  style={inputStyle}
+                />
+                <p style={hintStyle}>On full days, at least this much break is taken off worked hours, even if they didn't pause.</p>
+              </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.875rem' }}>
               <button type="button" onClick={() => { setEditing(null); setError(null) }} style={ghostBtn}>Cancel</button>
@@ -107,7 +116,7 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
           <table style={tableStyle}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Shift', 'Hours', 'Late after', 'Half day after', 'Split', 'Staff', ''].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                {['Shift', 'Hours', 'Late after', 'Half day after', 'Split', 'Min. break', 'Staff', ''].map(h => <th key={h} style={thStyle}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -123,6 +132,7 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
                     <td style={tdStyle}>{fmtClock(shift.late_after)}</td>
                     <td style={tdStyle}>{fmtClock(shift.half_day_after)}</td>
                     <td style={tdStyle}>{fmtClock(shift.split_time)}</td>
+                    <td style={tdStyle}>{shift.min_break_minutes} min</td>
                     <td style={{ ...tdStyle, color: '#64748b' }}>{used}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button onClick={() => startEdit(shift)} disabled={busy} style={ghostBtn}>Edit</button>

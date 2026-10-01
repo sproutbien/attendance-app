@@ -4,7 +4,9 @@ import { useAdminAttendance } from '../../hooks/useAdminAttendance'
 import type { AdminAttendanceRow } from '../../hooks/useAdminAttendance'
 import { STATUS_COLORS, STATUS_LABELS } from '../../types'
 import type { AttendanceRecord } from '../../types'
-import { fmtDuration, totalBreakSeconds } from '../../lib/breaks'
+import { fmtDuration, minBreakTopUp, totalBreakSeconds } from '../../lib/breaks'
+import { useShifts } from '../../hooks/useShifts'
+import type { Shift } from '../../types'
 import { localDate } from '../../lib/calendar'
 
 const todayISO = () => localDate()
@@ -36,6 +38,7 @@ const SUMMARY_CONFIG: Array<{ status: AttendanceRecord['status']; label: string;
 export default function AdminAttendancePage() {
   const today = todayISO()
   const [selectedDate, setSelectedDate] = useState(today)
+  const { shiftOn } = useShifts()
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<AttendanceRecord['status'] | ''>('')
@@ -191,7 +194,7 @@ export default function AdminAttendancePage() {
             </thead>
             <tbody>
               {filteredRows.map(row => (
-                <AttendanceTableRow key={row.employee.id} row={row} />
+                <AttendanceTableRow key={row.employee.id} row={row} shift={shiftOn(row.employee.id, selectedDate)} />
               ))}
             </tbody>
           </table>
@@ -207,8 +210,9 @@ export default function AdminAttendancePage() {
   )
 }
 
-function AttendanceTableRow({ row }: { row: AdminAttendanceRow }) {
+function AttendanceTableRow({ row, shift }: { row: AdminAttendanceRow; shift: Shift | null }) {
   const colors = STATUS_COLORS[row.effectiveStatus]
+  const topUp = minBreakTopUp(row.record, shift)
   return (
     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
       <td style={{ ...tdStyle, fontWeight: 500, color: '#1e293b' }}>{row.employee.full_name}</td>
@@ -230,6 +234,14 @@ function AttendanceTableRow({ row }: { row: AdminAttendanceRow }) {
       <td style={tdStyle}>{fmtTime(row.record?.check_out_time)}</td>
       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
         {fmtDuration(totalBreakSeconds(row.record))}
+        {topUp > 0 && (
+          <span
+            title={`Less than the ${shift!.min_break_minutes}-minute minimum break was recorded; ${Math.round(topUp / 60)} min extra is deducted from worked hours`}
+            style={{ marginLeft: 8, padding: '1px 8px', borderRadius: 99, background: '#fef3c7', color: '#92400e', fontSize: '0.75rem', fontWeight: 500 }}
+          >
+            +{Math.round(topUp / 60)}m to minimum
+          </span>
+        )}
         {row.record?.break_started_at && !row.record.check_out_time && (
           <span style={{
             marginLeft: 8,

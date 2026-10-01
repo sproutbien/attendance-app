@@ -150,7 +150,15 @@ export default function StatsView({ employee, title, actions }: {
                   <Fact label="Avg. per day" value={fmtHM(m.avgBreak)} />
                   <Fact label="Days with a break" value={String(m.days.filter(d => d.breaks > 0).length)} />
                   <Fact label="Longest" value={fmtHM(Math.max(0, ...m.days.map(d => d.breaks)))} />
+                  <Fact label="Min. break applied" value={`${m.topUpDays} day${m.topUpDays === 1 ? '' : 's'}`} />
+                  <Fact label="Extra deducted" value={fmtHM(m.topUp)} />
                 </div>
+                <p className="st-note">
+                  On full days, the shift’s minimum break ({shift.min_break_minutes} min) is taken off worked hours
+                  when less break was recorded.
+                  {m.noBreakDays > 0 && ` No break was recorded on ${m.noBreakDays} day${m.noBreakDays === 1 ? '' : 's'}.`}
+                  {m.longDays > 0 && ` ${m.longDays} day${m.longDays === 1 ? ' was' : 's were'} 2+ hours longer than the shift.`}
+                </p>
               </section>
             </div>
 
@@ -248,10 +256,12 @@ function DailyTable({ m }: { m: MonthStats }) {
               return (
                 <tr key={d.date}>
                   <td>{new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</td>
-                  <td>{d.kind ? KIND_LABEL[d.kind] : '—'}{d.half ? ' · ½ leave' : ''}</td>
+                  <td>{d.kind ? KIND_LABEL[d.kind] : '—'}{d.half ? ' · ½ leave' : ''}{d.longDay ? ' · long day' : ''}</td>
                   <td>{d.checkIn != null ? fmtMinutes(d.checkIn) : '—'}</td>
                   <td>{d.checkOut != null ? fmtMinutes(d.checkOut) : '—'}</td>
-                  <td>{d.breaks ? fmtHM(d.breaks) : '—'}</td>
+                  <td title={d.topUp ? `Paused ${fmtHM(d.breaks)}; minimum break applied` : undefined}>
+                    {d.breaks || d.topUp ? fmtHM(d.breaks + d.topUp) : '—'}{d.topUp ? ' (min)' : ''}
+                  </td>
                   <td>{d.worked ? fmtHM(d.worked) : '—'}</td>
                   <td>{d.expected ? fmtHM(d.expected) : '—'}</td>
                   <td>{d.expected && d.worked ? `${diff >= 0 ? '+' : '−'}${fmtHM(Math.abs(diff))}` : '—'}</td>
