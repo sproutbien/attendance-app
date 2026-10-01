@@ -22,6 +22,7 @@ export function useLeaveQueue() {
       .from('leave_requests')
       .select(`
         id, employee_id, start_date, end_date, duration, half_day_session, leave_type, days, paid_days, lop_days, reason, status,
+        voice_note_path, voice_note_seconds,
         requested_at, reviewed_by, reviewed_at,
         cancelled_at, cancelled_after_approval, cancel_seen_at,
         employee:employees!employee_id(full_name, department)

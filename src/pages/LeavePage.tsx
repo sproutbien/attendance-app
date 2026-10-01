@@ -12,6 +12,8 @@ import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../li
 import { fmtClock, sessionLabel } from '../lib/shifts'
 import { useMyShift } from '../hooks/useShifts'
 import type { Shift } from '../types'
+import { VoiceNotePlayer, VoiceNoteRecorder } from '../components/VoiceNote'
+import type { VoiceNote } from '../lib/voiceNotes'
 
 const STATUS_STYLES: Record<LeaveRequest['status'], { bg: string; text: string; label: string }> = {
   pending:  { bg: '#fef9c3', text: '#854d0e', label: 'Pending' },
@@ -34,6 +36,8 @@ export default function LeavePage() {
   const { employee } = useAuth()
   const current = useLeaveBalances(employee?.id)
   const [reason, setReason] = useState('')
+  const [voiceNote, setVoiceNote] = useState<VoiceNote | null>(null)
+  const [recording, setRecording] = useState(false)
   const [success, setSuccess] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -57,6 +61,10 @@ export default function LeavePage() {
       setFormError(blocked)
       return
     }
+    if (!reason.trim() && !voiceNote) {
+      setFormError('Write a reason or record a voice note.')
+      return
+    }
     if (clashMessage ?? balanceBlock) {
       setFormError(clashMessage ?? balanceBlock)
       return
@@ -68,13 +76,14 @@ export default function LeavePage() {
       half_day_session: half ? session : null,
       leave_type: leaveType,
       reason: reason.trim(),
-    })
+    }, voiceNote)
     if (ok) {
       current.refresh()
       booking.refresh()
       setStartDate('')
       setEndDate('')
       setReason('')
+      setVoiceNote(null)
       setSuccess(true)
     }
   }
@@ -245,15 +254,23 @@ export default function LeavePage() {
           )}
 
           <div style={{ marginBottom: '1.25rem' }}>
-            <label style={labelStyle}>Reason</label>
+            <label style={labelStyle} htmlFor="leave-reason">Reason</label>
             <textarea
+              id="leave-reason"
               value={reason}
               onChange={e => { setReason(e.target.value); setSuccess(false) }}
-              required
+              required={!voiceNote}
               rows={3}
-              placeholder="Brief description of reason for leave"
+              placeholder={voiceNote ? 'Optional — your voice note will be sent' : 'Brief description of reason for leave'}
               style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }}
             />
+            <div style={{ marginTop: '0.625rem' }}>
+              <VoiceNoteRecorder
+                value={voiceNote}
+                onChange={n => { setVoiceNote(n); setSuccess(false) }}
+                onRecordingChange={setRecording}
+              />
+            </div>
           </div>
 
           {booked.length > 0 && (
@@ -284,16 +301,16 @@ export default function LeavePage() {
 
           <button
             type="submit"
-            disabled={submitting || !!formBlock}
+            disabled={submitting || recording || !!formBlock}
             style={{
               padding: '0.625rem 1.5rem',
-              background: submitting || formBlock ? '#86efac' : '#16a34a',
+              background: submitting || recording || formBlock ? '#86efac' : '#16a34a',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
               fontWeight: 600,
               fontSize: '0.9375rem',
-              cursor: submitting || formBlock ? 'not-allowed' : 'pointer',
+              cursor: submitting || recording || formBlock ? 'not-allowed' : 'pointer',
             }}
           >
             {submitting ? 'Submitting…' : 'Submit Request'}
@@ -376,6 +393,7 @@ function RequestRow({ r, shift, onCancel }: { r: LeaveRequest; shift: Shift; onC
           }}>
             {r.reason}
           </div>
+          {r.voice_note_path && <VoiceNotePlayer path={r.voice_note_path} seconds={r.voice_note_seconds} />}
           <div style={{ color: 'var(--text-faint, #94a3b8)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
             Submitted {new Date(r.requested_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
             {r.cancelled_at && <> · Cancelled {new Date(r.cancelled_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</>}

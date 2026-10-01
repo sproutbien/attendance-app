@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import type { LeaveRequest } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { localDate } from '../lib/calendar'
+import { VOICE_NOTE_BUCKET, uploadVoiceNote } from '../lib/voiceNotes'
+import type { VoiceNote } from '../lib/voiceNotes'
 
 export type NewLeave = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session' | 'leave_type' | 'reason'>
 
@@ -39,14 +41,31 @@ export function useLeaveRequests() {
       .then(({ data }) => setCheckedInToday(!!data?.check_in_time))
   }, [employee])
 
-  async function submit(leave: NewLeave): Promise<boolean> {
+  async function submit(leave: NewLeave, voice: VoiceNote | null = null): Promise<boolean> {
     if (!employee) return false
     setSubmitting(true)
     setError(null)
+    let voicePath: string | null = null
+    if (voice) {
+      try {
+        voicePath = await uploadVoiceNote(employee.id, voice)
+      } catch (e) {
+        setError((e as Error).message)
+        setSubmitting(false)
+        return false
+      }
+    }
     const { error } = await supabase
       .from('leave_requests')
-      .insert({ employee_id: employee.id, ...leave })
+      .insert({
+        employee_id: employee.id,
+        ...leave,
+        voice_note_path: voicePath,
+        voice_note_seconds: voice ? Math.round(voice.seconds) : null,
+      })
     if (error) {
+      // Don't leave an orphaned recording behind
+      if (voicePath) await supabase.storage.from(VOICE_NOTE_BUCKET).remove([voicePath])
       setError(error.message)
       setSubmitting(false)
       return false

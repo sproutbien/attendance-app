@@ -7,6 +7,7 @@ import { LEAVE_TYPE_LABELS, daysLabel, fmtDays } from '../../lib/leave'
 import { useLeaveBalances } from '../../hooks/useLeaveBalances'
 import AdminLeaveBalances from '../../components/AdminLeaveBalances'
 import LeaveTypeSettings from '../../components/LeaveTypeSettings'
+import { VoiceNotePlayer } from '../../components/VoiceNote'
 
 function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
@@ -119,6 +120,7 @@ export default function AdminLeavePage() {
                     </span>
                   </div>
                   <div style={{ color: '#64748b', fontSize: '0.875rem', margin: '0.2rem 0' }}>{r.reason}</div>
+                  {r.voice_note_path && <VoiceNotePlayer path={r.voice_note_path} seconds={r.voice_note_seconds} />}
                   <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
                     {r.cancelled_after_approval ? 'Was approved' : 'Was pending'}
                     {r.cancelled_at && <> · cancelled {fmtDateTime(r.cancelled_at)}</>}
@@ -252,6 +254,7 @@ function PendingCard({
         </div>
         <PendingBalanceLine request={r} />
         <div style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '0.25rem' }}>{r.reason}</div>
+        {r.voice_note_path && <div style={{ marginBottom: '0.25rem' }}><VoiceNotePlayer path={r.voice_note_path} seconds={r.voice_note_seconds} /></div>}
         <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
           Submitted {fmtDate(r.requested_at.slice(0, 10))}
         </div>
@@ -342,8 +345,9 @@ function HistoryRow({ request: r }: { request: LeaveRequestWithEmployee }) {
           )}
         </div>
         <div style={{ color: '#64748b', fontSize: '0.875rem', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-          <span style={{ color: '#94a3b8' }}>Reason: </span>{r.reason}
+          <span style={{ color: '#94a3b8' }}>Reason: </span>{r.reason || (r.voice_note_path ? '(voice note)' : '')}
         </div>
+        {r.voice_note_path && <VoiceNotePlayer path={r.voice_note_path} seconds={r.voice_note_seconds} />}
         <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.25rem' }}>
           Submitted {fmtDate(r.requested_at.slice(0, 10))}
           {r.reviewed_at && <> · {decided} {fmtDate(r.reviewed_at.slice(0, 10))}</>}

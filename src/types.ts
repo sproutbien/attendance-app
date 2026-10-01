@@ -68,7 +68,9 @@ export type LeaveRequest = {
   paid_days: number | null         // set on approval
   lop_days: number | null          // set on approval: days beyond the balance
   half_day_session: HalfDaySession | null  // only for half days (start_date = end_date)
-  reason: string
+  reason: string                   // may be empty when there's a voice note
+  voice_note_path: string | null   // object in the 'leave-voice-notes' bucket
+  voice_note_seconds: number | null
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   requested_at: string
   reviewed_by: string | null

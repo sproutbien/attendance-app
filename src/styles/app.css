@@ -711,3 +711,7 @@
   .sb-corr-list li { flex-direction: column; }
   .sb-corr-side { flex-direction: row; align-items: center; }
 }
+
+/* Voice note recorder (Leave page) */
+.sb-rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #dc2626; animation: sb-pulse 1.2s ease-in-out infinite; flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) { .sb-rec-dot { animation: none; } }

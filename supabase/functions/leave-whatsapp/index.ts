@@ -102,7 +102,7 @@ Deno.serve(async req => {
   // Re-read the row — never trust request contents for what gets sent
   const { data: leave, error } = await supabase
     .from('leave_requests')
-    .select('employee_id, start_date, end_date, half_day_session, reason, status, cancelled_after_approval, employee:employees!employee_id(full_name, department, phone)')
+    .select('employee_id, start_date, end_date, half_day_session, reason, voice_note_path, status, cancelled_after_approval, employee:employees!employee_id(full_name, department, phone)')
     .eq('id', leaveId)
     .maybeSingle()
 
@@ -132,7 +132,7 @@ Deno.serve(async req => {
         param(employee.department),
         param(dates),
         param(dayCount(leave.start_date, leave.end_date, leave.half_day_session)),
-        param(leave.reason, 300),
+        param(leave.reason || (leave.voice_note_path ? 'Voice note — listen in the app' : ''), 300),
       ])))
     } else if (event === 'leave_cancelled' && leave.status === 'cancelled') {
       // {{1}} name  {{2}} department  {{3}} dates  {{4}} day count  {{5}} previous status
