@@ -6,7 +6,7 @@ import { localDate } from '../lib/calendar'
 import { VOICE_NOTE_BUCKET, uploadVoiceNote } from '../lib/voiceNotes'
 import type { VoiceNote } from '../lib/voiceNotes'
 
-export type NewLeave = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session' | 'leave_type' | 'reason'>
+export type NewLeave = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session' | 'leave_type' | 'reason' | 'split_with_lop'>
 
 export function useLeaveRequests() {
   const { employee } = useAuth()

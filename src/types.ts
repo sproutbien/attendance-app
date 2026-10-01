@@ -71,6 +71,8 @@ export type LeaveRequest = {
   reason: string                   // may be empty when there's a voice note
   voice_note_path: string | null   // object in the 'leave-voice-notes' bucket
   voice_note_seconds: number | null
+  split_with_lop: boolean          // employee agreed: use what's left of the type, rest as LOP
+  planned_paid_days: number | null // paid part of a split request, set by the server at request time
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   requested_at: string
   reviewed_by: string | null

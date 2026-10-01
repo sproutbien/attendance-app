@@ -38,6 +38,7 @@ export default function LeavePage() {
   const [reason, setReason] = useState('')
   const [voiceNote, setVoiceNote] = useState<VoiceNote | null>(null)
   const [recording, setRecording] = useState(false)
+  const [splitAccepted, setSplitAccepted] = useState<string | null>(null)  // key of the request they agreed to split
   const [success, setSuccess] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -76,6 +77,7 @@ export default function LeavePage() {
       half_day_session: half ? session : null,
       leave_type: leaveType,
       reason: reason.trim(),
+      split_with_lop: !!split,
     }, voiceNote)
     if (ok) {
       current.refresh()
@@ -84,6 +86,7 @@ export default function LeavePage() {
       setEndDate('')
       setReason('')
       setVoiceNote(null)
+      setSplitAccepted(null)
       setSuccess(true)
     }
   }
@@ -103,11 +106,17 @@ export default function LeavePage() {
   const typeBalance = booking.balances.find(b => b.leave_type === leaveType)
   const free = typeBalance?.is_paid ? bookableDays(typeBalance) : null
   const typeName = LEAVE_TYPE_LABELS[leaveType]
-  const balanceBlock = free == null ? null
-    : free === 0
+  // Asking for more than is left: offer to use what's left and take the rest as Loss of Pay
+  const paidPart = free == null ? 0 : Math.floor(free * 2) / 2   // leave is taken in half days
+  const splitOffer = free != null && paidPart > 0 && requested != null && requested > free
+    ? { key: `${leaveType}|${startDate}|${rangeEnd}|${duration}|${requested}`, paid: paidPart, lop: requested - paidPart }
+    : null
+  const split = splitOffer && splitAccepted === splitOffer.key ? splitOffer : null
+  const balanceBlock = free == null || split ? null
+    : paidPart === 0
       ? `You have no ${typeName} leave left${typeBalance!.pending > 0 ? ` (${daysLabel(typeBalance!.pending)} waiting for approval)` : ''}. Choose another leave type or Loss of Pay.`
-      : requested != null && requested > free
-        ? `Not enough ${typeName} leave: this request needs ${daysLabel(requested)} but only ${daysLabel(free)} ${free === 1 ? 'is' : 'are'} available. Pick fewer days or choose Loss of Pay.`
+      : splitOffer
+        ? `Not enough ${typeName} leave: this request needs ${daysLabel(requested!)} but only ${daysLabel(free)} ${free === 1 ? 'is' : 'are'} available.`
         : null
 
   // Days that already have pending or approved leave can't be requested again
@@ -284,6 +293,28 @@ export default function LeavePage() {
           {formBlock && !formError && (
             <div style={alertStyle('#fffbeb', '#fde68a', '#92400e')}>
               {formBlock}
+              {formBlock === balanceBlock && (
+                <div style={{ marginTop: '0.625rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {splitOffer && (
+                    <button type="button" onClick={() => setSplitAccepted(splitOffer.key)} style={splitBtn}>
+                      Use {daysLabel(splitOffer.paid)} {typeName} + {daysLabel(splitOffer.lop)} Loss of Pay
+                    </button>
+                  )}
+                  <button type="button" onClick={() => { setLeaveType('lop'); setSuccess(false) }} style={{ ...splitBtn, background: 'transparent' }}>
+                    Take all as Loss of Pay
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {split && !formBlock && (
+            <div style={alertStyle('#eff6ff', '#bfdbfe', '#1e40af')}>
+              <b>{daysLabel(split.paid)} {typeName}</b> + <b style={{ color: '#b91c1c' }}>{daysLabel(split.lop)} Loss of Pay</b> (unpaid).
+              {' '}
+              <button type="button" onClick={() => setSplitAccepted(null)} style={{ ...cancelLinkStyle, color: '#1e40af', textDecoration: 'underline' }}>
+                Undo
+              </button>
             </div>
           )}
 
@@ -379,6 +410,9 @@ function RequestRow({ r, shift, onCancel }: { r: LeaveRequest; shift: Shift; onC
             {r.start_date !== r.end_date && <> – {fmtDate(r.end_date)}</>}
             <span style={{ fontWeight: 400, color: 'var(--text-faint, #94a3b8)', fontSize: '0.8125rem', marginLeft: 8 }}>
               {LEAVE_TYPE_LABELS[r.leave_type]} · {leaveLength(r)}
+              {r.status === 'pending' && r.planned_paid_days != null && r.days != null && (
+                <span style={{ color: 'var(--red, #b91c1c)' }}> · {fmtDays(r.planned_paid_days)} {LEAVE_TYPE_LABELS[r.leave_type]}, {fmtDays(r.days - r.planned_paid_days)} LOP</span>
+              )}
               {r.status === 'approved' && r.lop_days != null && r.lop_days > 0 && (
                 <span style={{ color: 'var(--red, #b91c1c)' }}> · {fmtDays(r.paid_days)} paid, {fmtDays(r.lop_days)} LOP</span>
               )}
@@ -458,6 +492,18 @@ const cancelLinkStyle: CSSProperties = {
   fontSize: '0.8125rem',
   fontWeight: 600,
   cursor: 'pointer',
+}
+
+const splitBtn: CSSProperties = {
+  padding: '0.375rem 0.75rem',
+  borderRadius: 8,
+  border: '1px solid #d97706',
+  background: '#fff',
+  color: '#92400e',
+  fontWeight: 600,
+  fontSize: '0.8125rem',
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const keepBtnStyle: CSSProperties = {

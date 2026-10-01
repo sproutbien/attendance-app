@@ -311,7 +311,9 @@ function PendingBalanceLine({ request: r }: { request: LeaveRequestWithEmployee 
       <b>{LEAVE_TYPE_LABELS[r.leave_type]}</b> · {daysLabel(days)}
       {r.leave_type !== 'lop' && !loading && b && <> · balance {fmtDays(b.available)}</>}
       {!loading && lop > 0 && r.leave_type !== 'lop' && (
-        <span style={{ color: '#b91c1c', fontWeight: 600 }}> · {fmtDays(lop)} will be Loss of Pay</span>
+        <span style={{ color: '#b91c1c', fontWeight: 600 }}>
+          {' · '}{fmtDays(lop)} will be Loss of Pay{r.split_with_lop && ' (employee agreed)'}
+        </span>
       )}
     </div>
   )

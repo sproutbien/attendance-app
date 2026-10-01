@@ -138,8 +138,9 @@ export function VoiceNoteRecorder({ value, onChange, onRecordingChange }: Record
           </button>
         </div>
       ) : (
-        <button type="button" onClick={start} style={ghostBtn}>
-          <Mic size={14} /> Record voice note
+        <button type="button" onClick={start} className="sb-rec-btn">
+          <span className="sb-rec-badge" aria-hidden="true"><Mic size={16} strokeWidth={2.5} /></span>
+          Record a voice note
         </button>
       )}
       {error
