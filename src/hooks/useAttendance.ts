@@ -1,32 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { AttendanceRecord, HalfDaySession } from '../types'
+import type { AttendanceRecord } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { totalBreakSeconds } from '../lib/breaks'
 import { currentYearMonth, daysInMonth, localDate } from '../lib/calendar'
-import { halfDaySplit } from '../lib/halfDay'
 
-// Work starts 9:30 AM with a 10-minute grace. Minutes since midnight, inclusive.
-const ON_TIME_UNTIL = 9 * 60 + 40         // up to 9:40 AM → present
-const HALF_DAY_AFTER = 11 * 60 + 30       // after 11:30 AM → morning counts as half-day leave
-
-/**
- * Status for a check-in at `now`:
- *   ≤ 9:40 AM present · 9:41–11:30 AM late · after 11:30 AM morning half-day leave.
- * On a morning half day (approved or automatic) it's present until 1:30 PM, late after.
- */
-function checkInFields(now: Date, rec: AttendanceRecord | null): {
-  status: 'present' | 'late'
-  half_day_session: HalfDaySession | null
-} {
-  const minutes = now.getHours() * 60 + now.getMinutes()
-  const session = rec?.half_day_session ?? (minutes > HALF_DAY_AFTER ? 'morning' : null)
-  if (session === 'morning') {
-    const lateFrom = halfDaySplit(localDate(now)).getTime() + 60_000  // 1:30 PM itself is on time
-    return { status: now.getTime() < lateFrom ? 'present' : 'late', half_day_session: 'morning' }
-  }
-  return { status: minutes <= ON_TIME_UNTIL ? 'present' : 'late', half_day_session: session }
-}
+// Present / late / automatic morning half day is worked out by the server from
+// the employee's shift when check_in_time is first set (migration 020).
 
 // Local calendar date, so an early-morning check-in in IST isn't filed under yesterday (UTC)
 const todayISO = () => localDate()
@@ -73,11 +53,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     checkingIn.current = true
     setIsSubmitting(true)
     setError(null)
-    const now = new Date()
-    const fields = (rec: AttendanceRecord | null) => ({
-      check_in_time: now.toISOString(),
-      ...checkInFields(now, rec),
-    })
+    const fields = { check_in_time: new Date().toISOString() }
 
     // A row for today may already exist (approved leave, admin entry, another tab),
     // so fill that row in instead of inserting a duplicate.
@@ -92,7 +68,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
       if (existing.check_in_time) return { data: existing, error: null }
       return supabase
         .from('attendance_records')
-        .update(fields(existing))
+        .update(fields)
         .eq('id', existing.id)
         .select()
         .single()
@@ -102,7 +78,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     if (!result.error && !result.data) {
       result = await supabase
         .from('attendance_records')
-        .insert({ employee_id: employee.id, date: todayISO(), ...fields(null) })
+        .insert({ employee_id: employee.id, date: todayISO(), ...fields })
         .select()
         .single()
       // Lost a race with another insert for today — use that row instead
@@ -145,7 +121,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     }
   }
 
-  /** `at` back-dates the check-out, e.g. to 1:30 PM for an afternoon half day. */
+  /** `at` back-dates the check-out, e.g. to the shift's split for an afternoon half day. */
   function checkOut(at = new Date()) {
     return updateToday({ ...endBreakChanges(at), check_out_time: at.toISOString() })
   }

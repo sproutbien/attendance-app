@@ -6,6 +6,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { profileUpdates, useEmployeeManagement, useEmployeeOptions, useHrNotes } from '../../hooks/useEmployeeManagement'
 import type { EmployeeFormData } from '../../hooks/useEmployeeManagement'
 import { BLOCKED_STATUSES, fmtDate, fmtPhone, savePhoto } from '../../lib/employees'
+import { shiftHours } from '../../lib/shifts'
+import { useShifts } from '../../hooks/useShifts'
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar'
 import StatusBadge from '../../components/employees/StatusBadge'
 import EmployeeFormModal from '../../components/employees/EmployeeFormModal'
@@ -19,6 +21,7 @@ export default function AdminEmployeeProfilePage() {
   const { employee: me } = useAuth()
   const { employees, loading, saving, error, setError, updateEmployee, refetch } = useEmployeeManagement()
   const lists = useEmployeeOptions()
+  const shifts = useShifts()
   const [editing, setEditing] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
 
@@ -45,11 +48,17 @@ export default function AdminEmployeeProfilePage() {
   }
 
   async function handleSave(data: EmployeeFormData) {
-    if (await updateEmployee(id, profileUpdates(data))) {
-      setEditing(false)
-      show('Profile updated.')
+    if (!(await updateEmployee(id, profileUpdates(data)))) return
+    if (data.shift) {
+      const err = await shifts.assign(id, data.shift.id, data.shift.from)
+      if (err) { setError(`Profile saved, but the shift wasn't changed: ${err}`); return }
     }
+    setEditing(false)
+    show('Profile updated.')
   }
+
+  const shift = shifts.shiftOn(id)
+  const upcoming = shifts.upcomingFor(id)
 
   return (
     <div>
@@ -86,6 +95,12 @@ export default function AdminEmployeeProfilePage() {
           <Row label="Department" value={e.department} />
           <Row label="Designation" value={e.designation} />
           <Row label="Work location" value={e.work_location} />
+          <Row label="Shift" value={shift && (
+            <>
+              {shift.name} · {shiftHours(shift)}
+              {upcoming && <div style={{ color: '#92400e', fontSize: '0.75rem', fontWeight: 500 }}>→ {upcoming.shift.name} from {fmtDate(upcoming.from)}</div>}
+            </>
+          )} />
           <Row label="Reporting manager" value={manager ? <Link to={`/admin/employees/${manager.id}`} style={link}>{manager.full_name}</Link> : null} />
           <Row label="Role" value={e.role === 'admin' ? 'Admin' : 'Employee'} />
         </InfoCard>
@@ -135,6 +150,9 @@ export default function AdminEmployeeProfilePage() {
           isSelf={e.id === me?.id}
           employees={employees}
           options={{ department: lists.byKind('department'), work_location: lists.byKind('work_location'), employment_type: lists.byKind('employment_type') }}
+          shifts={shifts.shifts}
+          currentShift={shift}
+          upcomingShift={upcoming}
           designations={designations}
           saving={saving}
           error={error}

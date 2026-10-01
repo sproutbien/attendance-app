@@ -8,7 +8,10 @@ import { useHolidayDates, useLeaveBalances } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
 import { LEAVE_TYPE_LABELS, bookableAsOf, bookableDays, daysLabel, findLeaveClash, fmtDays, workingDays } from '../lib/leave'
 import { localDate } from '../lib/calendar'
-import { SESSION_LABELS, canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
+import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
+import { fmtClock, sessionLabel } from '../lib/shifts'
+import { useMyShift } from '../hooks/useShifts'
+import type { Shift } from '../types'
 
 const STATUS_STYLES: Record<LeaveRequest['status'], { bg: string; text: string; label: string }> = {
   pending:  { bg: '#fef9c3', text: '#854d0e', label: 'Pending' },
@@ -35,6 +38,9 @@ export default function LeavePage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   const today = localDate()
+  // Today's shift sets the same-day limits; the leave day's shift sets its session times
+  const { shift: todayShift } = useMyShift()
+  const { shift: leaveShift } = useMyShift(startDate || today)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -46,7 +52,7 @@ export default function LeavePage() {
       return
     }
     // Re-check at submit time — the page may have been open since before a cut-off
-    const blocked = startDate === localDate() && sameDayLeaveBlock(duration, half ? session : null, checkedInToday)
+    const blocked = startDate === localDate() && sameDayLeaveBlock(todayShift, duration, half ? session : null, checkedInToday)
     if (blocked) {
       setFormError(blocked)
       return
@@ -77,8 +83,8 @@ export default function LeavePage() {
   const showDayCount = !isHalf && startDate && endDate && endDate >= startDate
   // Leave starting today is limited by the time and whether they've checked in
   const startsToday = startDate === today
-  const sameDayBlock = startsToday ? sameDayLeaveBlock(duration, isHalf ? session : null, checkedInToday) : null
-  const sessionBlocked = (s: HalfDaySession) => startsToday && sameDayLeaveBlock('half', s, checkedInToday) !== null
+  const sameDayBlock = startsToday ? sameDayLeaveBlock(todayShift, duration, isHalf ? session : null, checkedInToday) : null
+  const sessionBlocked = (s: HalfDaySession) => startsToday && sameDayLeaveBlock(todayShift, 'half', s, checkedInToday) !== null
 
   // Paid leave must fit in what's credited so far, minus pending requests (the server enforces this too)
   const rangeEnd = isHalf ? startDate : endDate
@@ -182,7 +188,7 @@ export default function LeavePage() {
                     onClick={() => { setSession(s); setSuccess(false) }}
                     style={{ ...sessionCard(session === s), ...(sessionBlocked(s) ? { opacity: 0.5 } : null) }}
                   >
-                    {SESSION_LABELS[s]}
+                    {sessionLabel(leaveShift, s)}
                     {sessionBlocked(s) && (
                       <span style={{ display: 'block', fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted, #64748b)', marginTop: 2 }}>
                         Not available today
@@ -193,8 +199,8 @@ export default function LeavePage() {
               </div>
               <p style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
                 {session === 'morning'
-                  ? 'Once approved, Check In opens at 1:30 PM that day.'
-                  : 'Once approved, you’ll be checked out automatically at 1:30 PM that day.'}
+                  ? `Once approved, Check In opens at ${fmtClock(leaveShift.split_time)} that day.`
+                  : `Once approved, you’ll be checked out automatically at ${fmtClock(leaveShift.split_time)} that day.`}
               </p>
             </div>
           ) : (
@@ -306,7 +312,7 @@ export default function LeavePage() {
           <p style={{ color: 'var(--text-faint, #94a3b8)', margin: 0 }}>No leave requests yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {requests.map(r => <RequestRow key={r.id} r={r} onCancel={() => cancel(r.id)} />)}
+            {requests.map(r => <RequestRow key={r.id} r={r} shift={todayShift} onCancel={() => cancel(r.id)} />)}
           </div>
         )}
       </div>
@@ -325,12 +331,13 @@ function fmtDeadline(d: Date) {
   return `${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}, ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
 }
 
-function RequestRow({ r, onCancel }: { r: LeaveRequest; onCancel: () => Promise<string | null> }) {
+/** `shift` is today's; a future shift change could move the real deadline, which the server enforces. */
+function RequestRow({ r, shift, onCancel }: { r: LeaveRequest; shift: Shift; onCancel: () => Promise<string | null> }) {
   const s = STATUS_STYLES[r.status]
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
-  const cancellable = canCancel(r)
+  const cancellable = canCancel(shift, r)
 
   async function handleCancel() {
     setBusy(true)
@@ -372,7 +379,7 @@ function RequestRow({ r, onCancel }: { r: LeaveRequest; onCancel: () => Promise<
           <div style={{ color: 'var(--text-faint, #94a3b8)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
             Submitted {new Date(r.requested_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
             {r.cancelled_at && <> · Cancelled {new Date(r.cancelled_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</>}
-            {cancellable && <> · Can be cancelled until {fmtDeadline(cancelDeadline(r))}</>}
+            {cancellable && <> · Can be cancelled until {fmtDeadline(cancelDeadline(shift, r))}</>}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem', flexShrink: 0 }}>

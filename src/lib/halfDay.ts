@@ -1,44 +1,35 @@
-import type { HalfDaySession, LeaveRequest } from '../types'
+import type { HalfDaySession, LeaveRequest, Shift } from '../types'
+import { at, fmtClock, minutesOf } from './shifts'
 
-// Morning half-day 9:30 AM – 1:30 PM, afternoon 1:30 PM – 5:30 PM (local time).
-// The 1:30 PM split must match auto_checkout_afternoon_half_days() in migration 009.
-export const HALF_DAY_SPLIT = { hour: 13, minute: 30 }
-
-export const SESSION_LABELS: Record<HalfDaySession, string> = {
-  morning:   'Morning (9:30 AM – 1:30 PM)',
-  afternoon: 'Afternoon (1:30 PM – 5:30 PM)',
-}
+// Half days follow the employee's shift: the morning half runs from the shift
+// start to its split time, the afternoon half from the split to the end.
+// Must match migration 020 (auto check-out, leave_starts_at, check_leave_request_timing).
 
 export const SESSION_SHORT: Record<HalfDaySession, string> = {
   morning:   'Morning',
   afternoon: 'Afternoon',
 }
 
-/** 1:30 PM on the given local calendar date ("YYYY-MM-DD"). */
-export function halfDaySplit(date: string) {
-  const d = new Date(date + 'T00:00:00')
-  d.setHours(HALF_DAY_SPLIT.hour, HALF_DAY_SPLIT.minute, 0, 0)
-  return d
+/** The shift's split time on the given local calendar date ("YYYY-MM-DD"). */
+export function halfDaySplit(shift: Shift, date: string) {
+  return at(date, shift.split_time)
 }
 
-/** When the leave begins: 9:30 AM, or 1:30 PM for an afternoon half day (local time). */
-export function leaveStartsAt(r: Pick<LeaveRequest, 'start_date' | 'half_day_session'>) {
-  if (r.half_day_session === 'afternoon') return halfDaySplit(r.start_date)
-  const d = new Date(r.start_date + 'T00:00:00')
-  d.setHours(9, 30, 0, 0)
-  return d
+/** When the leave begins: shift start, or the split for an afternoon half day. */
+export function leaveStartsAt(shift: Shift, r: Pick<LeaveRequest, 'start_date' | 'half_day_session'>) {
+  return at(r.start_date, r.half_day_session === 'afternoon' ? shift.split_time : shift.start_time)
 }
 
-// Must match cancel_leave_request() in migration 010
+// Must match cancel_leave_request() in migration 020
 const CANCEL_CUTOFF_MS = 10 * 60_000
 
 /** Last moment the employee can cancel: 10 minutes before the leave starts. */
-export function cancelDeadline(r: Pick<LeaveRequest, 'start_date' | 'half_day_session'>) {
-  return new Date(leaveStartsAt(r).getTime() - CANCEL_CUTOFF_MS)
+export function cancelDeadline(shift: Shift, r: Pick<LeaveRequest, 'start_date' | 'half_day_session'>) {
+  return new Date(leaveStartsAt(shift, r).getTime() - CANCEL_CUTOFF_MS)
 }
 
-export function canCancel(r: Pick<LeaveRequest, 'status' | 'start_date' | 'half_day_session'>, now = Date.now()) {
-  return (r.status === 'pending' || r.status === 'approved') && now < cancelDeadline(r).getTime()
+export function canCancel(shift: Shift, r: Pick<LeaveRequest, 'status' | 'start_date' | 'half_day_session'>, now = Date.now()) {
+  return (r.status === 'pending' || r.status === 'approved') && now < cancelDeadline(shift, r).getTime()
 }
 
 /** "Half day · Morning", "1 day", "3 days" */
@@ -48,17 +39,17 @@ export function leaveLength(r: Pick<LeaveRequest, 'start_date' | 'end_date' | 'd
   return `${n} day${n !== 1 ? 's' : ''}`
 }
 
-// Same-day leave rules — must match check_leave_request_timing() in migration 012.
-// Minutes since midnight, inclusive.
-const FULL_DAY_APPLY_UNTIL = 10 * 60 + 30   // 10:30 AM
-const HALF_DAY_APPLY_UNTIL = 13 * 60 + 30   // 1:30 PM
+/** Full-day leave for today can be requested until an hour after the shift starts. */
+const FULL_DAY_GRACE_MIN = 60
 
 /**
  * Why a leave starting today can't be requested right now, or null if it can.
- *   Not checked in: full day until 10:30 AM; half days any time.
- *   Checked in:     afternoon half day until 1:30 PM only.
+ * Must match check_leave_request_timing() in migration 020.
+ *   Not checked in: full day until shift start + 1 hour; half days any time.
+ *   Checked in:     afternoon half day until the split only.
  */
 export function sameDayLeaveBlock(
+  shift: Shift,
   duration: LeaveRequest['duration'],
   session: HalfDaySession | null,
   checkedIn: boolean,
@@ -68,11 +59,13 @@ export function sameDayLeaveBlock(
   if (checkedIn) {
     if (duration === 'full') return 'You’ve already checked in today, so you can’t take a full day’s leave for today.'
     if (session === 'morning') return 'You’ve already checked in today, so you can’t take the morning off.'
-    if (minutes > HALF_DAY_APPLY_UNTIL) return 'Afternoon half-day leave for today can only be requested until 1:30 PM.'
+    if (minutes > minutesOf(shift.split_time)) return `Afternoon half-day leave for today can only be requested until ${fmtClock(shift.split_time)}.`
     return null
   }
-  if (duration === 'full' && minutes > FULL_DAY_APPLY_UNTIL) {
-    return 'Full-day leave for today can only be requested until 10:30 AM. You can still request a half day.'
+  const fullUntil = minutesOf(shift.start_time) + FULL_DAY_GRACE_MIN
+  if (duration === 'full' && minutes > fullUntil) {
+    const t = `${String(Math.floor(fullUntil / 60)).padStart(2, '0')}:${String(fullUntil % 60).padStart(2, '0')}`
+    return `Full-day leave for today can only be requested until ${fmtClock(t)}. You can still request a half day.`
   }
   return null
 }

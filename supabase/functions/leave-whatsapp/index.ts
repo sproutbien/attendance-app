@@ -32,7 +32,20 @@ function dateRange(start: string, end: string) {
   return start === end ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`
 }
 
-const SESSIONS: Record<string, string> = { morning: 'Morning, 9:30 AM – 1:30 PM', afternoon: 'Afternoon, 1:30 PM – 5:30 PM' }
+/** "13:30:00" → "1:30 PM" */
+function fmtClock(time: string) {
+  const [h, m] = time.split(':').map(Number)
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`
+}
+
+type ShiftTimes = { start_time: string; split_time: string; end_time: string }
+
+/** "Morning, 9:30 AM – 1:30 PM" from the employee's shift that day */
+function sessionLabel(session: string, s: ShiftTimes) {
+  return session === 'morning'
+    ? `Morning, ${fmtClock(s.start_time)} – ${fmtClock(s.split_time)}`
+    : `Afternoon, ${fmtClock(s.split_time)} – ${fmtClock(s.end_time)}`
+}
 
 function dayCount(start: string, end: string, halfDaySession: string | null) {
   if (halfDaySession) return 'Half day'
@@ -89,7 +102,7 @@ Deno.serve(async req => {
   // Re-read the row — never trust request contents for what gets sent
   const { data: leave, error } = await supabase
     .from('leave_requests')
-    .select('start_date, end_date, half_day_session, reason, status, cancelled_after_approval, employee:employees!employee_id(full_name, department, phone)')
+    .select('employee_id, start_date, end_date, half_day_session, reason, status, cancelled_after_approval, employee:employees!employee_id(full_name, department, phone)')
     .eq('id', leaveId)
     .maybeSingle()
 
@@ -99,8 +112,14 @@ Deno.serve(async req => {
   }
 
   const employee = leave.employee as unknown as { full_name: string; department: string | null; phone: string | null }
-  const dates = dateRange(leave.start_date, leave.end_date) +
-    (leave.half_day_session ? ` (${SESSIONS[leave.half_day_session]})` : '')
+  let session = ''
+  if (leave.half_day_session) {
+    const { data: shift } = await supabase.rpc('shift_for', { p_employee: leave.employee_id, p_date: leave.start_date })
+    session = shift?.split_time
+      ? ` (${sessionLabel(leave.half_day_session, shift as ShiftTimes)})`
+      : ` (${leave.half_day_session === 'morning' ? 'Morning' : 'Afternoon'})`
+  }
+  const dates = dateRange(leave.start_date, leave.end_date) + session
 
   try {
     if (event === 'leave_submitted') {

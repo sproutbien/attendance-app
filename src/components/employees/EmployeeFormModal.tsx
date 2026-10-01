@@ -1,18 +1,23 @@
 import { useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import {
-  EMPLOYEE_STATUSES, EMPLOYEE_STATUS_LABELS, LEAVING_STATUSES, BLOCKED_STATUSES, normalizePhone,
+  EMPLOYEE_STATUSES, EMPLOYEE_STATUS_LABELS, LEAVING_STATUSES, BLOCKED_STATUSES, fmtDate, normalizePhone,
 } from '../../lib/employees'
 import type { EmployeeFormData } from '../../hooks/useEmployeeManagement'
-import type { Employee, EmployeeOption, EmployeeStatus } from '../../types'
+import { localDate } from '../../lib/calendar'
+import { shiftHours } from '../../lib/shifts'
+import type { Employee, EmployeeOption, EmployeeStatus, Shift } from '../../types'
 import { errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn } from './styles'
 
 /** Add / edit an employee's full profile. */
-export default function EmployeeFormModal({ existing, isSelf, employees, options, designations, saving, error, onSave, onClose }: {
+export default function EmployeeFormModal({ existing, isSelf, employees, options, shifts, currentShift, upcomingShift, designations, saving, error, onSave, onClose }: {
   existing: Employee | null         // null = add
   isSelf: boolean                   // the signed-in admin's own record: status and role are locked
   employees: Employee[]             // reporting-manager choices
   options: { department: EmployeeOption[]; work_location: EmployeeOption[]; employment_type: EmployeeOption[] }
+  shifts: Shift[]
+  currentShift: Shift | null        // today's (default shift for a new employee)
+  upcomingShift: { shift: Shift; from: string } | null   // a change already scheduled
   designations: string[]            // already in use, offered as suggestions
   saving: boolean
   error: string | null
@@ -42,6 +47,12 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
     ec_relation:    s(existing?.emergency_contact_relation),
     ec_phone:       s(existing?.emergency_contact_phone),
   })
+  // Shift changes start tomorrow by default (today's attendance keeps today's shift); new staff start today
+  const initialShiftId = upcomingShift?.shift.id ?? currentShift?.id ?? ''
+  const initialShiftFrom = upcomingShift?.from ?? (isEdit ? tomorrow() : localDate())
+  const [shiftId, setShiftId] = useState(initialShiftId)
+  const [shiftFrom, setShiftFrom] = useState(initialShiftFrom)
+  const shiftChanged = shiftId !== initialShiftId || (!!upcomingShift && shiftFrom !== initialShiftFrom)
   const [phoneError, setPhoneError] = useState<string | null>(null)
   const set = (key: keyof typeof f) => (e: { target: { value: string } }) => setF(prev => ({ ...prev, [key]: e.target.value }))
 
@@ -73,6 +84,7 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
       joining_date:   t(f.joining_date),
       monthly_salary: f.salary === '' ? null : Number(f.salary),
       phone,
+      shift: shiftId && shiftChanged ? { id: shiftId, from: isEdit ? shiftFrom : localDate() } : null,
       emergency_contact_name:     t(f.ec_name),
       emergency_contact_relation: t(f.ec_relation),
       emergency_contact_phone:    t(f.ec_phone),
@@ -158,6 +170,22 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
                 <p style={hintStyle}>Paid leave is credited from this month.</p>
               </Field>
             </Grid>
+            <Grid>
+              <Field label="Shift">
+                <select value={shiftId} onChange={e => setShiftId(e.target.value)} style={inputStyle}>
+                  {shifts.map(s => <option key={s.id} value={s.id}>{s.name} · {shiftHours(s)}{s.is_default ? ' (default)' : ''}</option>)}
+                </select>
+                {upcomingShift && !shiftChanged && (
+                  <p style={hintStyle}>Moves to {upcomingShift.shift.name} on {fmtDate(upcomingShift.from)}.</p>
+                )}
+              </Field>
+              {isEdit && (shiftChanged || upcomingShift) && (
+                <Field label="Shift starts on">
+                  <input type="date" value={shiftFrom} min={localDate()} onChange={e => setShiftFrom(e.target.value)} required style={inputStyle} />
+                  <p style={hintStyle}>Days before this keep the current shift's rules.</p>
+                </Field>
+              )}
+            </Grid>
             <Field label="Monthly gross salary (optional)">
               <input type="number" value={f.salary} onChange={set('salary')} min="0" step="1" placeholder="e.g. 50000" style={inputStyle} />
               <p style={hintStyle}>Used for payroll on the Reports page.</p>
@@ -220,6 +248,12 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
       </div>
     </div>
   )
+}
+
+function tomorrow() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  return localDate(d)
 }
 
 const STATUS_HINTS: Record<EmployeeStatus, string> = {

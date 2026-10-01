@@ -16,7 +16,9 @@ import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, mont
 import type { DayMark } from '../lib/calendar'
 import { fmtClock, fmtHM, totalBreakSeconds, workedSeconds } from '../lib/breaks'
 import { halfDaySplit } from '../lib/halfDay'
-import type { AttendanceRecord, HalfDaySession } from '../types'
+import { fmtClock as clock, minutesOf, shiftHours } from '../lib/shifts'
+import { useMyShift } from '../hooks/useShifts'
+import type { AttendanceRecord, HalfDaySession, Shift } from '../types'
 
 type DayState = 'loading' | 'idle' | 'working' | 'break' | 'done'
 
@@ -92,6 +94,7 @@ export default function DashboardPage() {
   const corrections = useCorrections()
   const [correcting, setCorrecting] = useState<{ date: string; rec?: AttendanceRecord } | null>(null)
   const [confirmingOut, setConfirmingOut] = useState(false)
+  const { shift, loaded: shiftLoaded } = useMyShift()
 
   const state: DayState =
     todayRecord === undefined ? 'loading'
@@ -101,10 +104,10 @@ export default function DashboardPage() {
     : 'working'
   const now = useNow(state === 'working' || state === 'break')
 
-  // Approved half-day leave today: morning → check-in opens at 1:30 PM,
-  // afternoon → auto check-out at 1:30 PM (the server job does this too if the app is closed)
+  // Approved half-day leave today: morning → check-in opens at the shift's split,
+  // afternoon → auto check-out at the split (the server job does this too if the app is closed)
   const halfDay = todayRecord?.half_day_session ?? null
-  const split = halfDay ? halfDaySplit(localDate()).getTime() : null
+  const split = halfDay && shiftLoaded ? halfDaySplit(shift, localDate()).getTime() : null
   const pastSplit = usePassed(split)
   const clockedIn = state === 'working' || state === 'break'
   useEffect(() => {
@@ -119,7 +122,10 @@ export default function DashboardPage() {
   return (
     <AppLayout wide>
       <section className="sb-hero">
-        <p className="sb-hero-date"><CalendarDays size={16} strokeWidth={2} />{todayLabel}</p>
+        <p className="sb-hero-date">
+          <CalendarDays size={16} strokeWidth={2} />{todayLabel}
+          {shiftLoaded && <> · {shift.name} shift {shiftHours(shift)}</>}
+        </p>
         <h1>Good {greeting()}, <em>{firstName}</em></h1>
         <p className="sb-hero-sub">{SUBTITLE[state]}</p>
       </section>
@@ -134,6 +140,7 @@ export default function DashboardPage() {
             isSubmitting={isSubmitting}
             halfDay={halfDay}
             pastSplit={pastSplit}
+            shift={shift}
             onCheckIn={checkIn}
             onCheckOut={() => setConfirmingOut(true)}
           />
@@ -203,12 +210,13 @@ export default function DashboardPage() {
 
 // ── Check-in panel (left) ─────────────────────────────────────
 
-function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheckIn, onCheckOut }: {
+function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, onCheckIn, onCheckOut }: {
   state: DayState
   record: AttendanceRecord | null
   isSubmitting: boolean
   halfDay: HalfDaySession | null
   pastSplit: boolean
+  shift: Shift
   onCheckIn: () => void
   onCheckOut: () => void
 }) {
@@ -228,7 +236,7 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
     head = state === 'break' ? 'On a break' : 'Currently working'
     sub = `Checked in at ${fmtTime(record?.check_in_time)}`
     hint = state === 'break' ? 'Checking out will also end your break' : 'Tap to end your workday'
-    if (halfDay === 'afternoon') hint = 'Half-day leave this afternoon — you’ll be checked out automatically at 1:30 PM'
+    if (halfDay === 'afternoon') hint = `Half-day leave this afternoon — you’ll be checked out automatically at ${clock(shift.split_time)}`
     action = (
       <button className="sb-bigbtn is-out" onClick={onCheckOut} disabled={isSubmitting}>
         <LogOut size={18} strokeWidth={2.2} />
@@ -236,20 +244,22 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, onCheck
       </button>
     )
   } else {
-    // Morning leave: locked until 1:30 PM. Afternoon leave: locked once 1:30 PM has passed.
+    // Morning leave: locked until the split. Afternoon leave: locked once the split has passed.
     const locked = (halfDay === 'morning' && !pastSplit) || (halfDay === 'afternoon' && pastSplit)
     if (halfDay === 'morning') {
       head = pastSplit ? 'Welcome back from your half day' : 'Half-day leave this morning'
-      hint = pastSplit ? 'Tap to start your afternoon' : 'Check In opens at 1:30 PM, when your leave ends'
+      hint = pastSplit ? 'Tap to start your afternoon' : `Check In opens at ${clock(shift.split_time)}, when your leave ends`
     } else if (halfDay === 'afternoon') {
       head = pastSplit ? 'You’re on leave this afternoon' : 'Half-day leave this afternoon'
-      hint = pastSplit ? 'Enjoy your afternoon off' : 'You’ll be checked out automatically at 1:30 PM'
+      hint = pastSplit ? 'Enjoy your afternoon off' : `You’ll be checked out automatically at ${clock(shift.split_time)}`
     } else if (record?.status === 'on_leave') {
       head = 'You’re on leave today'
       hint = 'Check in only if you’re working today'
     } else {
       const d = new Date()
-      if (d.getHours() * 60 + d.getMinutes() > 11 * 60 + 30) hint = 'Checking in after 11:30 AM counts as a morning half-day leave'
+      const minutes = d.getHours() * 60 + d.getMinutes()
+      if (minutes > minutesOf(shift.half_day_after)) hint = `Checking in after ${clock(shift.half_day_after)} counts as a morning half-day leave`
+      else if (minutes > minutesOf(shift.late_after)) hint = `Checking in after ${clock(shift.late_after)} is marked Late`
     }
     action = (
       <button className="sb-bigbtn" onClick={onCheckIn} disabled={isSubmitting || state === 'loading' || locked}>

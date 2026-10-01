@@ -12,10 +12,11 @@ export type EmployeeProfileFields = Pick<Employee,
 export type EmployeeFormData = EmployeeProfileFields & {
   email: string
   password?: string   // add only
+  shift: { id: string; from: string } | null   // null = shift unchanged
 }
 
 /** The employees-row part of the form (email and password only apply when adding). */
-export function profileUpdates({ email: _email, password: _password, ...rest }: EmployeeFormData): EmployeeProfileFields {
+export function profileUpdates({ email: _email, password: _password, shift: _shift, ...rest }: EmployeeFormData): EmployeeProfileFields {
   return rest
 }
 
@@ -37,7 +38,8 @@ export function useEmployeeManagement() {
 
   useEffect(() => { fetchEmployees() }, [fetchEmployees])
 
-  async function addEmployee({ email, password, ...profile }: EmployeeFormData): Promise<boolean> {
+  /** Returns the new employee's id, or null on failure. */
+  async function addEmployee({ email, password, shift: _shift, ...profile }: EmployeeFormData): Promise<string | null> {
     setSaving(true)
     setError(null)
     const { data: newId, error } = await supabase.rpc('create_employee', {
@@ -50,7 +52,7 @@ export function useEmployeeManagement() {
     if (error) {
       setError(error.message)
       setSaving(false)
-      return false
+      return null
     }
     // create_employee only takes the basics; the rest of the profile follows
     const { employee_code, ...rest } = profile
@@ -62,9 +64,9 @@ export function useEmployeeManagement() {
     setSaving(false)
     if (updErr) {
       setError(`Employee created, but some details weren't saved: ${updErr.message}`)
-      return false
+      return null
     }
-    return true
+    return newId as string
   }
 
   async function updateEmployee(

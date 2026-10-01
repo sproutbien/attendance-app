@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useEmployeeManagement, useEmployeeOptions } from '../../hooks/useEmployeeManagement'
+import { useShifts } from '../../hooks/useShifts'
 import type { EmployeeFormData } from '../../hooks/useEmployeeManagement'
 import {
   BLOCKED_STATUSES, EMPLOYEE_STATUSES, EMPLOYEE_STATUS_LABELS, TRACKED_STATUSES, fmtDate, fmtPhone,
@@ -11,11 +12,12 @@ import EmployeeAvatar from '../../components/employees/EmployeeAvatar'
 import StatusBadge from '../../components/employees/StatusBadge'
 import EmployeeFormModal from '../../components/employees/EmployeeFormModal'
 import EmployeeListsModal from '../../components/employees/EmployeeListsModal'
+import ShiftsModal from '../../components/employees/ShiftsModal'
 import {
   card, dangerBtn, errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn,
   sectionHeading, successBox, tableStyle, tdStyle, thStyle,
 } from '../../components/employees/styles'
-import type { Employee, EmployeeStatus } from '../../types'
+import type { Employee, EmployeeStatus, Shift } from '../../types'
 
 /** Binned employees are permanently deleted this long after deletion (see migration 018) */
 const BIN_MONTHS = 6
@@ -41,6 +43,8 @@ export default function AdminEmployeesPage() {
   const mgmt = useEmployeeManagement()
   const { employees, loading, saving, error, setError, addEmployee, binEmployee, restoreEmployee, purgeEmployee } = mgmt
   const lists = useEmployeeOptions()
+  const shifts = useShifts()
+  const [showShifts, setShowShifts] = useState(false)
 
   const [adding, setAdding] = useState(false)
   const [showLists, setShowLists] = useState(false)
@@ -76,10 +80,11 @@ export default function AdminEmployeesPage() {
   }
 
   async function handleAdd(data: EmployeeFormData) {
-    if (await addEmployee(data)) {
-      setAdding(false)
-      flash(`${data.full_name} added.`)
-    }
+    const id = await addEmployee(data)
+    if (!id) return
+    setAdding(false)
+    const err = data.shift ? await shifts.assign(id, data.shift.id, data.shift.from) : null
+    flash(err ? `${data.full_name} added, but the shift wasn't set: ${err}` : `${data.full_name} added.`)
   }
 
   async function handleConfirm() {
@@ -113,6 +118,7 @@ export default function AdminEmployeesPage() {
             <button onClick={() => setShowBin(false)} style={ghostBtn}>← Back to employees</button>
           ) : (
             <>
+              <button onClick={() => setShowShifts(true)} style={ghostBtn}>Shifts</button>
               <button onClick={() => setShowLists(true)} style={ghostBtn}>Lists</button>
               <button onClick={() => setShowBin(true)} style={ghostBtn}>Bin ({binned.length})</button>
               <button onClick={() => { setError(null); setAdding(true) }} style={primaryBtn}>+ Add Employee</button>
@@ -171,6 +177,7 @@ export default function AdminEmployeesPage() {
                       key={e.id}
                       employee={e}
                       manager={e.reporting_manager_id ? byId.get(e.reporting_manager_id) ?? null : null}
+                      shift={shifts.shiftOn(e.id)}
                       onOpen={() => navigate(`/admin/employees/${e.id}`)}
                       onDelete={e.id === me?.id ? undefined : () => { setConfirmError(null); setConfirm({ type: 'bin', employee: e }) }}
                     />
@@ -188,12 +195,19 @@ export default function AdminEmployeesPage() {
           isSelf={false}
           employees={employees}
           options={{ department: lists.byKind('department'), work_location: lists.byKind('work_location'), employment_type: lists.byKind('employment_type') }}
+          shifts={shifts.shifts}
+          currentShift={shifts.defaultShift}
+          upcomingShift={null}
           designations={designations}
           saving={saving}
           error={error}
           onSave={handleAdd}
           onClose={() => { setAdding(false); setError(null) }}
         />
+      )}
+
+      {showShifts && (
+        <ShiftsModal shifts={shifts} employeeIds={current.map(e => e.id)} onClose={() => setShowShifts(false)} />
       )}
 
       {showLists && (
@@ -229,15 +243,16 @@ export default function AdminEmployeesPage() {
 
 // ── Employee table row ────────────────────────────────────────
 
-function EmployeeRow({ employee: e, manager, onOpen, onDelete }: {
+function EmployeeRow({ employee: e, manager, shift, onOpen, onDelete }: {
   employee: Employee
   manager: Employee | null
+  shift: Shift | null
   onOpen: () => void
   onDelete?: () => void             // absent for the signed-in admin's own row
 }) {
   const roleColor = ROLE_COLORS[e.role]
   const former = BLOCKED_STATUSES.includes(e.status)
-  const job = [e.employment_type, e.work_location].filter(Boolean).join(' · ')
+  const job = [e.employment_type, e.work_location, shift && `${shift.name} shift`].filter(Boolean).join(' · ')
 
   return (
     <tr style={{ borderBottom: '1px solid #f1f5f9', opacity: former ? 0.65 : 1 }}>

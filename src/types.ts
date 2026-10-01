@@ -138,3 +138,21 @@ export type LeaveAdjustment = {
   created_by: string | null
   created_at: string
 }
+
+/** Times are "HH:MM:SS" (Asia/Kolkata, same day). See migration 020. */
+export type Shift = {
+  id: string
+  name: string
+  start_time: string
+  end_time: string
+  late_after: string       // check-in after this is Late
+  half_day_after: string   // check-in after this makes the morning a half-day leave
+  split_time: string       // morning / afternoon boundary
+  is_default: boolean
+}
+
+export type EmployeeShift = {
+  employee_id: string
+  effective_from: string   // "YYYY-MM-DD"
+  shift_id: string
+}

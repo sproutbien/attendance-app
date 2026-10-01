@@ -89,7 +89,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
         }
       }
 
-      // Late check-ins (after 11:30 AM) become half days with no leave request behind them
+      // Late check-ins (after the shift's half-day time) become half days with no leave request behind them
       for (const r of records ?? []) {
         if (!r.half_day_session) continue
         if (!halfDay.has(r.employee_id)) halfDay.set(r.employee_id, new Map())
