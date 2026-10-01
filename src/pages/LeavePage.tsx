@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import type { CSSProperties } from 'react'
 import AppLayout from '../components/AppLayout'
 import { useLeaveRequests } from '../hooks/useLeaveRequests'
@@ -6,7 +7,7 @@ import type { HalfDaySession, LeaveRequest, LeaveTypeCode } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { useHolidayDates, useLeaveBalances } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
-import { LEAVE_TYPE_LABELS, bookableAsOf, bookableDays, daysLabel, findLeaveClash, fmtDays, workingDays } from '../lib/leave'
+import { LEAVE_TYPE_LABELS, addDays, bookableAsOf, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, workingDays } from '../lib/leave'
 import { localDate } from '../lib/calendar'
 import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 import { fmtClock, sessionLabel } from '../lib/shifts'
@@ -27,7 +28,12 @@ function fmtDate(iso: string) {
 }
 
 export default function LeavePage() {
-  const { requests, loading, submitting, error, checkedInToday, submit, cancel } = useLeaveRequests()
+  const { requests, loading, submitting, error, checkedInToday, submit, cancel, cancelToday } = useLeaveRequests()
+  // Arrived from the dashboard's "Cancel Leave" button: open that request's cancel options
+  const [params, setParams] = useSearchParams()
+  const cancelId = params.get('cancel')
+  const [cancelledToday, setCancelledToday] = useState(false)
+  const formRef = useRef<HTMLDivElement>(null)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [duration, setDuration] = useState<LeaveRequest['duration']>('full')
@@ -137,8 +143,24 @@ export default function LeavePage() {
     <AppLayout>
       <LeaveBalanceCards balances={current.balances} loading={current.loading} error={current.error} />
 
+      {cancelledToday && (
+        <div style={{ ...alertStyle('#f0fdf4', '#bbf7d0', '#166534'), display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+          <span>Today’s leave is cancelled and your admin has been notified. You can check in now.</span>
+          <span style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => { setCancelledToday(false); formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
+              style={keepBtnStyle}
+            >
+              Apply for new dates
+            </button>
+            <Link to="/dashboard" style={{ ...confirmBtnStyle, background: '#16a34a', textDecoration: 'none' }}>Go to Check In</Link>
+          </span>
+        </div>
+      )}
+
       {/* Request form */}
-      <div style={card}>
+      <div style={card} ref={formRef}>
         <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-strong, #1e293b)' }}>
           Request Leave
         </h2>
@@ -360,7 +382,28 @@ export default function LeavePage() {
           <p style={{ color: 'var(--text-faint, #94a3b8)', margin: 0 }}>No leave requests yet.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {requests.map(r => <RequestRow key={r.id} r={r} shift={todayShift} onCancel={() => cancel(r.id)} />)}
+            {requests.map(r => (
+              <RequestRow
+                key={r.id}
+                r={r}
+                shift={todayShift}
+                today={today}
+                todayCancel={coversToday(r, today) && !checkedInToday}
+                autoOpen={r.id === cancelId}
+                onCancel={() => cancel(r.id)}
+                onCancelToday={async mode => {
+                  const err = await cancelToday(r.id, mode)
+                  if (!err) {
+                    setCancelledToday(true)
+                    setParams({}, { replace: true })
+                    current.refresh()
+                    booking.refresh()
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }
+                  return err
+                }}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -379,26 +422,56 @@ function fmtDeadline(d: Date) {
   return `${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}, ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`
 }
 
-/** `shift` is today's; a future shift change could move the real deadline, which the server enforces. */
-function RequestRow({ r, shift, onCancel }: { r: LeaveRequest; shift: Shift; onCancel: () => Promise<string | null> }) {
+/**
+ * `shift` is today's; a future shift change could move the real deadline, which the server enforces.
+ * `todayCancel`: full-day leave covering today, not checked in — today's part can be cancelled any time today.
+ */
+function RequestRow({ r, shift, today, todayCancel, autoOpen, onCancel, onCancelToday }: {
+  r: LeaveRequest
+  shift: Shift
+  today: string
+  todayCancel: boolean
+  autoOpen: boolean
+  onCancel: () => Promise<string | null>
+  onCancelToday: (mode: 'today' | 'onward') => Promise<string | null>
+}) {
   const s = STATUS_STYLES[r.status]
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
-  const cancellable = canCancel(shift, r)
+  const [mode, setMode] = useState<'today' | 'onward'>('today')
+  const rowRef = useRef<HTMLDivElement>(null)
+  const cancellable = todayCancel || canCancel(shift, r)
+
+  useEffect(() => {
+    if (autoOpen && todayCancel) {
+      setConfirming(true)
+      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [autoOpen, todayCancel])
 
   async function handleCancel() {
     setBusy(true)
     setCancelError(null)
-    const err = await onCancel()
+    const err = todayCancel ? await onCancelToday(mode) : await onCancel()
     setBusy(false)
     if (err) setCancelError(err)
     else setConfirming(false)
   }
 
+  // Today's part of a multi-day leave: only today, or today onward
+  const before = r.start_date < today ? fmtLeaveSpan(r.start_date, addDays(today, -1)) : null
+  const after = r.end_date > today ? fmtLeaveSpan(addDays(today, 1), r.end_date) : null
+  const todayOptions = todayCancel && after ? [
+    { mode: 'today' as const, label: `Only today (${fmtLeaveSpan(today, today)})`,
+      detail: `${[before, after].filter(Boolean).join(' and ')} stay${before ? '' : 's'} as leave` },
+    { mode: 'onward' as const, label: before ? `Today onward (${fmtLeaveSpan(today, r.end_date)})` : `The whole leave (${fmtLeaveSpan(r.start_date, r.end_date)})`,
+      detail: before ? `${before} stays as leave` : 'Nothing stays as leave' },
+  ] : null
+
   return (
-    <div style={{
-      border: '1px solid var(--border, #e2e8f0)',
+    <div ref={rowRef} style={{
+      border: autoOpen && todayCancel ? '2px solid #dc2626' : '1px solid var(--border, #e2e8f0)',
       borderRadius: 12,
       padding: '0.875rem 1rem',
       opacity: r.status === 'cancelled' ? 0.75 : 1,
@@ -431,7 +504,9 @@ function RequestRow({ r, shift, onCancel }: { r: LeaveRequest; shift: Shift; onC
           <div style={{ color: 'var(--text-faint, #94a3b8)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
             Submitted {new Date(r.requested_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
             {r.cancelled_at && <> · Cancelled {new Date(r.cancelled_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</>}
-            {cancellable && <> · Can be cancelled until {fmtDeadline(cancelDeadline(shift, r))}</>}
+            {todayCancel
+              ? <> · Today’s leave can be cancelled until you check in</>
+              : cancellable && <> · Can be cancelled until {fmtDeadline(cancelDeadline(shift, r))}</>}
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem', flexShrink: 0 }}>
@@ -466,10 +541,29 @@ function RequestRow({ r, shift, onCancel }: { r: LeaveRequest; shift: Shift; onC
           gap: '0.75rem',
           flexWrap: 'wrap',
         }}>
-          <span style={{ fontSize: '0.875rem', color: 'var(--red, #b91c1c)' }}>
-            Cancel this {r.status === 'approved' ? 'approved ' : ''}leave? Your admin will be notified.
-          </span>
-          <span style={{ display: 'flex', gap: '0.5rem' }}>
+          {todayOptions ? (
+            <div role="radiogroup" aria-label="What to cancel" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+              <span style={{ fontSize: '0.875rem', color: 'var(--red, #b91c1c)', fontWeight: 600 }}>
+                What would you like to cancel? Your admin will be notified.
+              </span>
+              {todayOptions.map(o => (
+                <label key={o.mode} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', fontSize: '0.875rem', color: 'var(--text-strong, #1e293b)', cursor: 'pointer' }}>
+                  <input type="radio" name={`cancel-${r.id}`} checked={mode === o.mode} onChange={() => setMode(o.mode)} style={{ marginTop: 3 }} />
+                  <span>
+                    <b>{o.label}</b>
+                    <span style={{ display: 'block', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>{o.detail}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <span style={{ fontSize: '0.875rem', color: 'var(--red, #b91c1c)' }}>
+              {todayCancel
+                ? <>Cancel today’s leave ({fmtLeaveSpan(today, today)})?{before && <> {before} stays as leave.</>} Your admin will be notified.</>
+                : <>Cancel this {r.status === 'approved' ? 'approved ' : ''}leave? Your admin will be notified.</>}
+            </span>
+          )}
+          <span style={{ display: 'flex', gap: '0.5rem', marginLeft: todayOptions ? 'auto' : undefined }}>
             <button type="button" onClick={() => { setConfirming(false); setCancelError(null) }} disabled={busy} style={keepBtnStyle}>
               Keep it
             </button>

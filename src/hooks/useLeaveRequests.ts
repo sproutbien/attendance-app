@@ -83,5 +83,13 @@ export function useLeaveRequests() {
     return null
   }
 
-  return { requests, loading, submitting, error, checkedInToday, submit, cancel }
+  /** Cancel today's part of a full-day leave ('today' only, or today 'onward'). Returns an error message or null. */
+  async function cancelToday(id: string, mode: 'today' | 'onward'): Promise<string | null> {
+    const { error } = await supabase.rpc('cancel_leave_today', { p_id: id, p_mode: mode })
+    if (error) return error.message
+    await fetchRequests()
+    return null
+  }
+
+  return { requests, loading, submitting, error, checkedInToday, submit, cancel, cancelToday }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   BriefcaseBusiness, CalendarCheck, CalendarClock, CalendarDays, ChartColumn, ChevronLeft, ChevronRight,
   CircleArrowRight, Clock, Coffee, DoorOpen, LogOut, Pause, Play, Timer,
@@ -18,6 +18,9 @@ import { fmtClock, fmtHM, minBreakTopUp, totalBreakSeconds, workedSeconds } from
 import { halfDaySplit } from '../lib/halfDay'
 import { fmtClock as clock, minutesOf, shiftHours } from '../lib/shifts'
 import { useMyShift, useShiftHistory } from '../hooks/useShifts'
+import { supabase } from '../lib/supabase'
+import { LEAVE_TYPE_LABELS, fmtLeaveSpan } from '../lib/leave'
+import type { LeaveRequest } from '../types'
 import type { AttendanceRecord, HalfDaySession, Shift } from '../types'
 
 type DayState = 'loading' | 'idle' | 'working' | 'break' | 'done'
@@ -95,6 +98,9 @@ export default function DashboardPage() {
   const [correcting, setCorrecting] = useState<{ date: string; rec?: AttendanceRecord } | null>(null)
   const [confirmingOut, setConfirmingOut] = useState(false)
   const { shift, loaded: shiftLoaded } = useMyShift()
+  const todaysLeave = useTodaysLeave(employee?.id)
+  const [leavePopup, setLeavePopup] = useState(false)
+  const navigate = useNavigate()
 
   const state: DayState =
     todayRecord === undefined ? 'loading'
@@ -142,7 +148,8 @@ export default function DashboardPage() {
             halfDay={halfDay}
             pastSplit={pastSplit}
             shift={shift}
-            onCheckIn={checkIn}
+            onLeave={!!todaysLeave}
+            onCheckIn={() => todaysLeave ? setLeavePopup(true) : checkIn()}
             onCheckOut={() => setConfirmingOut(true)}
           />
           <TodayTime
@@ -184,6 +191,27 @@ export default function DashboardPage() {
         />
       )}
 
+      {leavePopup && todaysLeave && (
+        <div className="sb-modal-backdrop" onClick={() => setLeavePopup(false)}>
+          <div className="sb-modal" role="dialog" aria-modal="true" aria-labelledby="onleave-title" onClick={e => e.stopPropagation()}>
+            <div className="sb-modal-head">
+              <h2 id="onleave-title">You’re on leave today</h2>
+            </div>
+            <p className="sb-modal-sub">
+              You have {todaysLeave.status === 'approved' ? 'approved' : 'a pending request for'} {LEAVE_TYPE_LABELS[todaysLeave.leave_type]} leave
+              {' '}on <b>{fmtLeaveSpan(todaysLeave.start_date, todaysLeave.end_date)}</b>.
+              To check in, cancel today’s leave first.
+            </p>
+            <div className="sb-modal-actions">
+              <button type="button" className="sb-btn-ghost" onClick={() => setLeavePopup(false)}>Don’t Check-in</button>
+              <button type="button" className="sb-btn-primary" onClick={() => navigate(`/leave?cancel=${todaysLeave.id}`)}>
+                Cancel Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmingOut && clockedIn && (
         <div className="sb-modal-backdrop" onClick={() => setConfirmingOut(false)}>
           <div className="sb-modal" role="dialog" aria-modal="true" aria-labelledby="checkout-title" onClick={e => e.stopPropagation()}>
@@ -211,15 +239,37 @@ export default function DashboardPage() {
   )
 }
 
+/** Pending or approved full-day leave covering today (null when none). */
+function useTodaysLeave(employeeId: string | undefined) {
+  const [leave, setLeave] = useState<LeaveRequest | null>(null)
+  useEffect(() => {
+    if (!employeeId) return
+    const today = localDate()
+    supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .eq('duration', 'full')
+      .in('status', ['pending', 'approved'])
+      .lte('start_date', today)
+      .gte('end_date', today)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setLeave(data ?? null))
+  }, [employeeId])
+  return leave
+}
+
 // ── Check-in panel (left) ─────────────────────────────────────
 
-function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, onCheckIn, onCheckOut }: {
+function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, onLeave, onCheckIn, onCheckOut }: {
   state: DayState
   record: AttendanceRecord | null
   isSubmitting: boolean
   halfDay: HalfDaySession | null
   pastSplit: boolean
   shift: Shift
+  onLeave: boolean        // pending / approved full-day leave today: Check In opens the cancel-leave popup
   onCheckIn: () => void
   onCheckOut: () => void
 }) {
@@ -255,9 +305,9 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, 
     } else if (halfDay === 'afternoon') {
       head = pastSplit ? 'You’re on leave this afternoon' : 'Half-day leave this afternoon'
       hint = pastSplit ? 'Enjoy your afternoon off' : `You’ll be checked out automatically at ${clock(shift.split_time)}`
-    } else if (record?.status === 'on_leave') {
+    } else if (onLeave || record?.status === 'on_leave') {
       head = 'You’re on leave today'
-      hint = 'Check in only if you’re working today'
+      hint = 'Working today after all? Cancel today’s leave first'
     } else {
       const d = new Date()
       const minutes = d.getHours() * 60 + d.getMinutes()

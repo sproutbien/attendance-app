@@ -56,6 +56,28 @@ export function workingDays(start: string, end: string, half: boolean, holidays:
   return half ? n * 0.5 : n
 }
 
+/** Pending or approved full-day leave that covers `today`: check-in is blocked until today's part is cancelled. */
+export function coversToday(r: Pick<LeaveRequest, 'status' | 'duration' | 'start_date' | 'end_date'>, today: string) {
+  return (r.status === 'pending' || r.status === 'approved') && r.duration === 'full' && r.start_date <= today && r.end_date >= today
+}
+
+/** "Wed 3 Oct" */
+export function fmtLeaveDay(iso: string) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+/** "Wed 3 Oct" or "Wed 3 Oct – Fri 5 Oct" */
+export function fmtLeaveSpan(start: string, end: string) {
+  return start === end ? fmtLeaveDay(start) : `${fmtLeaveDay(start)} – ${fmtLeaveDay(end)}`
+}
+
+/** The day before / after an ISO date. */
+export function addDays(iso: string, n: number) {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 type Span = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session'>
 
 /**
