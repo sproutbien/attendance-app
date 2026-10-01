@@ -160,7 +160,7 @@ export default function LeavePage() {
       )}
 
       {/* Request form */}
-      <div style={card} ref={formRef}>
+      <div style={{ ...card, ...requestCard }} ref={formRef}>
         <h2 style={{ margin: '0 0 1.5rem', fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-strong, #1e293b)' }}>
           Request Leave
         </h2>
@@ -708,6 +708,12 @@ const card: CSSProperties = {
   boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
 }
 
+// Soft brand-green tint so the form stands out from the other cards
+const requestCard: CSSProperties = {
+  background: 'linear-gradient(180deg, var(--green-soft, #e6f2e1) 0%, var(--surface, #fff) 70%)',
+  border: '1px solid color-mix(in srgb, var(--green, #3d7f1f) 22%, transparent)',
+}
+
 const labelStyle: CSSProperties = {
   display: 'block',
   fontSize: '0.875rem',
@@ -725,5 +731,6 @@ const inputStyle: CSSProperties = {
   outline: 'none',
   boxSizing: 'border-box',
   color: 'var(--text-strong, #1e293b)',
+  background: 'var(--surface, #fff)',
   fontFamily: 'inherit',
 }
