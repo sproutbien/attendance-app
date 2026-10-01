@@ -154,6 +154,7 @@ export default function DashboardPage() {
           />
           <MonthSummary
             title={yearMonth === thisMonth ? 'This Month' : monthLabel(yearMonth)}
+            yearMonth={yearMonth}
             loading={calendar.loading}
             log={log}
           />
@@ -369,8 +370,9 @@ function TodayTime({ state, record, now, isSubmitting, onPause, onResume }: {
 
 // ── This Month card (right) ───────────────────────────────────
 
-function MonthSummary({ title, loading, log }: {
+function MonthSummary({ title, yearMonth, loading, log }: {
   title: string
+  yearMonth: string
   loading: boolean
   log: ReturnType<typeof useMonthLog>
 }) {
@@ -384,7 +386,7 @@ function MonthSummary({ title, loading, log }: {
 
   return (
     <div className="sb-card sb-month">
-      <Link to="/reports" className="sb-card-head sb-month-head">
+      <Link to={`/reports?month=${yearMonth}`} className="sb-card-head sb-month-head" aria-label={`${title}: see detailed statistics`}>
         <ChartColumn size={20} strokeWidth={2} />
         <h2>{title}</h2>
         <ChevronRight size={18} strokeWidth={2.2} className="sb-month-go" />
