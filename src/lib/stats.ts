@@ -49,6 +49,8 @@ export type StatsInput = {
   leaves: LeaveRequest[]       // approved
   shifts: Shift[]
   assignments: EmployeeShift[] // sorted by effective_from
+  activeFrom?: string | null   // joining date: earlier days aren't counted
+  activeTo?: string | null     // last working day: later days aren't counted
 }
 
 export function shiftOnDate(input: Pick<StatsInput, 'shifts' | 'assignments'>, date: string): Shift {
@@ -78,6 +80,7 @@ export function computeMonthStats(yearMonth: string, input: StatsInput, today: s
     if (date > today) break
     const rec = recs.get(date)
     if (date < TRACKING_START && !rec) continue
+    if (!rec && ((input.activeFrom && date < input.activeFrom) || (input.activeTo && date > input.activeTo))) continue
 
     const shift = shiftOnDate(input, date)
     const start = minutesOf(shift.start_time), split = minutesOf(shift.split_time), end = minutesOf(shift.end_time)
@@ -162,4 +165,27 @@ export function fmtDays(n: number) {
 
 export function fmtPct(r: number | null) {
   return r == null ? '—' : `${Math.round(r * 100)}%`
+}
+
+export type TeamTotals = Pick<MonthStats,
+  'onTime' | 'late' | 'leave' | 'absent' | 'present' | 'workingDays' | 'worked' | 'expected' | 'breaks'
+  | 'attendanceRate' | 'onTimeRate' | 'avgWorked'
+> & { people: number }
+
+/** Adds up several people's month stats; rates are worked out from the sums, not averaged. */
+export function teamTotals(list: MonthStats[]): TeamTotals {
+  const sum = (k: 'onTime' | 'late' | 'leave' | 'absent' | 'present' | 'workingDays' | 'worked' | 'expected' | 'breaks') =>
+    list.reduce((n, m) => n + m[k], 0)
+  const t = {
+    onTime: sum('onTime'), late: sum('late'), leave: sum('leave'), absent: sum('absent'), present: sum('present'),
+    workingDays: sum('workingDays'), worked: sum('worked'), expected: sum('expected'), breaks: sum('breaks'),
+    people: list.filter(m => m.workingDays > 0).length,
+  }
+  const due = t.workingDays - t.leave
+  return {
+    ...t,
+    attendanceRate: due > 0 ? t.present / due : null,
+    onTimeRate: t.present > 0 ? t.onTime / t.present : null,
+    avgWorked: t.present > 0 ? t.worked / t.present : 0,
+  }
 }

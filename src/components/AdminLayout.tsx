@@ -85,6 +85,7 @@ export default function AdminLayout() {
             <NavLink to="/admin/corrections" style={navStyle}>Corrections<Badge count={attention.corrections} /></NavLink>
             <NavLink to="/admin/employees"  style={navStyle}>Employees</NavLink>
             <NavLink to="/admin/reports"    style={navStyle}>Reports</NavLink>
+            <NavLink to="/admin/team-stats" style={navStyle}>Team Stats</NavLink>
             <NavLink to="/admin/calendar"   style={navStyle}>Calendar</NavLink>
           </nav>
         </div>

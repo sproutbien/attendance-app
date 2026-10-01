@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { CalendarCheck, CalendarDays, ChartColumn, Clock, DoorOpen, Download, Target, Timer } from 'lucide-react'
@@ -16,6 +15,7 @@ import { minutesOf, shiftHours } from '../../lib/shifts'
 import { LEAVE_TYPE_LABELS } from '../../lib/leave'
 import type { Employee, LeaveTypeCode } from '../../types'
 import '../../styles/stats.css'
+import { usePrintSetup } from './print'
 
 const PAID_TYPES: LeaveTypeCode[] = ['casual', 'sick', 'earned']
 
@@ -35,7 +35,7 @@ export default function StatsView({ employee, title, actions }: {
   const yearMonth = asked && /^\d{4}-\d{2}$/.test(asked) && asked <= thisMonth && asked >= TRACKING_START.slice(0, 7) ? asked : thisMonth
   const setMonth = (ym: string) => setParams(ym === thisMonth ? {} : { month: ym }, { replace: true })
 
-  const { stats, loading, error } = useEmployeeStats(employee.id, yearMonth)
+  const { stats, loading, error } = useEmployeeStats(employee, yearMonth)
   const { shift } = useMyShift(undefined, employee.id)
   const balances = useLeaveBalances(employee.id)
   const calendar = useMonthCalendar(yearMonth, employee.id)
@@ -304,28 +304,4 @@ function TrendTable({ trend, current }: { trend: MonthStats[]; current: string }
       </table>
     </div>
   )
-}
-
-/** While printing: name the PDF, open collapsed tables, force the light theme. */
-function usePrintSetup(title: string) {
-  useEffect(() => {
-    let oldTitle = document.title
-    const opened: HTMLDetailsElement[] = []
-    let theme: { el: HTMLElement; value: string | null } | null = null
-    const before = () => {
-      oldTitle = document.title
-      document.title = title
-      document.querySelectorAll<HTMLDetailsElement>('details.st-details:not([open])').forEach(d => { d.open = true; opened.push(d) })
-      const app = document.querySelector<HTMLElement>('.sb-app')
-      if (app) { theme = { el: app, value: app.getAttribute('data-theme') }; app.setAttribute('data-theme', 'light') }
-    }
-    const after = () => {
-      document.title = oldTitle
-      opened.splice(0).forEach(d => { d.open = false })
-      if (theme) { theme.value == null ? theme.el.removeAttribute('data-theme') : theme.el.setAttribute('data-theme', theme.value); theme = null }
-    }
-    window.addEventListener('beforeprint', before)
-    window.addEventListener('afterprint', after)
-    return () => { window.removeEventListener('beforeprint', before); window.removeEventListener('afterprint', after) }
-  }, [title])
 }

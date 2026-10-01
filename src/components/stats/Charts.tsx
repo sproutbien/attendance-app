@@ -18,7 +18,7 @@ export const KIND_META: Record<DayKind, { label: string; color: string }> = {
 const KINDS: DayKind[] = ['on_time', 'late', 'leave', 'absent']
 
 /** Width of an element, kept up to date (callback ref, so it works when the element mounts late). */
-function useWidth<T extends HTMLElement>() {
+export function useWidth<T extends HTMLElement>() {
   const [node, setNode] = useState<T | null>(null)
   const [width, setWidth] = useState(0)
   const ref = useCallback((el: T | null) => setNode(el), [])
@@ -31,9 +31,9 @@ function useWidth<T extends HTMLElement>() {
   return [ref, width] as const
 }
 
-type Tip = { x: number; y: number; content: ReactNode } | null
+export type Tip = { x: number; y: number; content: ReactNode } | null
 
-function Tooltip({ tip }: { tip: Tip }) {
+export function Tooltip({ tip }: { tip: Tip }) {
   if (!tip) return null
   return <div className="st-tip" role="status" style={{ left: tip.x, top: tip.y }}>{tip.content}</div>
 }

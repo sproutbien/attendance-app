@@ -13,6 +13,7 @@ import AdminLeavePage from './pages/admin/AdminLeavePage'
 import AdminEmployeesPage from './pages/admin/AdminEmployeesPage'
 import AdminEmployeeProfilePage from './pages/admin/AdminEmployeeProfilePage'
 import AdminEmployeeStatsPage from './pages/admin/AdminEmployeeStatsPage'
+import AdminTeamStatsPage from './pages/admin/AdminTeamStatsPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
 import AdminCalendarPage from './pages/admin/AdminCalendarPage'
 import AdminCorrectionsPage from './pages/admin/AdminCorrectionsPage'
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="employees/:id" element={<AdminEmployeeProfilePage />} />
             <Route path="employees/:id/stats" element={<AdminEmployeeStatsPage />} />
             <Route path="reports"    element={<AdminReportsPage />} />
+            <Route path="team-stats" element={<AdminTeamStatsPage />} />
             <Route path="calendar"   element={<AdminCalendarPage />} />
           </Route>
 

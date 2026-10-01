@@ -3,12 +3,16 @@ import { supabase } from '../lib/supabase'
 import { TRACKING_START, daysInMonth, localDate, shiftMonth } from '../lib/calendar'
 import { computeMonthStats } from '../lib/stats'
 import type { MonthStats, StatsInput } from '../lib/stats'
+import type { Employee } from '../types'
 
 /** How many months the trend covers, ending at the selected month. */
 export const TREND_MONTHS = 6
 
 /** One employee's statistics for the selected month plus a month-by-month trend (oldest first). */
-export function useEmployeeStats(employeeId: string | undefined, yearMonth: string) {
+export function useEmployeeStats(employee: Pick<Employee, 'id' | 'joining_date' | 'last_working_day'> | undefined, yearMonth: string) {
+  const employeeId = employee?.id
+  const activeFrom = employee?.joining_date ?? null
+  const activeTo = employee?.last_working_day ?? null
   const [input, setInput] = useState<StatsInput | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -50,13 +54,15 @@ export function useEmployeeStats(employeeId: string | undefined, yearMonth: stri
         leaves: lv.data ?? [],
         shifts: sh.data ?? [],
         assignments: asg.data ?? [],
+        activeFrom,
+        activeTo,
       })
       setLoading(false)
     }
 
     load()
     return () => { cancelled = true }
-  }, [employeeId, months, yearMonth])
+  }, [employeeId, activeFrom, activeTo, months, yearMonth])
 
   const stats = useMemo(() => {
     if (!input) return null
