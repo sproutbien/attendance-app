@@ -168,7 +168,7 @@ export default function AdminEmployeesPage() {
               <table style={tableStyle}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                    {['Employee', 'Job', 'Reports to', 'Status', 'Role', ''].map(h => <th key={h} style={thStyle}>{h}</th>)}
+                    {['Employee', 'Job', 'Reports to', 'Status', 'Role'].map(h => <th key={h} style={thStyle}>{h}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -256,7 +256,7 @@ function EmployeeRow({ employee: e, manager, shift, onOpen, onDelete }: {
 
   return (
     <tr style={{ borderBottom: '1px solid #f1f5f9', opacity: former ? 0.65 : 1 }}>
-      <td style={tdStyle}>
+      <td style={tdStyle} className="emp-cell">
         <button onClick={onOpen} style={rowLink} aria-label={`Open ${e.full_name}'s profile`}>
           <EmployeeAvatar employee={e} dim={former} />
           <div>
@@ -267,6 +267,14 @@ function EmployeeRow({ employee: e, manager, shift, onOpen, onDelete }: {
             </div>
           </div>
         </button>
+        {/* Shown on hover (mouse) or always (touch) — see .emp-actions in index.css */}
+        <div className="emp-actions">
+          <button type="button" onClick={onOpen} className="emp-action">View profile</button>
+          {onDelete && <>
+            <span aria-hidden="true">·</span>
+            <button type="button" onClick={onDelete} className="emp-action is-danger">Delete</button>
+          </>}
+        </div>
       </td>
       <td style={tdStyle}>
         <div style={{ color: '#1e293b', fontWeight: 500 }}>{e.designation ?? <span style={{ color: '#d97706' }}>No designation</span>}</div>
@@ -283,10 +291,6 @@ function EmployeeRow({ employee: e, manager, shift, onOpen, onDelete }: {
         <span style={{ padding: '2px 10px', borderRadius: 99, background: roleColor.bg, color: roleColor.text, fontWeight: 600, fontSize: '0.8125rem' }}>
           {e.role === 'admin' ? 'Admin' : 'Employee'}
         </span>
-      </td>
-      <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
-        <button onClick={onOpen} style={ghostBtn}>View</button>
-        {onDelete && <button onClick={onDelete} style={{ ...dangerBtn, marginLeft: '0.5rem' }}>Delete</button>}
       </td>
     </tr>
   )
