@@ -8,6 +8,10 @@ import { useLeaveBalances } from '../../hooks/useLeaveBalances'
 import AdminLeaveBalances from '../../components/AdminLeaveBalances'
 import LeaveTypeSettings from '../../components/LeaveTypeSettings'
 import { VoiceNotePlayer } from '../../components/VoiceNote'
+import { LeaveDocsPanel } from '../../components/LeaveDocuments'
+import { useLeaveDocuments } from '../../hooks/useLeaveDocuments'
+import { takesDocuments } from '../../lib/leaveDocs'
+import type { LeaveDocument } from '../../types'
 
 function fmtDate(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
@@ -37,6 +41,7 @@ export default function AdminLeavePage() {
   const [filter, setFilter] = useState<HistoryFilter>('all')
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<'requests' | 'balances' | 'types'>('requests')
+  const docs = useLeaveDocuments()
 
   const q = search.trim().toLowerCase()
   const shown = history.filter(r =>
@@ -152,6 +157,8 @@ export default function AdminLeavePage() {
               <PendingCard
                 key={r.id}
                 request={r}
+                docs={docs.byLeave.get(r.id) ?? []}
+                onDocsChanged={docs.reload}
                 isActioning={actioning.has(r.id)}
                 onApprove={() => approve(r.id)}
                 onReject={() => reject(r.id)}
@@ -208,7 +215,7 @@ export default function AdminLeavePage() {
           <p style={{ color: '#94a3b8', margin: 0 }}>No applications match.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {shown.map(r => <HistoryRow key={r.id} request={r} />)}
+            {shown.map(r => <HistoryRow key={r.id} request={r} docs={docs.byLeave.get(r.id) ?? []} onDocsChanged={docs.reload} />)}
           </div>
         )}
       </div>
@@ -218,11 +225,15 @@ export default function AdminLeavePage() {
 
 function PendingCard({
   request: r,
+  docs,
+  onDocsChanged,
   isActioning,
   onApprove,
   onReject,
 }: {
   request: LeaveRequestWithEmployee
+  docs: LeaveDocument[]
+  onDocsChanged: () => void
   isActioning: boolean
   onApprove: () => void
   onReject: () => void
@@ -255,6 +266,7 @@ function PendingCard({
         <PendingBalanceLine request={r} />
         <div style={{ color: '#64748b', fontSize: '0.875rem', marginBottom: '0.25rem' }}>{r.reason}</div>
         {r.voice_note_path && <div style={{ marginBottom: '0.25rem' }}><VoiceNotePlayer path={r.voice_note_path} seconds={r.voice_note_seconds} /></div>}
+        {takesDocuments(r) && <div style={{ marginBottom: '0.375rem' }}><LeaveDocsPanel leave={r} docs={docs} admin onChanged={onDocsChanged} /></div>}
         <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
           Submitted {fmtDate(r.requested_at.slice(0, 10))}
         </div>
@@ -319,7 +331,7 @@ function PendingBalanceLine({ request: r }: { request: LeaveRequestWithEmployee 
   )
 }
 
-function HistoryRow({ request: r }: { request: LeaveRequestWithEmployee }) {
+function HistoryRow({ request: r, docs, onDocsChanged }: { request: LeaveRequestWithEmployee; docs: LeaveDocument[]; onDocsChanged: () => void }) {
   const s = STATUS_STYLES[r.status]
   const decided = r.status === 'approved' || r.cancelled_after_approval ? 'Approved' : 'Rejected'
   return (
@@ -350,6 +362,7 @@ function HistoryRow({ request: r }: { request: LeaveRequestWithEmployee }) {
           <span style={{ color: '#94a3b8' }}>Reason: </span>{r.reason || (r.voice_note_path ? '(voice note)' : '')}
         </div>
         {r.voice_note_path && <VoiceNotePlayer path={r.voice_note_path} seconds={r.voice_note_seconds} />}
+        {takesDocuments(r) && <LeaveDocsPanel leave={r} docs={docs} admin onChanged={onDocsChanged} />}
         <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: '0.25rem' }}>
           Submitted {fmtDate(r.requested_at.slice(0, 10))}
           {r.reviewed_at && <> · {decided} {fmtDate(r.reviewed_at.slice(0, 10))}</>}

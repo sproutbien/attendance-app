@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { localDate } from '../lib/calendar'
 import { VOICE_NOTE_BUCKET, uploadVoiceNote } from '../lib/voiceNotes'
 import type { VoiceNote } from '../lib/voiceNotes'
+import { uploadLeaveDocuments } from '../lib/leaveDocs'
 
 export type NewLeave = Pick<LeaveRequest, 'start_date' | 'end_date' | 'duration' | 'half_day_session' | 'leave_type' | 'reason' | 'split_with_lop'>
 
@@ -14,6 +15,7 @@ export function useLeaveRequests() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [warning, setWarning] = useState<string | null>(null)   // saved, but something extra (a document) failed
   const [checkedInToday, setCheckedInToday] = useState(false)  // limits which leave can start today
 
   const fetchRequests = useCallback(async () => {
@@ -41,10 +43,11 @@ export function useLeaveRequests() {
       .then(({ data }) => setCheckedInToday(!!data?.check_in_time))
   }, [employee])
 
-  async function submit(leave: NewLeave, voice: VoiceNote | null = null): Promise<boolean> {
+  async function submit(leave: NewLeave, voice: VoiceNote | null = null, documents: File[] = []): Promise<boolean> {
     if (!employee) return false
     setSubmitting(true)
     setError(null)
+    setWarning(null)
     let voicePath: string | null = null
     if (voice) {
       try {
@@ -55,7 +58,7 @@ export function useLeaveRequests() {
         return false
       }
     }
-    const { error } = await supabase
+    const { data: saved, error } = await supabase
       .from('leave_requests')
       .insert({
         employee_id: employee.id,
@@ -63,12 +66,18 @@ export function useLeaveRequests() {
         voice_note_path: voicePath,
         voice_note_seconds: voice ? Math.round(voice.seconds) : null,
       })
+      .select('id')
+      .single()
     if (error) {
       // Don't leave an orphaned recording behind
       if (voicePath) await supabase.storage.from(VOICE_NOTE_BUCKET).remove([voicePath])
       setError(error.message)
       setSubmitting(false)
       return false
+    }
+    if (documents.length && saved) {
+      const failed = await uploadLeaveDocuments(employee.id, saved.id, documents)
+      if (failed.length) setWarning(`${failed.join(' ')} You can add documents from My Requests.`)
     }
     await fetchRequests()
     setSubmitting(false)
@@ -91,5 +100,5 @@ export function useLeaveRequests() {
     return null
   }
 
-  return { requests, loading, submitting, error, checkedInToday, submit, cancel, cancelToday }
+  return { requests, loading, submitting, error, warning, checkedInToday, submit, cancel, cancelToday }
 }

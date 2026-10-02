@@ -82,6 +82,18 @@ export type LeaveRequest = {
   cancel_seen_at: string | null    // when an admin dismissed the in-app cancellation alert
 }
 
+export type LeaveDocument = {
+  id: string
+  leave_id: string
+  employee_id: string
+  path: string          // object in the 'leave-documents' bucket
+  file_name: string
+  mime_type: string
+  size_bytes: number
+  uploaded_by: string | null
+  uploaded_at: string
+}
+
 export const STATUS_LABELS: Record<AttendanceRecord['status'], string> = {
   present:  'Present',
   late:     'Late',

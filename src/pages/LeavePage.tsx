@@ -14,6 +14,10 @@ import { fmtClock, sessionLabel } from '../lib/shifts'
 import { useMyShift } from '../hooks/useShifts'
 import type { Shift } from '../types'
 import { VoiceNotePlayer, VoiceNoteRecorder } from '../components/VoiceNote'
+import { DocumentPicker, LeaveDocsPanel } from '../components/LeaveDocuments'
+import { useLeaveDocuments } from '../hooks/useLeaveDocuments'
+import { leaveDocDeadline, leaveDocsOpen, takesDocuments } from '../lib/leaveDocs'
+import type { LeaveDocument } from '../types'
 import type { VoiceNote } from '../lib/voiceNotes'
 
 const STATUS_STYLES: Record<LeaveRequest['status'], { bg: string; text: string; label: string }> = {
@@ -28,12 +32,16 @@ function fmtDate(iso: string) {
 }
 
 export default function LeavePage() {
-  const { requests, loading, submitting, error, checkedInToday, submit, cancel, cancelToday } = useLeaveRequests()
+  const { requests, loading, submitting, error, warning, checkedInToday, submit, cancel, cancelToday } = useLeaveRequests()
   // Arrived from the dashboard's "Cancel Leave" button: open that request's cancel options
   const [params, setParams] = useSearchParams()
   const cancelId = params.get('cancel')
   const [cancelledToday, setCancelledToday] = useState(false)
   const formRef = useRef<HTMLDivElement>(null)
+  const { employee: me } = useAuth()
+  const docs = useLeaveDocuments(me?.id)
+  // Sick leave still open for documents but with none attached
+  const missingDocs = requests.filter(r => leaveDocsOpen(r) && !docs.byLeave.get(r.id)?.length).slice(0, 3)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [duration, setDuration] = useState<LeaveRequest['duration']>('full')
@@ -44,6 +52,7 @@ export default function LeavePage() {
   const [reason, setReason] = useState('')
   const [voiceNote, setVoiceNote] = useState<VoiceNote | null>(null)
   const [recording, setRecording] = useState(false)
+  const [docFiles, setDocFiles] = useState<File[]>([])
   const [splitAccepted, setSplitAccepted] = useState<string | null>(null)  // key of the request they agreed to split
   const [success, setSuccess] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
@@ -84,7 +93,7 @@ export default function LeavePage() {
       leave_type: leaveType,
       reason: reason.trim(),
       split_with_lop: !!split,
-    }, voiceNote)
+    }, voiceNote, leaveType === 'sick' ? docFiles : [])
     if (ok) {
       current.refresh()
       booking.refresh()
@@ -92,7 +101,9 @@ export default function LeavePage() {
       setEndDate('')
       setReason('')
       setVoiceNote(null)
+      setDocFiles([])
       setSplitAccepted(null)
+      docs.reload()
       setSuccess(true)
     }
   }
@@ -142,6 +153,24 @@ export default function LeavePage() {
   return (
     <AppLayout medium>
       <LeaveBalanceCards balances={current.balances} loading={current.loading} error={current.error} />
+
+      {missingDocs.length > 0 && (
+        <div style={{ ...alertStyle('#fffbeb', '#fde68a', '#92400e'), marginBottom: '1.5rem' }}>
+          {missingDocs.map(r => (
+            <div key={r.id}>
+              Your sick leave on <b>{fmtSpan(r)}</b> has no medical document. You can add one until{' '}
+              {leaveDocDeadline(r).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.{' '}
+              <button
+                type="button"
+                onClick={() => document.getElementById(`leave-${r.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                style={{ ...cancelLinkStyle, color: '#92400e', textDecoration: 'underline' }}
+              >
+                Add document
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {cancelledToday && (
         <div style={{ ...alertStyle('#f0fdf4', '#bbf7d0', '#166534'), display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
@@ -304,6 +333,13 @@ export default function LeavePage() {
             </div>
           </div>
 
+          {leaveType === 'sick' && (
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={labelStyle}>Medical documents</label>
+              <DocumentPicker files={docFiles} onChange={setDocFiles} />
+            </div>
+          )}
+
           {booked.length > 0 && (
             <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
               Already booked: {booked.map((r, i) => (
@@ -352,6 +388,10 @@ export default function LeavePage() {
             </div>
           )}
 
+          {success && warning && (
+            <div style={alertStyle('#fffbeb', '#fde68a', '#92400e')}>{warning}</div>
+          )}
+
           <button
             type="submit"
             disabled={submitting || recording || !!formBlock}
@@ -397,6 +437,8 @@ export default function LeavePage() {
                       today={today}
                       todayCancel={coversToday(r, today) && !checkedInToday}
                       autoOpen={r.id === cancelId}
+                      docs={docs.byLeave.get(r.id) ?? []}
+                      onDocsChanged={docs.reload}
                       onCancel={() => cancel(r.id)}
                       onCancelToday={async mode => {
                         const err = await cancelToday(r.id, mode)
@@ -457,12 +499,14 @@ function fmtDeadline(d: Date) {
  * `shift` is today's; a future shift change could move the real deadline, which the server enforces.
  * `todayCancel`: full-day leave covering today, not checked in — today's part can be cancelled any time today.
  */
-function RequestRow({ r, shift, today, todayCancel, autoOpen, onCancel, onCancelToday }: {
+function RequestRow({ r, shift, today, todayCancel, autoOpen, docs, onDocsChanged, onCancel, onCancelToday }: {
   r: LeaveRequest
   shift: Shift
   today: string
   todayCancel: boolean
   autoOpen: boolean
+  docs: LeaveDocument[]
+  onDocsChanged: () => void
   onCancel: () => Promise<string | null>
   onCancelToday: (mode: 'today' | 'onward') => Promise<string | null>
 }) {
@@ -501,7 +545,7 @@ function RequestRow({ r, shift, today, todayCancel, autoOpen, onCancel, onCancel
   ] : null
 
   return (
-    <div ref={rowRef} style={{
+    <div ref={rowRef} id={`leave-${r.id}`} style={{
       border: autoOpen && todayCancel ? '2px solid #dc2626' : '1px solid var(--border, #e2e8f0)',
       borderRadius: 12,
       padding: '0.875rem 1rem',
@@ -532,6 +576,7 @@ function RequestRow({ r, shift, today, todayCancel, autoOpen, onCancel, onCancel
             {r.reason}
           </div>
           {r.voice_note_path && <VoiceNotePlayer path={r.voice_note_path} seconds={r.voice_note_seconds} />}
+          {takesDocuments(r) && <LeaveDocsPanel leave={r} docs={docs} onChanged={onDocsChanged} />}
           <div style={{ color: 'var(--text-faint, #94a3b8)', fontSize: '0.75rem', marginTop: '0.25rem' }}>
             Submitted {new Date(r.requested_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
             {r.cancelled_at && <> · Cancelled {new Date(r.cancelled_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</>}
