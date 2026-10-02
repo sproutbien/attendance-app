@@ -271,7 +271,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '0.4375rem 0', borderBottom: '1px solid #f8fafc', fontSize: '0.875rem' }}>
       <span style={{ color: '#64748b' }}>{label}</span>
-      <span style={{ color: value ? '#1e293b' : '#cbd5e1', fontWeight: 500, textAlign: 'right' }}>{value || '—'}</span>
+      <span style={{ color: value ? '#1e293b' : '#cbd5e1', fontWeight: 500, textAlign: 'right', minWidth: 0, overflowWrap: 'anywhere' }}>{value || '—'}</span>
     </div>
   )
 }

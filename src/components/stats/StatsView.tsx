@@ -246,7 +246,7 @@ function DailyTable({ m }: { m: MonthStats }) {
     <details className="st-details">
       <summary>Show day-by-day table</summary>
       <div className="st-table-wrap">
-        <table className="st-table">
+        <table className="st-table rt">
           <thead>
             <tr><th>Date</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Breaks</th><th>Worked</th><th>Shift</th><th>Difference</th></tr>
           </thead>
@@ -278,7 +278,7 @@ function DailyTable({ m }: { m: MonthStats }) {
 function TrendTable({ trend, current }: { trend: MonthStats[]; current: string }) {
   return (
     <div className="st-table-wrap" style={{ marginTop: 12 }}>
-      <table className="st-table">
+      <table className="st-table rt">
         <thead>
           <tr>
             <th>Month</th><th>Total hours</th><th>Avg. / day</th><th>Present</th><th>Attendance</th>

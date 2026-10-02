@@ -184,7 +184,7 @@ export default function AdminAttendancePage() {
             {rows.length === 0 ? 'No active employees found.' : 'No results match your filters.'}
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {['Employee', 'Department', 'Status', 'Check In', 'Check Out', 'Break'].map(h => (

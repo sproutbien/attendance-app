@@ -15,6 +15,8 @@ export default function AttendanceCalendarGrid({ yearMonth, employees, holidays,
   const today = localDate()
 
   return (
+    <>
+    <p className="phone-only" style={{ margin: '0 0 0.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>Swipe sideways to see the whole month →</p>
     <div style={{ overflowX: 'auto' }}>
       <table style={{ borderCollapse: 'separate', borderSpacing: 3, fontSize: '0.75rem' }}>
         <thead>
@@ -71,6 +73,7 @@ export default function AttendanceCalendarGrid({ yearMonth, employees, holidays,
         </tbody>
       </table>
     </div>
+    </>
   )
 }
 

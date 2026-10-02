@@ -258,7 +258,7 @@ export default function AdminTeamStatsPage() {
                 <p>Click a column to sort · click a name for their full statistics</p>
               </div>
               <div className="st-table-wrap">
-                <table className="st-table">
+                <table className="st-table rt">
                   <thead>
                     <tr>
                       {COLUMNS.map(c => (

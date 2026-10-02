@@ -113,7 +113,7 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
         )}
 
         <div style={{ overflowX: 'auto' }}>
-          <table style={tableStyle}>
+          <table className="rt" style={tableStyle}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 {['Shift', 'Hours', 'Late after', 'Half day after', 'Split', 'Min. break', 'Staff', ''].map(h => <th key={h} style={thStyle}>{h}</th>)}

@@ -113,7 +113,7 @@ function PendingCorrection({ request: r, busy, onApprove, onReject }: {
         <span style={{ color: '#94a3b8' }}>Reason: </span>{r.reason}
       </div>
 
-      <table style={{ borderCollapse: 'collapse', fontSize: '0.875rem', marginBottom: '0.875rem' }}>
+      <table style={{ borderCollapse: 'collapse', fontSize: '0.875rem', marginBottom: '0.875rem', width: '100%', maxWidth: 420, tableLayout: 'fixed' }}>
         <thead>
           <tr style={{ color: '#94a3b8', textAlign: 'left' }}>
             <th style={cellHead}></th><th style={cellHead}>Check-in</th><th style={cellHead}>Check-out</th>
@@ -208,8 +208,8 @@ function pill(active: boolean): CSSProperties {
 
 const card: CSSProperties = { background: '#fff', borderRadius: 16, padding: '1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
 const sectionTitle: CSSProperties = { margin: '0 0 1.25rem', fontSize: '1rem', fontWeight: 600, color: '#1e293b' }
-const cellHead: CSSProperties = { padding: '0 1.25rem 0.375rem 0', fontWeight: 500, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }
-const cellLabel: CSSProperties = { padding: '0.25rem 1.25rem 0.25rem 0', color: '#94a3b8' }
-const cell: CSSProperties = { padding: '0.25rem 1.25rem 0.25rem 0', color: '#1e293b' }
-const timeInput: CSSProperties = { padding: '0.3125rem 0.5rem', border: '1px solid #d1d5db', borderRadius: 6, fontSize: '0.875rem', fontFamily: 'inherit' }
+const cellHead: CSSProperties = { padding: '0 0.75rem 0.375rem 0', fontWeight: 500, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em' }
+const cellLabel: CSSProperties = { padding: '0.25rem 0.75rem 0.25rem 0', color: '#94a3b8' }
+const cell: CSSProperties = { padding: '0.25rem 0.75rem 0.25rem 0', color: '#1e293b' }
+const timeInput: CSSProperties = { width: '100%', minWidth: 0, boxSizing: 'border-box', padding: '0.3125rem 0.5rem', border: '1px solid #d1d5db', borderRadius: 6, fontSize: '0.875rem', fontFamily: 'inherit' }
 const actionBtn: CSSProperties = { padding: '0.5rem 1.125rem', borderRadius: 8, fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }

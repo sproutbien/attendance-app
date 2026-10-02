@@ -53,7 +53,7 @@ export default function AdminLeaveBalances() {
         : loading ? <p style={{ color: '#94a3b8', margin: 0 }}>Loading…</p>
         : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+            <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
               <thead>
                 <tr>
                   <th style={th}>Employee</th>

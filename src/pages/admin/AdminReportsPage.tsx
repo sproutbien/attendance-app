@@ -216,7 +216,7 @@ export default function AdminReportsPage() {
         ) : summaries.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>No active employees found.</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+          <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                 <th style={thStyle}>Employee</th>

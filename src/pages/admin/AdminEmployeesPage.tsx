@@ -165,7 +165,7 @@ export default function AdminEmployeesPage() {
             </p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={tableStyle}>
+              <table className="rt" style={tableStyle}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
                     {['Employee', 'Job', 'Reports to', 'Status', 'Role'].map(h => <th key={h} style={thStyle}>{h}</th>)}
@@ -313,7 +313,7 @@ function BinList({ employees, saving, onRestore, onPurge }: {
       {employees.length === 0 ? (
         <p style={{ color: '#94a3b8', margin: 0 }}>The bin is empty.</p>
       ) : (
-        <table style={tableStyle}>
+        <table className="rt" style={tableStyle}>
           <thead>
             <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
               {['Employee', 'Deleted on', 'Deleted permanently on', ''].map(h => <th key={h} style={thStyle}>{h}</th>)}

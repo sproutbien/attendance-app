@@ -273,7 +273,7 @@ export default function LeavePage() {
               </p>
             </div>
           ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: showDayCount ? '0.5rem' : '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: showDayCount ? '0.5rem' : '1rem' }}>
             <div>
               <label style={labelStyle}>Start date</label>
               <input
@@ -569,9 +569,7 @@ function RequestRow({ r, shift, today, todayCancel, autoOpen, docs, onDocsChange
           <div style={{
             color: 'var(--text-muted, #64748b)',
             fontSize: '0.875rem',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            overflowWrap: 'anywhere',
           }}>
             {r.reason}
           </div>
@@ -769,6 +767,7 @@ const labelStyle: CSSProperties = {
 
 const inputStyle: CSSProperties = {
   width: '100%',
+  minWidth: 0,
   padding: '0.625rem 0.75rem',
   border: '1px solid var(--border, #d1d5db)',
   borderRadius: 8,
