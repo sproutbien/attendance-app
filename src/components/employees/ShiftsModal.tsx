@@ -57,7 +57,7 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
 
   return (
     <div style={overlayStyle} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={{ ...modalStyle, maxWidth: 820 }}>
+      <div style={{ ...modalStyle, maxWidth: 1040 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
           <h2 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#1e293b' }}>Shifts</h2>
           <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#94a3b8', lineHeight: 1 }}>✕</button>
@@ -129,10 +129,10 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
                       {shift.is_default && <span style={defaultTag}>Default</span>}
                     </td>
                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{shiftHours(shift)}</td>
-                    <td style={tdStyle}>{fmtClock(shift.late_after)}</td>
-                    <td style={tdStyle}>{fmtClock(shift.half_day_after)}</td>
-                    <td style={tdStyle}>{fmtClock(shift.split_time)}</td>
-                    <td style={tdStyle}>{shift.min_break_minutes} min</td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtClock(shift.late_after)}</td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtClock(shift.half_day_after)}</td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtClock(shift.split_time)}</td>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{shift.min_break_minutes} min</td>
                     <td style={{ ...tdStyle, color: '#64748b' }}>{used}</td>
                     <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
                       <button onClick={() => startEdit(shift)} disabled={busy} style={ghostBtn}>Edit</button>

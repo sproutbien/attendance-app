@@ -121,3 +121,81 @@ a {
   .emp-actions { opacity: 0; visibility: hidden; transition: opacity 0.15s ease, visibility 0.15s; }
   .emp-cell:hover .emp-actions, .emp-cell:focus-within .emp-actions { opacity: 1; visibility: visible; }
 }
+
+/* ── Admin header: menu button + panel on phones ─────────────── */
+
+.admin-menu-btn {
+  display: none;
+  position: relative;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-menu-dot {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: #f87171;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.admin-menu {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  right: 0;
+  z-index: 9;
+  padding: 0.5rem 1rem 1rem;
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 12px 24px -12px rgba(15, 23, 42, 0.35);
+}
+
+.admin-menu nav { display: grid; gap: 2px; }
+
+.admin-menu-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding: 0.8rem 1rem 0;
+  border-top: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.admin-menu-foot button {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #b91c1c;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .admin-header { padding: 0 1rem !important; }
+  .admin-nav, .admin-user { display: none !important; }
+  .admin-menu-btn { display: inline-flex; }
+  .admin-main { padding: 1.25rem 1rem !important; }
+}
+
+@media (min-width: 901px) {
+  .admin-menu { display: none; }
+}

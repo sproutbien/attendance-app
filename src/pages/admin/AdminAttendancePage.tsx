@@ -111,7 +111,7 @@ export default function AdminAttendancePage() {
       </p>
 
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         {SUMMARY_CONFIG.map(({ status, label, color, bg }) => (
           <div
             key={status}

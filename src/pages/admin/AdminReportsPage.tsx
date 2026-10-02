@@ -192,7 +192,7 @@ export default function AdminReportsPage() {
 
       {/* Summary pills */}
       {!loading && summaries.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {([
             { label: 'Total Present',  value: totals.present,  bg: '#dcfce7', text: '#166534' },
             { label: 'Total Late',     value: totals.late,     bg: '#fef9c3', text: '#854d0e' },
