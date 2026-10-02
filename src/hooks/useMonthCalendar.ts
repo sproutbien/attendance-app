@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchAll, supabase } from '../lib/supabase'
 import type { AttendanceRecord, HalfDaySession } from '../types'
 import { daysInMonth, localDate, monthDates, resolveMark } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
@@ -32,11 +32,15 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
       const start = `${yearMonth}-01`
       const end = `${yearMonth}-${String(daysInMonth(yearMonth)).padStart(2, '0')}`
 
-      let attendanceQuery = supabase
-        .from('attendance_records')
-        .select('employee_id, date, status, half_day_session')
-        .gte('date', start)
-        .lte('date', end)
+      const attendancePage = (from: number, to: number) => {
+        let q = supabase
+          .from('attendance_records')
+          .select('employee_id, date, status, half_day_session')
+          .gte('date', start)
+          .lte('date', end)
+        if (employeeId) q = q.eq('employee_id', employeeId)
+        return q.order('id').range(from, to)
+      }
       let leaveQuery = supabase
         .from('leave_requests')
         .select('employee_id, start_date, end_date, status, duration, half_day_session')
@@ -44,7 +48,6 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
         .lte('start_date', end)
         .gte('end_date', start)
       if (employeeId) {
-        attendanceQuery = attendanceQuery.eq('employee_id', employeeId)
         leaveQuery = leaveQuery.eq('employee_id', employeeId)
       }
 
@@ -54,7 +57,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
         { data: leaves, error: leaveErr },
       ] = await Promise.all([
         supabase.from('public_holidays').select('date, name').gte('date', start).lte('date', end),
-        attendanceQuery,
+        fetchAll(attendancePage),
         leaveQuery,
       ])
 

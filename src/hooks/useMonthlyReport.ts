@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchAll, supabase } from '../lib/supabase'
 import type { Employee } from '../types'
 import { TRACKING_START, isSunday, monthDates } from '../lib/calendar'
 import { TRACKED_STATUSES } from '../lib/employees'
@@ -71,11 +71,13 @@ export function useMonthlyReport(yearMonth: string) {
           .or(`status.in.(${TRACKED_STATUSES.join(',')}),last_working_day.gte.${start}`)
           .is('deleted_at', null)
           .order('full_name'),
-        supabase
+        fetchAll((from, to) => supabase
           .from('attendance_records')
           .select('employee_id, status, half_day_session, paid_leave')
           .gte('date', start)
-          .lte('date', end),
+          .lte('date', end)
+          .order('id')
+          .range(from, to)),
         supabase
           .from('payroll_settings')
           .select('working_days')

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { fetchAll, supabase } from '../lib/supabase'
 import { TRACKING_START, daysInMonth, localDate, shiftMonth } from '../lib/calendar'
 import { TRACKED_STATUSES } from '../lib/employees'
 import { computeMonthStats, teamTotals } from '../lib/stats'
@@ -52,9 +52,12 @@ export function useTeamStats(yearMonth: string) {
           .is('deleted_at', null)
           .or(`status.in.(${TRACKED_STATUSES.join(',')}),last_working_day.gte.${start}`)
           .order('full_name'),
-        supabase.from('attendance_records').select('*').gte('date', start).lte('date', end),
+        fetchAll<AttendanceRecord>((from, to) =>
+          supabase.from('attendance_records').select('*').gte('date', start).lte('date', end).order('id').range(from, to)),
         supabase.from('public_holidays').select('date').gte('date', start).lte('date', end),
-        supabase.from('leave_requests').select('*').eq('status', 'approved').lte('start_date', end).gte('end_date', start),
+        fetchAll<LeaveRequest>((from, to) =>
+          supabase.from('leave_requests').select('*').eq('status', 'approved').lte('start_date', end).gte('end_date', start)
+            .order('id').range(from, to)),
         supabase.from('shifts').select('*'),
         supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').order('effective_from'),
       ])
