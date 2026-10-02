@@ -281,3 +281,55 @@
   .auth-submit-arrow { width: 42px; height: 42px; }
   .auth-brand img { width: 88px; height: 88px; }
 }
+
+/* ── Demo build: one-click logins ─────────────────────────── */
+
+.auth-demo {
+  margin: -0.25rem 0 1.25rem;
+}
+
+.auth-demo-title {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #5b6b5b;
+  text-align: center;
+}
+
+.auth-demo-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.auth-demo-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #cde6c1;
+  border-radius: 12px;
+  background: #f3faef;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.auth-demo-btn strong {
+  font-size: 0.9rem;
+  color: #1f5a1d;
+}
+
+.auth-demo-btn span {
+  font-size: 0.72rem;
+  color: #5b6b5b;
+}
+
+.auth-demo-btn:hover {
+  border-color: #3a9a1d;
+}
+
+.auth-demo-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

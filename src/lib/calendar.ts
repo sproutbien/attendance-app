@@ -1,12 +1,20 @@
 import type { AttendanceRecord } from '../types'
+import { DEMO_HISTORY_MONTHS } from './demo'
 
 // ── Date helpers (local time, "YYYY-MM" / "YYYY-MM-DD" strings) ──
 
 /**
  * First day attendance is tracked (data was reset before this). Earlier days with no
  * check-in show blank instead of Absent and don't count as absent in reports.
+ * The demo's history rolls with the calendar, so it starts N months back.
  */
-export const TRACKING_START = '2026-10-01'
+export const TRACKING_START = DEMO_HISTORY_MONTHS > 0 ? demoTrackingStart(DEMO_HISTORY_MONTHS) : '2026-10-01'
+
+function demoTrackingStart(months: number) {
+  const d = new Date()
+  const first = new Date(d.getFullYear(), d.getMonth() - months, 1)
+  return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-01`
+}
 
 export function localDate(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
