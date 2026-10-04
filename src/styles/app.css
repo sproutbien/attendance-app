@@ -268,9 +268,8 @@
   z-index: 20;
   transition: flex-basis 0.15s ease, width 0.15s ease;
 }
-.sb-shell.is-collapsed .sb-side { flex-basis: 78px; width: 78px; }
-
-.sb-side-brand { display: flex; align-items: center; gap: 12px; padding: 0 2px 24px; text-decoration: none; }
+.sb-side-top { display: flex; align-items: center; gap: 8px; padding-bottom: 24px; }
+.sb-side-brand { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0 2px; text-decoration: none; }
 .sb-side-brand img {
   width: 44px;
   height: 44px;
@@ -333,20 +332,36 @@
 }
 .sb-side-collapse:hover { background: rgba(255, 255, 255, 0.08); color: #fff; filter: none !important; }
 
-.sb-shell.is-collapsed .sb-side-label,
-.sb-shell.is-collapsed .sb-side-who,
-.sb-shell.is-collapsed .sb-side .sb-user-btn > svg { display: none; }
-.sb-shell.is-collapsed .sb-side-brand,
-.sb-shell.is-collapsed .sb-side .sb-user-btn { justify-content: center; }
-.sb-shell.is-collapsed .sb-side-nav a,
-.sb-shell.is-collapsed .sb-side-collapse { justify-content: center; padding: 0; }
+/* Menu button (top bar) and close button (slide-out menu): phones only */
+.sb-menu-btn, .sb-drawer-close {
+  display: none;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.sb-menu-btn:hover, .sb-drawer-close:hover { background: rgba(255, 255, 255, 0.1); filter: none !important; }
+.sb-drawer-backdrop { display: none; }
 
+/* Collapsed to icons: desktop only (the phone menu always shows labels) */
 @media (min-width: 761px) {
   .sb-header { display: none; }
+  .sb-shell.is-collapsed .sb-side { flex-basis: 78px; width: 78px; }
+  .sb-shell.is-collapsed .sb-side-label,
+  .sb-shell.is-collapsed .sb-side-who,
+  .sb-shell.is-collapsed .sb-side .sb-user-btn > svg { display: none; }
+  .sb-shell.is-collapsed .sb-side-brand,
+  .sb-shell.is-collapsed .sb-side .sb-user-btn { justify-content: center; }
+  .sb-shell.is-collapsed .sb-side-nav a,
+  .sb-shell.is-collapsed .sb-side-collapse { justify-content: center; padding: 0; }
 }
-
-/* Bottom tab bar (phones) */
-.sb-tabbar { display: none; }
 
 /* ── Page containers ───────────────────────────────────────── */
 
@@ -621,35 +636,33 @@
 }
 
 @media (max-width: 760px) {
-  .sb-side { display: none; }
-  .sb-header { height: 58px; padding: 0 16px; gap: 12px; }
+  /* The sidebar becomes a slide-out menu */
+  .sb-side {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: auto;
+    width: min(300px, 86vw);
+    flex-basis: auto;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.22s ease, visibility 0.22s;
+    z-index: 40;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+  }
+  .sb-side.is-open { transform: none; visibility: visible; transition: transform 0.22s ease, visibility 0s; }
+  .sb-side-collapse { display: none; }
+  .sb-menu-btn, .sb-drawer-close { display: inline-flex; }
+  .sb-drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(16, 38, 26, 0.45); }
+
+  .sb-header { height: 58px; padding: 0 12px 0 6px; gap: 6px; }
   .sb-brand img { width: 36px; height: 36px; }
   .sb-wordmark strong { font-size: 20px; }
   .sb-wordmark span { font-size: 9px; }
   .sb-avatar { width: 34px; height: 34px; font-size: 14px; }
 
-  .sb-tabbar {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
-    z-index: 20;
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
-  }
-  .sb-tabbar a {
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
-    padding: 6px 0;
-    border-radius: 12px;
-    color: var(--text-muted);
-    font-size: 12px;
-    font-weight: 600;
-    text-decoration: none;
-  }
-  .sb-tabbar a.active { color: var(--green-dark); background: var(--green-soft); }
-  .sb-app { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 
   .sb-hero { padding: 18px 16px 14px; }
   .sb-hero-date { font-size: 13px; margin-bottom: 6px; }
@@ -784,7 +797,7 @@
 
 /* Voice note recorder (Leave page) */
 .sb-rec-dot { width: 10px; height: 10px; border-radius: 50%; background: #dc2626; animation: sb-pulse 1.2s ease-in-out infinite; flex-shrink: 0; }
-@media (prefers-reduced-motion: reduce) { .sb-rec-dot { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sb-rec-dot { animation: none; } .sb-side { transition: none; } }
 .sb-rec-btn {
   display: inline-flex; align-items: center; gap: 0.625rem;
   padding: 0.3rem 1rem 0.3rem 0.3rem;

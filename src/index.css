@@ -145,7 +145,6 @@ a {
   z-index: 10;
   transition: flex-basis 0.15s ease, width 0.15s ease;
 }
-.admin-shell.is-collapsed .admin-side { flex-basis: 72px; width: 72px; }
 
 .admin-side-brand { display: flex; align-items: center; gap: 12px; padding: 0 6px 18px; }
 .admin-side-brand img { width: 36px; height: 36px; border-radius: 50%; background: #fff; object-fit: cover; flex-shrink: 0; }
@@ -234,15 +233,35 @@ a {
 .admin-side-who span { color: #a7d7b4; font-size: 0.75rem; }
 .admin-side-collapse { color: rgba(187, 247, 208, 0.7); }
 
-.admin-shell.is-collapsed .admin-side-label,
-.admin-shell.is-collapsed .admin-side-badge,
-.admin-shell.is-collapsed .admin-side-who,
-.admin-shell.is-collapsed .admin-side-brand .admin-chip { display: none; }
-.admin-shell.is-collapsed .admin-side-dot { display: block; }
-.admin-shell.is-collapsed .admin-side nav a,
-.admin-shell.is-collapsed .admin-side-btn { justify-content: center; padding: 0; }
-.admin-shell.is-collapsed .admin-side-brand,
-.admin-shell.is-collapsed .admin-side-user { justify-content: center; padding-left: 0; padding-right: 0; }
+/* Collapsed to icons: desktop only (the phone menu always shows labels) */
+@media (min-width: 901px) {
+  .admin-shell.is-collapsed .admin-side { flex-basis: 72px; width: 72px; }
+  .admin-shell.is-collapsed .admin-side-label,
+  .admin-shell.is-collapsed .admin-side-badge,
+  .admin-shell.is-collapsed .admin-side-who,
+  .admin-shell.is-collapsed .admin-side-brand .admin-chip { display: none; }
+  .admin-shell.is-collapsed .admin-side-dot { display: block; }
+  .admin-shell.is-collapsed .admin-side nav a,
+  .admin-shell.is-collapsed .admin-side-btn { justify-content: center; padding: 0; }
+  .admin-shell.is-collapsed .admin-side-brand,
+  .admin-shell.is-collapsed .admin-side-user { justify-content: center; padding-left: 0; padding-right: 0; }
+}
+
+.admin-drawer-close {
+  display: none;
+  margin-left: auto;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.admin-drawer-backdrop { display: none; }
 
 /* Phones: the top bar instead of the sidebar */
 .admin-header {
@@ -253,7 +272,7 @@ a {
   height: 56px;
   padding: 0 1rem;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.75rem;
   background: #14532d;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
@@ -288,51 +307,33 @@ a {
   line-height: 18px;
 }
 
-.admin-menu {
-  position: fixed;
-  top: 56px;
-  left: 0;
-  right: 0;
-  z-index: 9;
-  padding: 0.5rem 1rem 1rem;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 12px 24px -12px rgba(15, 23, 42, 0.35);
-}
-
-.admin-menu nav { display: grid; gap: 2px; }
-
-.admin-menu-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  padding: 0.8rem 1rem 0;
-  border-top: 1px solid #e2e8f0;
-  color: #64748b;
-  font-size: 0.9rem;
-}
-
-.admin-menu-foot button {
-  padding: 0.5rem 1rem;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  background: #fff;
-  color: #b91c1c;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 @media (max-width: 900px) {
-  .admin-side { display: none; }
-  .admin-header { display: flex; }
+  /* The sidebar becomes a slide-out menu */
+  .admin-side {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    height: auto;
+    width: min(280px, 86vw);
+    flex-basis: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.22s ease, visibility 0.22s;
+    z-index: 40;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.3);
+  }
+  .admin-side.is-open { transform: none; visibility: visible; transition: transform 0.22s ease, visibility 0s; }
+  .admin-side-collapse { display: none; }
+  .admin-drawer-close { display: inline-flex; }
+  .admin-drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(15, 23, 42, 0.45); }
+  .admin-header { display: flex; padding-left: 0.5rem; }
   .admin-menu-btn { display: inline-flex; }
   .admin-main { padding: 1.25rem 1rem !important; min-height: calc(100vh - 56px) !important; }
 }
 
-@media (min-width: 901px) {
-  .admin-menu { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .admin-side { transition: none; }
 }
 
 /* ── Tables → cards on phones (table.rt, labels from lib/responsiveTables.ts) ── */

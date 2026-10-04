@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import type { CSSProperties } from 'react'
 import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
-import { initials, useSidebarCollapsed } from '../lib/sidebar'
+import { initials, useDrawer, useSidebarCollapsed } from '../lib/sidebar'
 
 /**
  * Nav badge counts: leave = pending requests + cancellations no admin has marked seen;
@@ -46,24 +45,25 @@ const NAV = [
   { to: '/admin/calendar',    label: 'Calendar',    Icon: CalendarDays },
 ] as const
 
-/** Admin shell: a sidebar on desktop (collapsible to icons), a top bar with a menu panel on phones. */
+/** Admin shell: a sidebar on desktop (collapsible to icons); on phones the same sidebar slides out from a ☰ button. */
 export default function AdminLayout() {
   const { employee, signOut } = useAuth()
   const attention = useAttentionCounts()
-  const { pathname } = useLocation()
-  const [menuOpen, setMenuOpen] = useState(false)
   const side = useSidebarCollapsed('sb.adminSidebarCollapsed')
+  const drawer = useDrawer('(min-width: 901px)')
+  const closeBtn = useRef<HTMLButtonElement>(null)
+  useEffect(() => { if (drawer.open) closeBtn.current?.focus() }, [drawer.open])
   const totalAttention = attention.leave + attention.corrections
-
-  // Phone menu closes when a page is picked
-  useEffect(() => { setMenuOpen(false) }, [pathname])
 
   return (
     <div className={`admin-shell${side.collapsed ? ' is-collapsed' : ''}`}>
-      <aside className="admin-side st-no-print">
+      <aside className={`admin-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu">
         <div className="admin-side-brand">
           <img src="/logo.jpg" alt="Sproutbien" />
           <span className="admin-chip">Admin</span>
+          <button type="button" ref={closeBtn} className="admin-drawer-close" onClick={drawer.hide} aria-label="Close menu">
+            <X size={22} aria-hidden="true" />
+          </button>
         </div>
         <nav aria-label="Admin">
           {NAV.map(n => {
@@ -97,39 +97,17 @@ export default function AdminLayout() {
           </button>
         </div>
       </aside>
+      {drawer.open && <div className="admin-drawer-backdrop st-no-print" onClick={drawer.hide} />}
 
       <div className="admin-body">
         <header className="st-no-print admin-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <img src="/logo.jpg" alt="Sproutbien" style={{ height: 32, display: 'block' }} />
-            <span className="admin-chip">Admin</span>
-          </div>
-          <button
-            className="admin-menu-btn"
-            onClick={() => setMenuOpen(o => !o)}
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
-            {!menuOpen && totalAttention > 0 && <span className="admin-menu-dot">{totalAttention}</span>}
+          <button type="button" className="admin-menu-btn" onClick={drawer.show} aria-label="Open menu" aria-expanded={drawer.open}>
+            <Menu size={22} aria-hidden="true" />
+            {totalAttention > 0 && <span className="admin-menu-dot">{totalAttention}</span>}
           </button>
+          <img src="/logo.jpg" alt="Sproutbien" style={{ height: 32, display: 'block' }} />
+          <span className="admin-chip">Admin</span>
         </header>
-
-        {menuOpen && (
-          <div className="admin-menu st-no-print">
-            <nav>
-              {NAV.map(n => (
-                <NavLink key={n.to} to={n.to} style={menuLinkStyle}>
-                  {n.label}{'badge' in n && <Badge count={attention[n.badge]} />}
-                </NavLink>
-              ))}
-            </nav>
-            <div className="admin-menu-foot">
-              <span>{employee?.full_name}</span>
-              <button onClick={signOut}>Sign out</button>
-            </div>
-          </div>
-        )}
 
         <div className="admin-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: '#f0fdf4', minHeight: '100vh', boxSizing: 'border-box' }}>
           <Outlet />
@@ -137,30 +115,4 @@ export default function AdminLayout() {
       </div>
     </div>
   )
-}
-
-function Badge({ count }: { count: number }) {
-  if (count <= 0) return null
-  return (
-    <span aria-label={`${count} need attention`} style={{
-      marginLeft: 6, padding: '0 6px', borderRadius: 99, background: '#f87171',
-      color: '#fff', fontSize: '0.6875rem', fontWeight: 700, lineHeight: '16px', display: 'inline-block',
-    }}>
-      {count}
-    </span>
-  )
-}
-
-function menuLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
-  return {
-    display: 'flex',
-    alignItems: 'center',
-    textDecoration: 'none',
-    padding: '0.8rem 1rem',
-    borderRadius: 8,
-    fontSize: '1rem',
-    fontWeight: isActive ? 700 : 500,
-    color: isActive ? '#14532d' : '#1e293b',
-    background: isActive ? '#dcfce7' : 'transparent',
-  }
 }

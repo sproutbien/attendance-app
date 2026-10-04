@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
-import { House, CalendarDays, ChartColumn, ChevronDown, ChevronUp, User, LogOut, Sun, Moon, Monitor, Camera, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { House, CalendarDays, ChartColumn, ChevronUp, User, LogOut, Sun, Moon, Monitor, Camera, PanelLeftClose, PanelLeftOpen, Menu, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { photoUrl, savePhoto } from '../lib/employees'
 import { useTheme } from '../lib/theme'
 import type { ThemeChoice } from '../lib/theme'
-import { useSidebarCollapsed } from '../lib/sidebar'
+import { useDrawer, useSidebarCollapsed } from '../lib/sidebar'
 import '../styles/app.css'
 
 const NAV = [
@@ -21,22 +21,31 @@ const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
 ]
 
 /**
- * Employee shell: a sidebar on desktop (collapsible to icons), a top bar + bottom tabs on phones.
+ * Employee shell: a sidebar on desktop (collapsible to icons); on phones the same sidebar slides out from a ☰ button.
  * `wide` lets the page lay out its own full-width sections (Dashboard); `medium` is a roomier single column (Leaves).
  */
 export default function AppLayout({ children, wide = false, medium = false }: { children: React.ReactNode; wide?: boolean; medium?: boolean }) {
   const theme = useTheme()
   const side = useSidebarCollapsed('sb.sidebarCollapsed')
+  const drawer = useDrawer('(min-width: 761px)')
+  const closeBtn = useRef<HTMLButtonElement>(null)
+  useEffect(() => { if (drawer.open) closeBtn.current?.focus() }, [drawer.open])
+
   return (
     <div className={`sb-app sb-shell${side.collapsed ? ' is-collapsed' : ''}`} data-theme={theme.dataTheme}>
-      <aside className="sb-side st-no-print">
-        <Link to="/dashboard" className="sb-side-brand" aria-label="Sproutbien home">
-          <img src="/logo.jpg" alt="" />
-          <span className="sb-wordmark sb-side-label">
-            <strong>SproutBien</strong>
-            <span>nurturing businesses digitally</span>
-          </span>
-        </Link>
+      <aside className={`sb-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu">
+        <div className="sb-side-top">
+          <Link to="/dashboard" className="sb-side-brand" aria-label="Sproutbien home">
+            <img src="/logo.jpg" alt="" />
+            <span className="sb-wordmark sb-side-label">
+              <strong>SproutBien</strong>
+              <span>nurturing businesses digitally</span>
+            </span>
+          </Link>
+          <button type="button" ref={closeBtn} className="sb-drawer-close" onClick={drawer.hide} aria-label="Close menu">
+            <X size={22} aria-hidden="true" />
+          </button>
+        </div>
         <nav className="sb-side-nav" aria-label="Main">
           {NAV.map(({ to, label, Icon }) => (
             <NavLink key={to} to={to} title={label}>
@@ -46,7 +55,7 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
           ))}
         </nav>
         <div className="sb-side-foot">
-          <UserMenu theme={theme} placement="side" />
+          <UserMenu theme={theme} />
           <button type="button" className="sb-side-collapse" onClick={side.toggle}
             aria-label={side.collapsed ? 'Expand menu' : 'Collapse menu'} title={side.collapsed ? 'Expand menu' : 'Collapse menu'}>
             {side.collapsed ? <PanelLeftOpen size={20} aria-hidden="true" /> : <PanelLeftClose size={20} aria-hidden="true" />}
@@ -54,25 +63,24 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
           </button>
         </div>
       </aside>
+      {drawer.open && <div className="sb-drawer-backdrop st-no-print" onClick={drawer.hide} />}
       <div className="sb-body">
-        <Header theme={theme} />
+        <Header onMenu={drawer.show} menuOpen={drawer.open} />
         {wide ? children : <div className={medium ? 'sb-narrow sb-medium' : 'sb-narrow'}>{children}</div>}
       </div>
-      <nav className="sb-tabbar" aria-label="Main">
-        {NAV.map(({ to, label, Icon }) => (
-          <NavLink key={to} to={to}><Icon size={22} strokeWidth={2} />{label}</NavLink>
-        ))}
-      </nav>
     </div>
   )
 }
 
 type Theme = ReturnType<typeof useTheme>
 
-/** Phones only (desktop has the sidebar) */
-function Header({ theme }: { theme: Theme }) {
+/** Phones only (desktop has the sidebar): ☰ opens the sidebar as a slide-out menu */
+function Header({ onMenu, menuOpen }: { onMenu: () => void; menuOpen: boolean }) {
   return (
     <header className="sb-header">
+      <button type="button" className="sb-menu-btn" onClick={onMenu} aria-label="Open menu" aria-expanded={menuOpen}>
+        <Menu size={24} aria-hidden="true" />
+      </button>
       <Link to="/dashboard" className="sb-brand" aria-label="Sproutbien home">
         <img src="/logo.jpg" alt="" />
         <span className="sb-wordmark">
@@ -80,13 +88,12 @@ function Header({ theme }: { theme: Theme }) {
           <span>nurturing businesses digitally</span>
         </span>
       </Link>
-      <UserMenu theme={theme} placement="header" />
     </header>
   )
 }
 
-/** Account menu: in the phone top bar it drops down; at the foot of the sidebar it opens upward. */
-function UserMenu({ theme, placement }: { theme: Theme; placement: 'header' | 'side' }) {
+/** Account menu at the foot of the sidebar; opens upward. */
+function UserMenu({ theme }: { theme: Theme }) {
   const { employee, signOut, refreshEmployee } = useAuth()
   const [open, setOpen] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
@@ -123,20 +130,18 @@ function UserMenu({ theme, placement }: { theme: Theme; placement: 'header' | 's
   return (
     <div className="sb-user" ref={ref}>
       <button className="sb-user-btn" onClick={() => setOpen(o => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="Account menu"
-        title={placement === 'side' ? employee?.full_name : undefined}>
+        title={employee?.full_name}>
         <span className="sb-avatar">
           {photo ? <img src={photo} alt="" /> : <User size={20} strokeWidth={2.2} fill="currentColor" />}
         </span>
-        {placement === 'side' && (
-          <span className="sb-side-who">
-            <strong>{employee?.full_name}</strong>
-            <span>{employee?.designation ?? employee?.email}</span>
-          </span>
-        )}
-        {placement === 'side' ? <ChevronUp size={18} strokeWidth={2.4} /> : <ChevronDown size={18} strokeWidth={2.4} />}
+        <span className="sb-side-who">
+          <strong>{employee?.full_name}</strong>
+          <span>{employee?.designation ?? employee?.email}</span>
+        </span>
+        <ChevronUp size={18} strokeWidth={2.4} />
       </button>
       {open && (
-        <div className={placement === 'side' ? 'sb-menu sb-menu-up' : 'sb-menu'} role="menu">
+        <div className="sb-menu sb-menu-up" role="menu">
           <div className="sb-menu-who">
             <strong>{employee?.full_name}</strong>
             <span>{employee?.designation ?? employee?.email}</span>
