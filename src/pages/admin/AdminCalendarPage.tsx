@@ -17,13 +17,13 @@ export default function AdminCalendarPage() {
   // Choice holiday dates (e.g. Onam: 27 or 28 Aug) and the days everyone takes for them
   const choiceDateName = new Map(choices.choices.flatMap(c => c.dates.map(d => [d.date, c.name] as const)))
   const choiceDays = choices.choices.reduce((n, c) => n + c.pick_count, 0)
-  // Leave already on these days is recounted when a holiday is added or removed
-  const onLeave = useLeaveOnDates([date, ...holidays.map(h => h.date)])
-  const leaveOn = (d: string) => onLeave.filter(l => l.start_date <= d && l.end_date >= d)
   const [date, setDate] = useState('')
   const [name, setName] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
+  // Leave already on these days is recounted when a holiday is added or removed
+  const onLeave = useLeaveOnDates([date, ...holidays.map(h => h.date)])
+  const leaveOn = (d: string) => onLeave.filter(l => l.start_date <= d && l.end_date >= d)
 
   const byDate = new Map(holidays.map(h => [h.date, h.name]))
   const monthStart = `${yearMonth}-01`
