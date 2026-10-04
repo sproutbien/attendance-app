@@ -46,7 +46,9 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
     ec_name:        s(existing?.emergency_contact_name),
     ec_relation:    s(existing?.emergency_contact_relation),
     ec_phone:       s(existing?.emergency_contact_phone),
+    probation_end:  s(existing?.probation_end_date),
   })
+  const [startOnboarding, setStartOnboarding] = useState(true)
   // Shift changes start tomorrow by default (today's attendance keeps today's shift); new staff start today
   const initialShiftId = upcomingShift?.shift.id ?? currentShift?.id ?? ''
   const initialShiftFrom = upcomingShift?.from ?? (isEdit ? tomorrow() : localDate())
@@ -88,6 +90,8 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
       emergency_contact_name:     t(f.ec_name),
       emergency_contact_relation: t(f.ec_relation),
       emergency_contact_phone:    t(f.ec_phone),
+      probation_end_date: f.status === 'probation' ? t(f.probation_end) : existing?.probation_end_date ?? null,
+      startOnboarding: isEdit ? undefined : startOnboarding,
     })
   }
 
@@ -167,7 +171,7 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
               </Field>
               <Field label="Date of joining">
                 <input type="date" value={f.joining_date} onChange={set('joining_date')} style={inputStyle} />
-                <p style={hintStyle}>Paid leave is credited from this month.</p>
+                <p style={hintStyle}>Paid leave is credited from this month. Before this date they can log in but not check in, and aren't marked Absent.</p>
               </Field>
             </Grid>
             <Grid>
@@ -210,6 +214,12 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
                 <p style={hintStyle}>{isSelf ? "You can't change your own role." : 'Admins manage everything in the admin panel.'}</p>
               </Field>
             </Grid>
+            {f.status === 'probation' && (
+              <Field label="Probation ends (optional)">
+                <input type="date" value={f.probation_end} onChange={set('probation_end')} min={f.joining_date || undefined} style={inputStyle} />
+                <p style={hintStyle}>You're reminded on the Employees page two weeks before, with a button to make them Active.</p>
+              </Field>
+            )}
             {leaving && (
               <Field label="Last working day">
                 <input type="date" value={f.last_working_day} onChange={set('last_working_day')} required={f.status === 'on_notice'} style={inputStyle} />
@@ -235,6 +245,17 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
               <input type="tel" value={f.ec_phone} onChange={set('ec_phone')} placeholder="+91 98765 43210" style={inputStyle} />
             </Field>
           </Section>
+
+          {!isEdit && (
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', margin: '0 0 1rem', fontSize: '0.875rem', color: '#374151', cursor: 'pointer' }}>
+              <input type="checkbox" checked={startOnboarding} onChange={e => setStartOnboarding(e.target.checked)}
+                style={{ width: 16, height: 16, marginTop: 2, accentColor: '#16a34a' }} />
+              <span>
+                Start the onboarding checklist
+                <span style={{ display: 'block', ...hintStyle }}>They'll see their steps (documents to upload and so on) on their Dashboard.</span>
+              </span>
+            </label>
+          )}
 
           {error && <div style={errorBox}>{error}</div>}
 

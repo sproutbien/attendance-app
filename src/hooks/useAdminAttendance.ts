@@ -24,7 +24,7 @@ export function useAdminAttendance(selectedDate: string) {
       const [{ data: employees, error: empErr }, { data: records, error: recErr }] = await Promise.all([
         supabase
           .from('employees')
-          .select('id, full_name, department, status')
+          .select('id, full_name, department, status, joining_date')
           .in('status', TRACKED_STATUSES)
           .order('full_name'),
         supabase
@@ -43,7 +43,9 @@ export function useAdminAttendance(selectedDate: string) {
 
       const recordMap = new Map((records ?? []).map(r => [r.employee_id, r]))
 
-      const combined: AdminAttendanceRow[] = (employees ?? []).map(({ status, ...emp }) => {
+      // People who haven't joined yet aren't expected in
+      const joined = (employees ?? []).filter(e => !e.joining_date || e.joining_date <= selectedDate)
+      const combined: AdminAttendanceRow[] = joined.map(({ status, joining_date: _joining, ...emp }) => {
         const record = recordMap.get(emp.id) ?? null
         return {
           employee: emp,

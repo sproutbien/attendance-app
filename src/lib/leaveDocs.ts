@@ -23,6 +23,9 @@ export const LEAVE_DOC_ACCEPT = '.pdf,.png,.jpg,.jpeg,.doc,.docx,' + [...new Set
 
 const extOf = (name: string) => name.split('.').pop()?.toLowerCase() ?? ''
 
+/** Content type of an allowed file, from its extension (undefined if not allowed). Also used for employee documents. */
+export const docMimeType = (name: string): string | undefined => TYPES[extOf(name)]
+
 /** Why this file can't be attached, or null. */
 export function leaveDocProblem(file: File): string | null {
   if (!TYPES[extOf(file.name)]) return `${file.name}: only PDF, PNG, JPEG and Word files can be attached.`

@@ -4,7 +4,8 @@ import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, Lo
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
-import { initials, useDrawer, useSidebarCollapsed } from '../lib/sidebar'
+import { useDrawer, useSidebarCollapsed } from '../lib/sidebar'
+import { initials } from '../lib/employees'
 
 /**
  * Nav badge counts: leave = pending requests + cancellations no admin has marked seen;
@@ -80,7 +81,7 @@ export default function AdminLayout() {
         </nav>
         <div className="admin-side-foot">
           <div className="admin-side-user" title={employee?.full_name}>
-            <span className="admin-side-initials">{initials(employee?.full_name)}</span>
+            <span className="admin-side-initials">{initials(employee?.full_name ?? '')}</span>
             <span className="admin-side-who">
               <strong>{employee?.full_name}</strong>
               <span>Admin</span>

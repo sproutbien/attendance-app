@@ -6,17 +6,18 @@ import type { Employee, EmployeeOption, EmployeeOptionKind } from '../types'
 export type EmployeeProfileFields = Pick<Employee,
   | 'full_name' | 'role' | 'status' | 'department' | 'designation' | 'monthly_salary' | 'phone'
   | 'joining_date' | 'employment_type' | 'work_location' | 'reporting_manager_id' | 'last_working_day'
-  | 'emergency_contact_name' | 'emergency_contact_relation' | 'emergency_contact_phone'
+  | 'emergency_contact_name' | 'emergency_contact_relation' | 'emergency_contact_phone' | 'probation_end_date'
 > & { employee_code: string | null }   // null = assign the next SB number
 
 export type EmployeeFormData = EmployeeProfileFields & {
   email: string
   password?: string   // add only
   shift: { id: string; from: string } | null   // null = shift unchanged
+  startOnboarding?: boolean   // add only: copy the onboarding checklist to them
 }
 
 /** The employees-row part of the form (email and password only apply when adding). */
-export function profileUpdates({ email: _email, password: _password, shift: _shift, ...rest }: EmployeeFormData): EmployeeProfileFields {
+export function profileUpdates({ email: _email, password: _password, shift: _shift, startOnboarding: _start, ...rest }: EmployeeFormData): EmployeeProfileFields {
   return rest
 }
 
@@ -39,7 +40,7 @@ export function useEmployeeManagement() {
   useEffect(() => { fetchEmployees() }, [fetchEmployees])
 
   /** Returns the new employee's id, or null on failure. */
-  async function addEmployee({ email, password, shift: _shift, ...profile }: EmployeeFormData): Promise<string | null> {
+  async function addEmployee({ email, password, shift: _shift, startOnboarding: _start, ...profile }: EmployeeFormData): Promise<string | null> {
     setSaving(true)
     setError(null)
     const { data: newId, error } = await supabase.rpc('create_employee', {

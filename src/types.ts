@@ -22,6 +22,7 @@ export type Employee = {
   emergency_contact_name: string | null
   emergency_contact_relation: string | null
   emergency_contact_phone: string | null
+  probation_end_date: string | null
   deleted_at: string | null       // set while in the bin; purged 6 months later
   created_at: string
 }
@@ -93,6 +94,37 @@ export type LeaveDocument = {
   uploaded_by: string | null
   uploaded_at: string
 }
+
+/** Kinds of HR document kept per employee. Must match employee_document_category_ok() in migration 029. */
+export type DocCategory = 'Offer letter' | 'ID proof' | 'PAN card' | 'Bank proof' | 'Certificates' | 'Other'
+
+export type EmployeeDocument = {
+  id: string
+  employee_id: string
+  category: DocCategory
+  path: string          // object in the 'employee-documents' bucket
+  file_name: string
+  mime_type: string
+  size_bytes: number
+  uploaded_by: string | null
+  uploaded_at: string
+}
+
+/** One step of an onboarding checklist (a template row has the same shape minus employee / done). */
+export type OnboardingTask = {
+  id: string
+  employee_id: string
+  title: string
+  details: string | null
+  assignee: 'admin' | 'employee'
+  document_category: DocCategory | null   // done by uploading a document of this kind
+  sort_order: number
+  done_at: string | null
+  done_by: string | null
+  created_at: string
+}
+
+export type OnboardingTemplateTask = Pick<OnboardingTask, 'id' | 'title' | 'details' | 'assignee' | 'document_category' | 'sort_order'>
 
 export const STATUS_LABELS: Record<AttendanceRecord['status'], string> = {
   present:  'Present',

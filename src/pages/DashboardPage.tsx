@@ -12,6 +12,9 @@ import MyCorrections from '../components/MyCorrections'
 import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
+import GettingStartedCard from '../components/GettingStartedCard'
+import { notStartedYet } from '../lib/onboarding'
+import { fmtHolidayDay } from '../lib/holidays'
 import AppLayout from '../components/AppLayout'
 import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
@@ -122,7 +125,9 @@ export default function DashboardPage() {
   }, [halfDay, clockedIn, pastSplit])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const shiftOn = useShiftHistory(employee?.id)
-  const log = useMonthLog(yearMonth, monthRecords, calendar, employee?.id, now, shiftOn)
+  const log = useMonthLog(yearMonth, monthRecords, calendar, employee?.id, now, shiftOn, employee?.joining_date ?? null)
+  // Before the joining date: can log in (onboarding), can't check in
+  const startsOn = notStartedYet(employee) ? employee!.joining_date! : null
 
   const firstName = employee?.full_name.split(' ')[0] ?? ''
   const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -135,11 +140,13 @@ export default function DashboardPage() {
           {shiftLoaded && <> · {shift.name} shift {shiftHours(shift)}</>}
         </p>
         <h1>Good {greeting()}, <em>{firstName}</em></h1>
-        <p className="sb-hero-sub">{SUBTITLE[state]}</p>
+        <p className="sb-hero-sub">{startsOn ? `You start on ${fmtHolidayDay(startsOn)}. We’re glad to have you.` : SUBTITLE[state]}</p>
       </section>
 
       <div className="sb-container">
         {error && <p className="sb-error">{error}</p>}
+
+        <GettingStartedCard />
 
         <section className="sb-today">
           <CheckInPanel
@@ -150,6 +157,7 @@ export default function DashboardPage() {
             pastSplit={pastSplit}
             shift={shift}
             onLeave={!!todaysLeave}
+            startsOn={startsOn}
             onCheckIn={() => todaysLeave ? setLeavePopup(true) : checkIn()}
             onCheckOut={() => setConfirmingOut(true)}
           />
@@ -265,7 +273,7 @@ function useTodaysLeave(employeeId: string | undefined) {
 
 // ── Check-in panel (left) ─────────────────────────────────────
 
-function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, onLeave, onCheckIn, onCheckOut }: {
+function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, onLeave, startsOn, onCheckIn, onCheckOut }: {
   state: DayState
   record: AttendanceRecord | null
   isSubmitting: boolean
@@ -273,6 +281,7 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, 
   pastSplit: boolean
   shift: Shift
   onLeave: boolean        // pending / approved full-day leave today: Check In opens the cancel-leave popup
+  startsOn: string | null // joining date still ahead: Check In is closed until then
   onCheckIn: () => void
   onCheckOut: () => void
 }) {
@@ -301,8 +310,11 @@ function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, 
     )
   } else {
     // Morning leave: locked until the split. Afternoon leave: locked once the split has passed.
-    const locked = (halfDay === 'morning' && !pastSplit) || (halfDay === 'afternoon' && pastSplit)
-    if (halfDay === 'morning') {
+    const locked = !!startsOn || (halfDay === 'morning' && !pastSplit) || (halfDay === 'afternoon' && pastSplit)
+    if (startsOn) {
+      head = 'See you soon'
+      hint = `Check In opens on your first day, ${fmtHolidayDay(startsOn)}`
+    } else if (halfDay === 'morning') {
       head = pastSplit ? 'Welcome back from your half day' : 'Half-day leave this morning'
       hint = pastSplit ? 'Tap to start your afternoon' : `Check In opens at ${clock(shift.split_time)}, when your leave ends`
     } else if (halfDay === 'afternoon') {
@@ -487,6 +499,7 @@ function useMonthLog(
   employeeId: string | undefined,
   now: number,
   shiftOn: (date: string) => Shift | null,
+  joiningDate: string | null,
 ) {
   const today = localDate()
 
@@ -495,7 +508,8 @@ function useMonthLog(
     const leave = employeeId ? calendar.leave.get(employeeId) : undefined
     const halfDay = employeeId ? calendar.halfDay.get(employeeId) : undefined
     const rows: LogRow[] = monthDates(yearMonth)
-      .filter(d => d <= today && (d >= TRACKING_START || recMap.has(d)))
+      // Days before tracking started or before they joined only show if there's a record
+      .filter(d => d <= today && ((d >= TRACKING_START && (!joiningDate || d >= joiningDate)) || recMap.has(d)))
       .reverse()
       .map(date => {
         const rec = recMap.get(date)
@@ -525,13 +539,13 @@ function useMonthLog(
     // and today (or an untracked day) only once checked in
     const workingDays = rows.filter(r =>
       !isSunday(r.date) && !calendar.holidays.has(r.date) && r.mark !== 'leave' &&
-      ((r.date < today && r.date >= TRACKING_START) || cameIn(r)),
+      ((r.date < today && r.date >= TRACKING_START && (!joiningDate || r.date >= joiningDate)) || cameIn(r)),
     ).reduce((n, r) => n + weight(r), 0)
 
     const workedTotal = rows.reduce((n, r) => n + (r.worked ?? 0), 0)
     const leaveDays = rows.reduce((n, r) => n + (r.mark === 'leave' ? 1 : r.mark === 'half_leave' ? 0.5 : 0), 0)
     return { rows, presentDays, workingDays, workedTotal, leaveDays }
-  }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now, shiftOn])
+  }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now, shiftOn, joiningDate])
 }
 
 /** Break for the day; marks days where the shift's minimum break was applied. */

@@ -11,6 +11,10 @@ import { useShifts } from '../../hooks/useShifts'
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar'
 import StatusBadge from '../../components/employees/StatusBadge'
 import EmployeeFormModal from '../../components/employees/EmployeeFormModal'
+import { DocumentsCard, OnboardingCard } from '../../components/onboarding/AdminOnboarding'
+import { useOnboarding } from '../../hooks/useOnboarding'
+import { daysUntil, notStartedYet, relativeDays } from '../../lib/onboarding'
+import { supabase } from '../../lib/supabase'
 import { card, errorBox, ghostBtn, hintStyle, inputStyle, primaryBtn, successBox } from '../../components/employees/styles'
 import type { Employee } from '../../types'
 
@@ -24,6 +28,7 @@ export default function AdminEmployeeProfilePage() {
   const shifts = useShifts()
   const [editing, setEditing] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
+  const onboarding = useOnboarding(id)
 
   const e = employees.find(x => x.id === id)
 
@@ -85,6 +90,11 @@ export default function AdminEmployeeProfilePage() {
           {e.status === 'on_notice' && e.last_working_day && (
             <div style={{ color: '#92400e', fontSize: '0.8125rem', marginTop: 6 }}>Last working day {fmtDate(e.last_working_day)}.</div>
           )}
+          {notStartedYet(e) && (
+            <div style={{ color: '#1d4ed8', fontSize: '0.8125rem', marginTop: 6 }}>
+              Joins {fmtDate(e.joining_date!)} ({relativeDays(daysUntil(e.joining_date!))}). Can log in to finish onboarding; check-in opens that day.
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <Link to={`/admin/employees/${e.id}/stats`} style={{ ...ghostBtn, padding: '0.5rem 0.875rem', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
@@ -93,6 +103,13 @@ export default function AdminEmployeeProfilePage() {
           <button onClick={() => { setError(null); setEditing(true) }} style={primaryBtn}>Edit profile</button>
         </div>
       </div>
+
+      {!former && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', alignItems: 'start', marginBottom: '1.5rem' }}>
+          <OnboardingCard employee={e} data={onboarding} />
+          <DocumentsCard employee={e} data={onboarding} />
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', alignItems: 'start' }}>
         <InfoCard title="Job">
@@ -113,6 +130,11 @@ export default function AdminEmployeeProfilePage() {
         <InfoCard title="Employment">
           <Row label="Status" value={<StatusBadge status={e.status} />} />
           <Row label="Date of joining" value={e.joining_date && fmtDate(e.joining_date)} />
+          {(e.status === 'probation' || e.probation_end_date) && (
+            <Row label="Probation ends" value={
+              <ProbationValue employee={e} onConfirmed={async () => { await refetch(); show(`${e.full_name} is now Active. Noted in HR notes.`) }} />
+            } />
+          )}
           {(e.last_working_day || e.status === 'on_notice') && <Row label="Last working day" value={e.last_working_day && fmtDate(e.last_working_day)} />}
           <Row label="Monthly gross salary" value={e.monthly_salary != null ? `₹${e.monthly_salary.toLocaleString('en-IN')}` : null} />
           <Row label="Account created" value={fmtDate(new Date(e.created_at))} />
@@ -146,7 +168,7 @@ export default function AdminEmployeeProfilePage() {
           )}
         </InfoCard>
 
-        <HrNotes key={e.id} employee={e} adminId={me?.id ?? ''} />
+        <HrNotes key={`${e.id}-${e.status}`} employee={e} adminId={me?.id ?? ''} />
       </div>
 
       {editing && (
@@ -166,6 +188,41 @@ export default function AdminEmployeeProfilePage() {
         />
       )}
     </div>
+  )
+}
+
+/** Probation end date; while on probation, a Confirm button that makes them Active. */
+function ProbationValue({ employee: e, onConfirmed }: { employee: Employee; onConfirmed: () => void }) {
+  const [asking, setAsking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const n = e.probation_end_date ? daysUntil(e.probation_end_date) : null
+
+  async function confirm() {
+    setBusy(true)
+    const { error } = await supabase.rpc('confirm_probation', { p_employee: e.id })
+    setBusy(false)
+    setAsking(false)
+    if (error) setErr(error.message)
+    else onConfirmed()
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+      <span>
+        {e.probation_end_date ? fmtDate(e.probation_end_date) : 'Not set'}
+        {e.status === 'probation' && n !== null && <span style={{ color: n < 0 ? '#b45309' : '#94a3b8', fontWeight: 400 }}> · {relativeDays(n)}</span>}
+      </span>
+      {e.status === 'probation' && (asking ? (
+        <span style={{ display: 'flex', gap: 6 }}>
+          <button onClick={confirm} disabled={busy} style={{ ...primaryBtn, padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}>Make Active</button>
+          <button onClick={() => setAsking(false)} style={{ ...ghostBtn, padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>Cancel</button>
+        </span>
+      ) : (
+        <button onClick={() => setAsking(true)} style={{ ...ghostBtn, padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}>Confirm probation</button>
+      ))}
+      {err && <span style={{ color: '#dc2626', fontSize: '0.75rem', fontWeight: 400 }}>{err}</span>}
+    </span>
   )
 }
 

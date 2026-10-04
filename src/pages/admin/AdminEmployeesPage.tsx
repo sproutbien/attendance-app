@@ -13,6 +13,10 @@ import StatusBadge from '../../components/employees/StatusBadge'
 import EmployeeFormModal from '../../components/employees/EmployeeFormModal'
 import EmployeeListsModal from '../../components/employees/EmployeeListsModal'
 import ShiftsModal from '../../components/employees/ShiftsModal'
+import ChecklistTemplateModal from '../../components/onboarding/ChecklistTemplateModal'
+import OnboardingOverview from '../../components/onboarding/OnboardingOverview'
+import { useOnboardingOverview } from '../../hooks/useOnboarding'
+import { supabase } from '../../lib/supabase'
 import {
   card, dangerBtn, errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn,
   sectionHeading, successBox, tableStyle, tdStyle, thStyle,
@@ -45,6 +49,8 @@ export default function AdminEmployeesPage() {
   const lists = useEmployeeOptions()
   const shifts = useShifts()
   const [showShifts, setShowShifts] = useState(false)
+  const [showChecklist, setShowChecklist] = useState(false)
+  const onboarding = useOnboardingOverview()
 
   const [adding, setAdding] = useState(false)
   const [showLists, setShowLists] = useState(false)
@@ -84,7 +90,19 @@ export default function AdminEmployeesPage() {
     if (!id) return
     setAdding(false)
     const err = data.shift ? await shifts.assign(id, data.shift.id, data.shift.from) : null
-    flash(err ? `${data.full_name} added, but the shift wasn't set: ${err}` : `${data.full_name} added.`)
+    const onbErr = data.startOnboarding ? (await supabase.rpc('start_onboarding', { p_employee: id })).error?.message : null
+    if (data.startOnboarding) onboarding.refresh()
+    flash(err ? `${data.full_name} added, but the shift wasn't set: ${err}`
+      : onbErr ? `${data.full_name} added, but the onboarding checklist wasn't started: ${onbErr}`
+      : `${data.full_name} added.`)
+  }
+
+  async function handleConfirmProbation(e: Employee) {
+    const { error } = await supabase.rpc('confirm_probation', { p_employee: e.id })
+    if (error) return error.message
+    await mgmt.refetch()
+    flash(`${e.full_name} is now Active. Noted in their HR notes.`)
+    return null
   }
 
   async function handleConfirm() {
@@ -118,6 +136,7 @@ export default function AdminEmployeesPage() {
             <button onClick={() => setShowBin(false)} style={ghostBtn}>← Back to employees</button>
           ) : (
             <>
+              <button onClick={() => setShowChecklist(true)} style={ghostBtn}>Checklist</button>
               <button onClick={() => setShowShifts(true)} style={ghostBtn}>Shifts</button>
               <button onClick={() => setShowLists(true)} style={ghostBtn}>Lists</button>
               <button onClick={() => setShowBin(true)} style={ghostBtn}>Bin ({binned.length})</button>
@@ -134,6 +153,8 @@ export default function AdminEmployeesPage() {
       ) : showBin ? (
         <BinList employees={binned} saving={saving} onRestore={handleRestore} onPurge={e => { setConfirmError(null); setConfirm({ type: 'purge', employee: e }) }} />
       ) : (
+        <>
+        <OnboardingOverview employees={current} progress={onboarding.byEmployee} onConfirm={handleConfirmProbation} />
         <div style={card}>
           {/* Filters */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
@@ -187,7 +208,10 @@ export default function AdminEmployeesPage() {
             </div>
           )}
         </div>
+        </>
       )}
+
+      {showChecklist && <ChecklistTemplateModal onClose={() => setShowChecklist(false)} />}
 
       {adding && (
         <EmployeeFormModal

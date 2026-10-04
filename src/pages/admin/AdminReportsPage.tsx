@@ -178,7 +178,10 @@ export default function AdminReportsPage() {
             employees={summaries.map(s => s.employee)}
             holidays={calendar.holidays}
             holidayFor={calendar.holidayFor}
-            markFor={calendar.markFor}
+            markFor={(empId, date) => {
+              const joined = summaries.find(s => s.employee.id === empId)?.employee.joining_date
+              return joined && date < joined ? 'none' : calendar.markFor(empId, date)
+            }}
           />
         )}
       </div>

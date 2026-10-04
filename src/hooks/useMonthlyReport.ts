@@ -6,7 +6,7 @@ import { TRACKED_STATUSES } from '../lib/employees'
 import { loadHolidays } from '../lib/holidays'
 
 export type EmployeeSummary = {
-  employee: Pick<Employee, 'id' | 'full_name' | 'email' | 'department' | 'monthly_salary'>
+  employee: Pick<Employee, 'id' | 'full_name' | 'email' | 'department' | 'monthly_salary' | 'joining_date'>
   totalDays: number      // working days so far (Sundays and their holidays excluded)
   present: number
   late: number
@@ -68,7 +68,7 @@ export function useMonthlyReport(yearMonth: string) {
         // Current staff, plus anyone whose last working day falls in or after this month (final pay)
         supabase
           .from('employees')
-          .select('id, full_name, email, department, monthly_salary, status, last_working_day')
+          .select('id, full_name, email, department, monthly_salary, status, last_working_day, joining_date')
           .or(`status.in.(${TRACKED_STATUSES.join(',')}),last_working_day.gte.${start}`)
           .is('deleted_at', null)
           .order('full_name'),
@@ -119,18 +119,20 @@ export function useMonthlyReport(yearMonth: string) {
         if (r.status === 'on_leave') t.on_leave += r.half_day_session ? 0 : 1
       }
 
-      const result: EmployeeSummary[] = (employees ?? []).map(emp => {
+      const monthEnd = monthDates(yearMonth).slice(-1)[0]
+      const result: EmployeeSummary[] = (employees ?? []).filter(emp => !emp.joining_date || emp.joining_date <= monthEnd).map(emp => {
         const t = tally.get(emp.id) ?? empty()
         const lwd = emp.last_working_day as string | null
+        const joined = emp.joining_date as string | null
         const own = holidays.personal.get(emp.id)
-        const totalDays = workingDates.filter(d => (!lwd || d <= lwd) && !own?.has(d)).length
+        const totalDays = workingDates.filter(d => (!lwd || d <= lwd) && (!joined || d >= joined) && !own?.has(d)).length
         const missing = Math.max(0, totalDays - t.present - t.late - t.on_leave)
         // Long leave: days without a record count as (unpaid) leave, not absent
         if (emp.status === 'on_long_leave') t.on_leave += missing
         const absent = emp.status === 'on_long_leave' ? 0 : missing
         const salary = (emp.monthly_salary as number | null) ?? null
         return {
-          employee: { id: emp.id, full_name: emp.full_name, email: emp.email, department: emp.department, monthly_salary: salary },
+          employee: { id: emp.id, full_name: emp.full_name, email: emp.email, department: emp.department, monthly_salary: salary, joining_date: joined },
           totalDays,
           present: t.present,
           late: t.late,
