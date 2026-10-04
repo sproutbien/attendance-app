@@ -83,7 +83,7 @@ function ChoiceRow({ choice: c, onChoose }: { choice: MyHolidayChoice; onChoose:
               {fmtHolidayDay(d.date)}
               {full && <span style={{ fontWeight: 500 }}> · full</span>}
               {!full && d.max_people != null && (
-                <span style={{ fontWeight: 500, opacity: 0.8 }}> · {d.max_people - d.taken} left</span>
+                <span style={{ fontWeight: 500, opacity: 0.8 }}> · {d.max_people - d.taken - (on ? 1 : 0)} left</span>
               )}
             </button>
           )
