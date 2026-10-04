@@ -52,10 +52,13 @@ export function monthLabel(yearMonth: string) {
   return new Date(year, month - 1, 1).toLocaleDateString([], { month: 'long', year: 'numeric' })
 }
 
-/** Days in month minus Sundays minus holidays that don't fall on a Sunday */
-export function suggestedWorkingDays(yearMonth: string, holidayDates: Iterable<string>) {
+/**
+ * Days in month minus Sundays minus holidays that don't fall on a Sunday,
+ * minus the days everyone takes for choice holidays (e.g. 1 for "Onam: 27 or 28 Aug").
+ */
+export function suggestedWorkingDays(yearMonth: string, holidayDates: Iterable<string>, choiceDays = 0) {
   const holidays = new Set(holidayDates)
-  return monthDates(yearMonth).filter(d => !isSunday(d) && !holidays.has(d)).length
+  return monthDates(yearMonth).filter(d => !isSunday(d) && !holidays.has(d)).length - choiceDays
 }
 
 // ── Day marks ─────────────────────────────────────────────────

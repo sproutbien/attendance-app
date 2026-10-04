@@ -5,10 +5,11 @@ import type { DayMark } from '../lib/calendar'
 const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 /** Admin view: one row per employee, one column per day of the month */
-export default function AttendanceCalendarGrid({ yearMonth, employees, holidays, markFor }: {
+export default function AttendanceCalendarGrid({ yearMonth, employees, holidays, holidayFor, markFor }: {
   yearMonth: string
   employees: { id: string; full_name: string }[]
-  holidays: Map<string, string>
+  holidays: Map<string, string>                                        // public holidays (column headings)
+  holidayFor?: (employeeId: string, date: string) => string | undefined // incl. their choice holidays
   markFor: (employeeId: string, date: string) => DayMark
 }) {
   const dates = monthDates(yearMonth)
@@ -51,7 +52,7 @@ export default function AttendanceCalendarGrid({ yearMonth, employees, holidays,
               {dates.map(date => {
                 const mark = markFor(emp.id, date)
                 const s = MARK_STYLES[mark]
-                const holiday = holidays.get(date)
+                const holiday = holidayFor ? holidayFor(emp.id, date) : holidays.get(date)
                 return (
                   <td
                     key={date}

@@ -3,10 +3,11 @@ import { fetchAll, supabase } from '../lib/supabase'
 import type { Employee } from '../types'
 import { TRACKING_START, isSunday, monthDates } from '../lib/calendar'
 import { TRACKED_STATUSES } from '../lib/employees'
+import { loadHolidays } from '../lib/holidays'
 
 export type EmployeeSummary = {
   employee: Pick<Employee, 'id' | 'full_name' | 'email' | 'department' | 'monthly_salary'>
-  totalDays: number      // working days so far (Sundays and public holidays excluded)
+  totalDays: number      // working days so far (Sundays and their holidays excluded)
   present: number
   late: number
   on_leave: number
@@ -84,10 +85,10 @@ export function useMonthlyReport(yearMonth: string) {
           .eq('year_month', yearMonth)
           .maybeSingle(),
       ])
-      const { data: holidays } = await supabase.from('public_holidays').select('date').gte('date', start).lte('date', end)
-      const holidaySet = new Set((holidays ?? []).map(h => h.date))
-      // Working days so far this month (from TRACKING_START): absent is counted against these, not calendar days
-      const workingDates = monthDates(yearMonth).filter(d => d >= start && d >= TRACKING_START && d <= end && !isSunday(d) && !holidaySet.has(d))
+      const { holidays } = await loadHolidays(start, end)
+      // Working days so far this month (from TRACKING_START): absent is counted against these, not calendar days.
+      // Each person's own choice holidays (e.g. the Onam date they chose) come off their count below.
+      const workingDates = monthDates(yearMonth).filter(d => d >= start && d >= TRACKING_START && d <= end && !isSunday(d) && !holidays.common.has(d))
 
       if (cancelled) return
       if (empErr || recErr || setErr) {
@@ -121,7 +122,8 @@ export function useMonthlyReport(yearMonth: string) {
       const result: EmployeeSummary[] = (employees ?? []).map(emp => {
         const t = tally.get(emp.id) ?? empty()
         const lwd = emp.last_working_day as string | null
-        const totalDays = lwd ? workingDates.filter(d => d <= lwd).length : workingDates.length
+        const own = holidays.personal.get(emp.id)
+        const totalDays = workingDates.filter(d => (!lwd || d <= lwd) && !own?.has(d)).length
         const missing = Math.max(0, totalDays - t.present - t.late - t.on_leave)
         // Long leave: days without a record count as (unpaid) leave, not absent
         if (emp.status === 'on_long_leave') t.on_leave += missing

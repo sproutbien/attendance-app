@@ -7,6 +7,7 @@ import type { HalfDaySession, LeaveRequest, LeaveTypeCode } from '../types'
 import { useAuth } from '../contexts/AuthContext'
 import { useHolidayDates, useLeaveBalances, useLeaveCapPreview } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
+import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import { LEAVE_TYPE_LABELS, addDays, bookableAsOf, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, isMonthCapped, workingDays } from '../lib/leave'
 import { localDate, monthLabel } from '../lib/calendar'
 import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
@@ -118,7 +119,8 @@ export default function LeavePage() {
 
   // Paid leave must fit in what's credited so far, minus pending requests (the server enforces this too)
   const rangeEnd = isHalf ? startDate : endDate
-  const holidays = useHolidayDates(startDate, rangeEnd)
+  const [holidayVersion, setHolidayVersion] = useState(0)   // bumped when they choose a holiday date
+  const holidays = useHolidayDates(startDate, rangeEnd, employee?.id, holidayVersion)
   const booking = useLeaveBalances(employee?.id, bookableAsOf(startDate || today, today))
   const requested = startDate && rangeEnd && rangeEnd >= startDate ? workingDays(startDate, rangeEnd, isHalf, holidays) : null
   const typeBalance = booking.balances.find(b => b.leave_type === leaveType)
@@ -197,6 +199,8 @@ export default function LeavePage() {
           </span>
         </div>
       )}
+
+      <ChoiceHolidayCard onChanged={() => setHolidayVersion(v => v + 1)} />
 
       {/* Request form */}
       <div style={{ ...card, ...requestCard }} ref={formRef}>

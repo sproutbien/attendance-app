@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { holidaysFor, loadHolidays } from '../lib/holidays'
 import type { LeaveBalance, LeaveMonthCap, LeaveType, LeaveTypeCode } from '../types'
 
 /** Balances for one employee as of a date (default today). Pass null to skip. */
@@ -50,16 +51,19 @@ export function useLeaveTypes() {
   return { types, loading, refresh, update }
 }
 
-/** Holiday dates between two dates (for working-day estimates). */
-export function useHolidayDates(start: string, end: string) {
+/**
+ * Holiday dates between two dates (for working-day estimates): public holidays,
+ * plus that employee's own choice holidays when employeeId is given.
+ */
+export function useHolidayDates(start: string, end: string, employeeId?: string, version = 0) {
   const [dates, setDates] = useState<Set<string>>(new Set())
   useEffect(() => {
     if (!start || !end || end < start) return
     let cancelled = false
-    supabase.from('public_holidays').select('date').gte('date', start).lte('date', end)
-      .then(({ data }) => { if (!cancelled) setDates(new Set((data ?? []).map(h => h.date))) })
+    loadHolidays(start, end)
+      .then(({ holidays }) => { if (!cancelled) setDates(new Set(holidaysFor(holidays, employeeId).keys())) })
     return () => { cancelled = true }
-  }, [start, end])
+  }, [start, end, employeeId, version])
   return dates
 }
 

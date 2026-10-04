@@ -11,6 +11,7 @@ import CorrectionDialog from '../components/CorrectionDialog'
 import MyCorrections from '../components/MyCorrections'
 import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
+import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import AppLayout from '../components/AppLayout'
 import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
@@ -168,6 +169,8 @@ export default function DashboardPage() {
             log={log}
           />
         </section>
+
+        <ChoiceHolidayCard />
 
         <MonthLog
           yearMonth={yearMonth}

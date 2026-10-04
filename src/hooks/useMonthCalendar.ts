@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchAll, supabase } from '../lib/supabase'
 import type { AttendanceRecord, HalfDaySession } from '../types'
 import { daysInMonth, localDate, monthDates, resolveMark } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
+import { NO_HOLIDAYS, holidayName, holidaysFor, loadHolidays } from '../lib/holidays'
+import type { HolidayCalendar } from '../lib/holidays'
 
 type MonthData = {
-  holidays: Map<string, string>                                        // date → name
+  holidays: HolidayCalendar                                            // public + each employee's choice holidays
   attendance: Map<string, Map<string, AttendanceRecord['status']>>    // employee → date → status
   leave: Map<string, Map<string, 'approved' | 'pending'>>             // employee → date → status (full days, and pending half days)
   halfDay: Map<string, Map<string, HalfDaySession>>                   // employee → date → approved half-day session
 }
 
-const EMPTY: MonthData = { holidays: new Map(), attendance: new Map(), leave: new Map(), halfDay: new Map() }
+const EMPTY: MonthData = { holidays: NO_HOLIDAYS, attendance: new Map(), leave: new Map(), halfDay: new Map() }
 
 /**
  * Holidays, attendance and leave for one month.
@@ -52,18 +54,18 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
       }
 
       const [
-        { data: holidays, error: holErr },
+        { holidays, error: holErr },
         { data: records, error: recErr },
         { data: leaves, error: leaveErr },
       ] = await Promise.all([
-        supabase.from('public_holidays').select('date, name').gte('date', start).lte('date', end),
+        loadHolidays(start, end),
         fetchAll(attendancePage),
         leaveQuery,
       ])
 
       if (cancelled) return
       if (holErr || recErr || leaveErr) {
-        setError((holErr ?? recErr ?? leaveErr)!.message)
+        setError(holErr ?? (recErr ?? leaveErr)!.message)
         setLoading(false)
         return
       }
@@ -100,7 +102,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
       }
 
       setData({
-        holidays: new Map((holidays ?? []).map(h => [h.date, h.name])),
+        holidays,
         attendance,
         leave,
         halfDay,
@@ -113,7 +115,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
   }, [yearMonth, employeeId])
 
   const markFor = useCallback((empId: string, date: string): DayMark => resolveMark(date, localDate(), {
-    holiday: data.holidays.has(date),
+    holiday: holidayName(data.holidays, empId, date) !== undefined,
     attendance: data.attendance.get(empId)?.get(date),
     leave: data.leave.get(empId)?.get(date),
     halfDay: data.halfDay.get(empId)?.has(date),
@@ -124,5 +126,11 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
     [data],
   )
 
-  return { holidays: data.holidays, leave: data.leave, halfDay: data.halfDay, markFor, statusFor, loading, error }
+  /** An employee's holiday on a date (public or their choice), if any */
+  const holidayFor = useCallback((empId: string, date: string) => holidayName(data.holidays, empId, date), [data])
+
+  // One employee: their holidays (public + their own choice dates). Everyone: public holidays only.
+  const holidays = useMemo(() => employeeId ? holidaysFor(data.holidays, employeeId) : data.holidays.common, [data, employeeId])
+
+  return { holidays, holidayFor, leave: data.leave, halfDay: data.halfDay, markFor, statusFor, loading, error }
 }

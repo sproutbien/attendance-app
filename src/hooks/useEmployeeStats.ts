@@ -4,6 +4,7 @@ import { TRACKING_START, daysInMonth, localDate, shiftMonth } from '../lib/calen
 import { computeMonthStats } from '../lib/stats'
 import type { MonthStats, StatsInput } from '../lib/stats'
 import type { Employee } from '../types'
+import { holidaysFor, loadHolidays } from '../lib/holidays'
 
 /** How many months the trend covers, ending at the selected month. */
 export const TREND_MONTHS = 6
@@ -39,18 +40,18 @@ export function useEmployeeStats(employee: Pick<Employee, 'id' | 'joining_date' 
       setError(null)
       const [rec, hol, lv, sh, asg] = await Promise.all([
         supabase.from('attendance_records').select('*').eq('employee_id', employeeId).gte('date', start).lte('date', end),
-        supabase.from('public_holidays').select('date').gte('date', start).lte('date', end),
+        loadHolidays(start, end),
         supabase.from('leave_requests').select('*').eq('employee_id', employeeId).eq('status', 'approved')
           .lte('start_date', end).gte('end_date', start),
         supabase.from('shifts').select('*'),
         supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').eq('employee_id', employeeId).order('effective_from'),
       ])
       if (cancelled) return
-      const err = rec.error ?? hol.error ?? lv.error ?? sh.error ?? asg.error
-      if (err) { setError(err.message); setLoading(false); return }
+      const err = (rec.error ?? lv.error ?? sh.error ?? asg.error)?.message ?? hol.error
+      if (err) { setError(err); setLoading(false); return }
       setInput({
         records: rec.data ?? [],
-        holidays: new Set((hol.data ?? []).map(h => h.date)),
+        holidays: new Set(holidaysFor(hol.holidays, employeeId).keys()),
         leaves: lv.data ?? [],
         shifts: sh.data ?? [],
         assignments: asg.data ?? [],

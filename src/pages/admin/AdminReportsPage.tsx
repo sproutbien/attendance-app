@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { useMonthlyReport } from '../../hooks/useMonthlyReport'
 import type { EmployeeSummary } from '../../hooks/useMonthlyReport'
 import { useMonthCalendar } from '../../hooks/useMonthCalendar'
+import { useHolidayChoices } from '../../hooks/useHolidayChoices'
 import AttendanceCalendarGrid from '../../components/AttendanceCalendarGrid'
 import { CalendarLegend } from '../../components/MonthCalendar'
 import { suggestedWorkingDays } from '../../lib/calendar'
@@ -95,6 +96,7 @@ export default function AdminReportsPage() {
   const [yearMonth, setYearMonth] = useState(currentMonth)
   const { summaries, loading, error, workingDays, savingWorkingDays, saveWorkingDays } = useMonthlyReport(yearMonth)
   const calendar = useMonthCalendar(yearMonth)
+  const choices = useHolidayChoices(yearMonth)
 
   const totals = summaries.reduce(
     (acc, s) => ({ present: acc.present + s.present, late: acc.late + s.late, absent: acc.absent + s.absent, on_leave: acc.on_leave + s.on_leave }),
@@ -175,16 +177,17 @@ export default function AdminReportsPage() {
             yearMonth={yearMonth}
             employees={summaries.map(s => s.employee)}
             holidays={calendar.holidays}
+            holidayFor={calendar.holidayFor}
             markFor={calendar.markFor}
           />
         )}
       </div>
 
       {/* Working days editor */}
-      {!loading && !calendar.loading && (
+      {!loading && !calendar.loading && !choices.loading && (
         <WorkingDaysEditor
           workingDays={workingDays}
-          suggested={suggestedWorkingDays(yearMonth, calendar.holidays.keys())}
+          suggested={suggestedWorkingDays(yearMonth, calendar.holidays.keys(), choices.choices.reduce((n, c) => n + c.pick_count, 0))}
           saving={savingWorkingDays}
           onSave={saveWorkingDays}
         />
@@ -344,7 +347,7 @@ function WorkingDaysEditor({ workingDays, suggested, saving, onSave }: {
         ? <span style={{ fontSize: '0.8125rem', color: '#ef4444' }}>{err}</span>
         : <span style={{ fontSize: '0.8125rem', color: '#94a3b8' }}>
             {workingDays == null
-              ? `Suggested ${suggested} (excluding Sundays and public holidays) — save to enable payroll calculations.`
+              ? `Suggested ${suggested} (excluding Sundays, public holidays and choice holidays) — save to enable payroll calculations.`
               : `Payroll is calculated over ${workingDays} working days.${workingDays !== suggested ? ` (Calendar suggests ${suggested}.)` : ''}`}
           </span>
       }

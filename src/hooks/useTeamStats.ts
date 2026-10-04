@@ -6,6 +6,8 @@ import { computeMonthStats, teamTotals } from '../lib/stats'
 import type { MonthStats, TeamTotals } from '../lib/stats'
 import type { AttendanceRecord, Employee, EmployeeShift, LeaveRequest, Shift } from '../types'
 import { TREND_MONTHS } from './useEmployeeStats'
+import { holidaysFor, loadHolidays } from '../lib/holidays'
+import type { HolidayCalendar } from '../lib/holidays'
 
 export type TeamMember = Pick<Employee,
   'id' | 'full_name' | 'employee_code' | 'designation' | 'department' | 'role' | 'status' | 'photo_path' | 'joining_date' | 'last_working_day'>
@@ -15,7 +17,7 @@ export type MemberStats = { employee: TeamMember; month: MonthStats; previous: M
 type Raw = {
   employees: TeamMember[]
   records: AttendanceRecord[]
-  holidays: Set<string>
+  holidays: HolidayCalendar
   leaves: LeaveRequest[]
   shifts: Shift[]
   assignments: EmployeeShift[]
@@ -54,7 +56,7 @@ export function useTeamStats(yearMonth: string) {
           .order('full_name'),
         fetchAll<AttendanceRecord>((from, to) =>
           supabase.from('attendance_records').select('*').gte('date', start).lte('date', end).order('id').range(from, to)),
-        supabase.from('public_holidays').select('date').gte('date', start).lte('date', end),
+        loadHolidays(start, end),
         fetchAll<LeaveRequest>((from, to) =>
           supabase.from('leave_requests').select('*').eq('status', 'approved').lte('start_date', end).gte('end_date', start)
             .order('id').range(from, to)),
@@ -62,12 +64,12 @@ export function useTeamStats(yearMonth: string) {
         supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').order('effective_from'),
       ])
       if (cancelled) return
-      const err = emp.error ?? rec.error ?? hol.error ?? lv.error ?? sh.error ?? asg.error
-      if (err) { setError(err.message); setLoading(false); return }
+      const err = (emp.error ?? rec.error ?? lv.error ?? sh.error ?? asg.error)?.message ?? hol.error
+      if (err) { setError(err); setLoading(false); return }
       setRaw({
         employees: emp.data ?? [],
         records: rec.data ?? [],
-        holidays: new Set((hol.data ?? []).map(h => h.date)),
+        holidays: hol.holidays,
         leaves: lv.data ?? [],
         shifts: sh.data ?? [],
         assignments: asg.data ?? [],
@@ -95,7 +97,7 @@ export function useTeamStats(yearMonth: string) {
     // Per person, per month (oldest first)
     const perPerson = raw.employees.map(e => {
       const input = {
-        records: recs.get(e.id) ?? [], holidays: raw.holidays, leaves: leaves.get(e.id) ?? [],
+        records: recs.get(e.id) ?? [], holidays: new Set(holidaysFor(raw.holidays, e.id).keys()), leaves: leaves.get(e.id) ?? [],
         shifts: raw.shifts, assignments: asg.get(e.id) ?? [], activeFrom: e.joining_date, activeTo: e.last_working_day,
       }
       return { employee: e, trend: months.map(ym => computeMonthStats(ym, input, today)) }

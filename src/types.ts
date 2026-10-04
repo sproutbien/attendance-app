@@ -144,6 +144,21 @@ export type LeaveBalance = {
   available: number | null         // null for Loss of Pay
 }
 
+/** A holiday employees take on one of several dates (e.g. Onam: 27 or 28 Aug). See migration 027. */
+export type HolidayChoice = {
+  id: string
+  name: string
+  pick_count: number      // how many of the dates each employee takes
+  choose_by: string       // last day employees can choose; the defaults apply after it
+  dates: HolidayChoiceDate[]
+}
+
+export type HolidayChoiceDate = {
+  date: string
+  is_default: boolean     // given to anyone who hasn't chosen by the deadline
+  max_people: number | null
+}
+
 /** Admin-set limit on paid Casual + Earned days per employee in one month. See migration 026. */
 export type LeaveMonthCap = {
   month: string        // first of the month, "YYYY-MM-01"

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useHolidays } from '../../hooks/useHolidays'
+import { useHolidayChoices, useLeaveOnDates } from '../../hooks/useHolidayChoices'
+import ChoiceHolidays, { RecountNote } from '../../components/ChoiceHolidays'
 import { MonthGrid, MonthPicker, CalendarLegend } from '../../components/MonthCalendar'
 import { currentYearMonth, daysInMonth, isSunday, monthLabel, suggestedWorkingDays } from '../../lib/calendar'
 
@@ -11,6 +13,13 @@ function fmtDate(iso: string) {
 export default function AdminCalendarPage() {
   const [yearMonth, setYearMonth] = useState(currentYearMonth())
   const { holidays, loading, error, saving, save, remove } = useHolidays(yearMonth)
+  const choices = useHolidayChoices(yearMonth)
+  // Choice holiday dates (e.g. Onam: 27 or 28 Aug) and the days everyone takes for them
+  const choiceDateName = new Map(choices.choices.flatMap(c => c.dates.map(d => [d.date, c.name] as const)))
+  const choiceDays = choices.choices.reduce((n, c) => n + c.pick_count, 0)
+  // Leave already on these days is recounted when a holiday is added or removed
+  const onLeave = useLeaveOnDates([date, ...holidays.map(h => h.date)])
+  const leaveOn = (d: string) => onLeave.filter(l => l.start_date <= d && l.end_date >= d)
   const [date, setDate] = useState('')
   const [name, setName] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
@@ -59,7 +68,7 @@ export default function AdminCalendarPage() {
       </div>
       <p style={{ margin: '0 0 1.25rem', color: '#64748b', fontSize: '0.875rem' }}>
         Public holidays appear in blue on every employee's calendar.
-        {!loading && ` ${monthLabel(yearMonth)}: ${holidays.length} holiday${holidays.length !== 1 ? 's' : ''}, ${suggestedWorkingDays(yearMonth, byDate.keys())} working days.`}
+        {!loading && !choices.loading && ` ${monthLabel(yearMonth)}: ${holidays.length} holiday${holidays.length !== 1 ? 's' : ''}${choiceDays ? ` + ${choiceDays} choice holiday day${choiceDays === 1 ? '' : 's'} each` : ''}, ${suggestedWorkingDays(yearMonth, byDate.keys(), choiceDays)} working days.`}
       </p>
 
       <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -74,7 +83,7 @@ export default function AdminCalendarPage() {
               <MonthGrid
                 yearMonth={yearMonth}
                 markFor={d => byDate.has(d) ? 'holiday' : isSunday(d) ? 'sunday' : 'none'}
-                noteFor={d => byDate.get(d)}
+                noteFor={d => byDate.get(d) ?? (choiceDateName.has(d) ? `${choiceDateName.get(d)} (choice)` : undefined)}
                 onDayClick={pickDay}
               />
               <div style={{ marginTop: '0.875rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -111,6 +120,7 @@ export default function AdminCalendarPage() {
               maxLength={80}
               style={{ ...inputStyle, marginBottom: '1rem' }}
             />
+            {date && !editing && leaveOn(date).length > 0 && <RecountNote leave={leaveOn(date)} what="this day" />}
             {formError && (
               <div style={{ marginBottom: '0.875rem', padding: '0.625rem 0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: '0.8125rem' }}>
                 {formError}
@@ -153,6 +163,11 @@ export default function AdminCalendarPage() {
                       <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
                         {fmtDate(h.date)}{isSunday(h.date) && ' · falls on a Sunday'}
                       </div>
+                      {leaveOn(h.date).length > 0 && (
+                        <div style={{ fontSize: '0.75rem', color: '#92400e' }} title={leaveOn(h.date).map(l => l.full_name).join(', ')}>
+                          {leaveOn(h.date).length} on leave around it — removing it recounts their leave
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => handleRemove(h.date)}
@@ -171,6 +186,10 @@ export default function AdminCalendarPage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div style={{ marginTop: '1.25rem' }}>
+        <ChoiceHolidays yearMonth={yearMonth} data={choices} />
       </div>
     </div>
   )
