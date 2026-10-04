@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import type { CSSProperties } from 'react'
-import { Menu, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
+import { initials, useSidebarCollapsed } from '../lib/sidebar'
 
 /**
  * Nav badge counts: leave = pending requests + cancellations no admin has marked seen;
@@ -35,6 +36,109 @@ function useAttentionCounts() {
   return counts
 }
 
+const NAV = [
+  { to: '/admin/attendance',  label: 'Attendance',  Icon: Clock },
+  { to: '/admin/leave',       label: 'Leave',       Icon: CalendarCheck, badge: 'leave' },
+  { to: '/admin/corrections', label: 'Corrections', Icon: FilePen,       badge: 'corrections' },
+  { to: '/admin/employees',   label: 'Employees',   Icon: Users },
+  { to: '/admin/reports',     label: 'Reports',     Icon: ChartColumn },
+  { to: '/admin/team-stats',  label: 'Team Stats',  Icon: ChartLine },
+  { to: '/admin/calendar',    label: 'Calendar',    Icon: CalendarDays },
+] as const
+
+/** Admin shell: a sidebar on desktop (collapsible to icons), a top bar with a menu panel on phones. */
+export default function AdminLayout() {
+  const { employee, signOut } = useAuth()
+  const attention = useAttentionCounts()
+  const { pathname } = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const side = useSidebarCollapsed('sb.adminSidebarCollapsed')
+  const totalAttention = attention.leave + attention.corrections
+
+  // Phone menu closes when a page is picked
+  useEffect(() => { setMenuOpen(false) }, [pathname])
+
+  return (
+    <div className={`admin-shell${side.collapsed ? ' is-collapsed' : ''}`}>
+      <aside className="admin-side st-no-print">
+        <div className="admin-side-brand">
+          <img src="/logo.jpg" alt="Sproutbien" />
+          <span className="admin-chip">Admin</span>
+        </div>
+        <nav aria-label="Admin">
+          {NAV.map(n => {
+            const count = 'badge' in n ? attention[n.badge] : 0
+            return (
+              <NavLink key={n.to} to={n.to} title={n.label} aria-label={count > 0 ? `${n.label}, ${count} need attention` : undefined}>
+                <n.Icon size={20} strokeWidth={2} aria-hidden="true" />
+                <span className="admin-side-label">{n.label}</span>
+                {count > 0 && <span className="admin-side-badge">{count}</span>}
+                {count > 0 && <span className="admin-side-dot" />}
+              </NavLink>
+            )
+          })}
+        </nav>
+        <div className="admin-side-foot">
+          <div className="admin-side-user" title={employee?.full_name}>
+            <span className="admin-side-initials">{initials(employee?.full_name)}</span>
+            <span className="admin-side-who">
+              <strong>{employee?.full_name}</strong>
+              <span>Admin</span>
+            </span>
+          </div>
+          <button type="button" className="admin-side-btn" onClick={signOut} title="Sign out">
+            <LogOut size={20} aria-hidden="true" />
+            <span className="admin-side-label">Sign out</span>
+          </button>
+          <button type="button" className="admin-side-btn admin-side-collapse" onClick={side.toggle}
+            aria-label={side.collapsed ? 'Expand menu' : 'Collapse menu'} title={side.collapsed ? 'Expand menu' : 'Collapse menu'}>
+            {side.collapsed ? <PanelLeftOpen size={20} aria-hidden="true" /> : <PanelLeftClose size={20} aria-hidden="true" />}
+            <span className="admin-side-label">Collapse</span>
+          </button>
+        </div>
+      </aside>
+
+      <div className="admin-body">
+        <header className="st-no-print admin-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <img src="/logo.jpg" alt="Sproutbien" style={{ height: 32, display: 'block' }} />
+            <span className="admin-chip">Admin</span>
+          </div>
+          <button
+            className="admin-menu-btn"
+            onClick={() => setMenuOpen(o => !o)}
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            {!menuOpen && totalAttention > 0 && <span className="admin-menu-dot">{totalAttention}</span>}
+          </button>
+        </header>
+
+        {menuOpen && (
+          <div className="admin-menu st-no-print">
+            <nav>
+              {NAV.map(n => (
+                <NavLink key={n.to} to={n.to} style={menuLinkStyle}>
+                  {n.label}{'badge' in n && <Badge count={attention[n.badge]} />}
+                </NavLink>
+              ))}
+            </nav>
+            <div className="admin-menu-foot">
+              <span>{employee?.full_name}</span>
+              <button onClick={signOut}>Sign out</button>
+            </div>
+          </div>
+        )}
+
+        <div className="admin-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: '#f0fdf4', minHeight: '100vh', boxSizing: 'border-box' }}>
+          <Outlet />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Badge({ count }: { count: number }) {
   if (count <= 0) return null
   return (
@@ -45,126 +149,6 @@ function Badge({ count }: { count: number }) {
       {count}
     </span>
   )
-}
-
-const NAV = [
-  { to: '/admin/attendance',  label: 'Attendance' },
-  { to: '/admin/leave',       label: 'Leave',       badge: 'leave' },
-  { to: '/admin/corrections', label: 'Corrections', badge: 'corrections' },
-  { to: '/admin/employees',   label: 'Employees' },
-  { to: '/admin/reports',     label: 'Reports' },
-  { to: '/admin/team-stats',  label: 'Team Stats' },
-  { to: '/admin/calendar',    label: 'Calendar' },
-] as const
-
-export default function AdminLayout() {
-  const { employee, signOut } = useAuth()
-  const attention = useAttentionCounts()
-  const { pathname } = useLocation()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const totalAttention = attention.leave + attention.corrections
-
-  // Phone menu closes when a page is picked
-  useEffect(() => { setMenuOpen(false) }, [pathname])
-
-  const links = (style: typeof navStyle) => NAV.map(n => (
-    <NavLink key={n.to} to={n.to} style={style}>
-      {n.label}{'badge' in n && <Badge count={attention[n.badge]} />}
-    </NavLink>
-  ))
-
-  return (
-    <div style={{ minHeight: '100vh', background: '#f1f5f9' }}>
-      <header className="st-no-print admin-header" style={{
-        background: '#14532d',
-        padding: '0 1.5rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: 56,
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-        boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <img src="/logo.jpg" alt="Sproutbien" style={{ height: 32, display: 'block' }} />
-          <span style={{
-            fontSize: '0.625rem',
-            background: 'rgba(187,247,208,0.15)',
-            color: '#bbf7d0',
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            border: '1px solid rgba(187,247,208,0.25)',
-          }}>
-            Admin
-          </span>
-          <nav className="admin-nav" style={{ display: 'flex', gap: '0.125rem' }}>
-            {links(navStyle)}
-          </nav>
-        </div>
-        <button
-          className="admin-menu-btn"
-          onClick={() => setMenuOpen(o => !o)}
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={menuOpen}
-        >
-          {menuOpen ? <X size={22} /> : <Menu size={22} />}
-          {!menuOpen && totalAttention > 0 && <span className="admin-menu-dot">{totalAttention}</span>}
-        </button>
-        <div className="admin-user" style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
-          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.8125rem' }}>
-            {employee?.full_name}
-          </span>
-          <button
-            onClick={signOut}
-            style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.2)',
-              borderRadius: 6,
-              padding: '0.3125rem 0.75rem',
-              cursor: 'pointer',
-              fontSize: '0.8125rem',
-              color: 'rgba(255,255,255,0.75)',
-              fontFamily: 'inherit',
-            }}
-          >
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      {menuOpen && (
-        <div className="admin-menu st-no-print">
-          <nav>{links(menuLinkStyle)}</nav>
-          <div className="admin-menu-foot">
-            <span>{employee?.full_name}</span>
-            <button onClick={signOut}>Sign out</button>
-          </div>
-        </div>
-      )}
-
-      <div className="admin-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: '#f0fdf4', minHeight: 'calc(100vh - 56px)' }}>
-        <Outlet />
-      </div>
-    </div>
-  )
-}
-
-function navStyle({ isActive }: { isActive: boolean }): CSSProperties {
-  return {
-    textDecoration: 'none',
-    padding: '0.3125rem 0.75rem',
-    borderRadius: 6,
-    fontSize: '0.875rem',
-    fontWeight: isActive ? 600 : 400,
-    color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
-    background: isActive ? 'rgba(255,255,255,0.14)' : 'transparent',
-    letterSpacing: '-0.01em',
-  }
 }
 
 function menuLinkStyle({ isActive }: { isActive: boolean }): CSSProperties {
