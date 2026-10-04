@@ -17,6 +17,7 @@ import AdminTeamStatsPage from './pages/admin/AdminTeamStatsPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
 import AdminCalendarPage from './pages/admin/AdminCalendarPage'
 import AdminCorrectionsPage from './pages/admin/AdminCorrectionsPage'
+import AdminHiringPage from './pages/admin/AdminHiringPage'
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
             <Route path="employees"  element={<AdminEmployeesPage />} />
             <Route path="employees/:id" element={<AdminEmployeeProfilePage />} />
             <Route path="employees/:id/stats" element={<AdminEmployeeStatsPage />} />
+            <Route path="hiring"     element={<AdminHiringPage />} />
             <Route path="reports"    element={<AdminReportsPage />} />
             <Route path="team-stats" element={<AdminTeamStatsPage />} />
             <Route path="calendar"   element={<AdminCalendarPage />} />

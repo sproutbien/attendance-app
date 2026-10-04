@@ -95,6 +95,28 @@ export type LeaveDocument = {
   uploaded_at: string
 }
 
+export type CandidateStage = 'applied' | 'interview' | 'offer' | 'hired' | 'not_selected'
+
+/** Someone applying for a job. See migration 030. */
+export type Candidate = {
+  id: string
+  full_name: string
+  role: string | null           // position applied for
+  email: string | null
+  phone: string | null
+  source: string | null         // e.g. Referral, LinkedIn
+  notes: string
+  stage: CandidateStage
+  stage_changed_at: string
+  resume_path: string | null    // object in the 'candidate-resumes' bucket
+  resume_name: string | null
+  resume_type: string | null
+  resume_size: number | null
+  employee_id: string | null    // set when hired
+  created_by: string | null
+  created_at: string
+}
+
 /** Kinds of HR document kept per employee. Must match employee_document_category_ok() in migration 029. */
 export type DocCategory = 'Offer letter' | 'ID proof' | 'PAN card' | 'Bank proof' | 'Certificates' | 'Other'
 

@@ -10,8 +10,9 @@ import type { Employee, EmployeeOption, EmployeeStatus, Shift } from '../../type
 import { errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn } from './styles'
 
 /** Add / edit an employee's full profile. */
-export default function EmployeeFormModal({ existing, isSelf, employees, options, shifts, currentShift, upcomingShift, designations, saving, error, onSave, onClose }: {
+export default function EmployeeFormModal({ existing, prefill, isSelf, employees, options, shifts, currentShift, upcomingShift, designations, saving, error, onSave, onClose }: {
   existing: Employee | null         // null = add
+  prefill?: Partial<Pick<Employee, 'full_name' | 'email' | 'phone' | 'designation' | 'status'>>   // add: start from these (e.g. a hired candidate)
   isSelf: boolean                   // the signed-in admin's own record: status and role are locked
   employees: Employee[]             // reporting-manager choices
   options: { department: EmployeeOption[]; work_location: EmployeeOption[]; employment_type: EmployeeOption[] }
@@ -29,20 +30,20 @@ export default function EmployeeFormModal({ existing, isSelf, employees, options
 
   const [f, setF] = useState({
     employee_code:  s(existing?.employee_code),
-    full_name:      s(existing?.full_name),
-    email:          s(existing?.email),
+    full_name:      s(existing?.full_name ?? prefill?.full_name),
+    email:          s(existing?.email ?? prefill?.email),
     password:       '',
     role:           existing?.role ?? 'employee',
-    status:         existing?.status ?? 'active' as EmployeeStatus,
+    status:         existing?.status ?? prefill?.status ?? 'active' as EmployeeStatus,
     last_working_day: s(existing?.last_working_day),
     employment_type: s(existing?.employment_type),
     department:     s(existing?.department),
-    designation:    s(existing?.designation),
+    designation:    s(existing?.designation ?? prefill?.designation),
     work_location:  s(existing?.work_location),
     reporting_manager_id: s(existing?.reporting_manager_id),
     joining_date:   s(existing?.joining_date),
     salary:         existing?.monthly_salary != null ? String(existing.monthly_salary) : '',
-    phone:          existing?.phone ? `+${existing.phone}` : '',
+    phone:          existing?.phone ? `+${existing.phone}` : prefill?.phone ?? '',
     ec_name:        s(existing?.emergency_contact_name),
     ec_relation:    s(existing?.emergency_contact_relation),
     ec_phone:       s(existing?.emergency_contact_phone),

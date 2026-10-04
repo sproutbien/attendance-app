@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Users, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, PanelLeftClose, PanelLeftOpen, UserPlus, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
@@ -41,6 +41,7 @@ const NAV = [
   { to: '/admin/leave',       label: 'Leave',       Icon: CalendarCheck, badge: 'leave' },
   { to: '/admin/corrections', label: 'Corrections', Icon: FilePen,       badge: 'corrections' },
   { to: '/admin/employees',   label: 'Employees',   Icon: Users },
+  { to: '/admin/hiring',      label: 'Hiring',      Icon: UserPlus },
   { to: '/admin/reports',     label: 'Reports',     Icon: ChartColumn },
   { to: '/admin/team-stats',  label: 'Team Stats',  Icon: ChartLine },
   { to: '/admin/calendar',    label: 'Calendar',    Icon: CalendarDays },
