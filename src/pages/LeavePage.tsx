@@ -5,9 +5,9 @@ import AppLayout from '../components/AppLayout'
 import { useLeaveRequests } from '../hooks/useLeaveRequests'
 import type { HalfDaySession, LeaveRequest, LeaveTypeCode } from '../types'
 import { useAuth } from '../contexts/AuthContext'
-import { useHolidayDates, useLeaveBalances } from '../hooks/useLeaveBalances'
+import { useHolidayDates, useLeaveBalances, useLeaveCapPreview } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
-import { LEAVE_TYPE_LABELS, addDays, bookableAsOf, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, workingDays } from '../lib/leave'
+import { LEAVE_TYPE_LABELS, addDays, bookableAsOf, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, isMonthCapped, workingDays } from '../lib/leave'
 import { localDate, monthLabel } from '../lib/calendar'
 import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 import { fmtClock, sessionLabel } from '../lib/shifts'
@@ -97,6 +97,7 @@ export default function LeavePage() {
     if (ok) {
       current.refresh()
       booking.refresh()
+      capPreview.refresh()
       setStartDate('')
       setEndDate('')
       setReason('')
@@ -123,18 +124,27 @@ export default function LeavePage() {
   const typeBalance = booking.balances.find(b => b.leave_type === leaveType)
   const free = typeBalance?.is_paid ? bookableDays(typeBalance) : null
   const typeName = LEAVE_TYPE_LABELS[leaveType]
+  // Monthly Casual / Earned limits: paid days past a limit become Loss of Pay automatically (the server decides)
+  const capPreview = useLeaveCapPreview(startDate, rangeEnd, duration, leaveType)
+  const capPaid = isMonthCapped(leaveType) && capPreview.preview && requested != null ? Math.min(requested, capPreview.preview.capPaid) : requested
+  const capMonths = capPreview.preview?.months ?? []
   // Asking for more than is left: offer to use what's left and take the rest as Loss of Pay
   const paidPart = free == null ? 0 : Math.floor(free * 2) / 2   // leave is taken in half days
-  const splitOffer = free != null && paidPart > 0 && requested != null && requested > free
-    ? { key: `${leaveType}|${startDate}|${rangeEnd}|${duration}|${requested}`, paid: paidPart, lop: requested - paidPart }
+  const balanceShort = free != null && capPaid != null && paidPart < capPaid
+  const splitOffer = balanceShort && paidPart > 0
+    ? { key: `${leaveType}|${startDate}|${rangeEnd}|${duration}|${requested}`, paid: paidPart, lop: requested! - paidPart }
     : null
   const split = splitOffer && splitAccepted === splitOffer.key ? splitOffer : null
   const balanceBlock = free == null || split ? null
-    : paidPart === 0
+    : paidPart === 0 && (capPaid == null || capPaid > 0)
       ? `You have no ${typeName} leave left${typeBalance!.pending > 0 ? ` (${daysLabel(typeBalance!.pending)} waiting for approval)` : ''}. Choose another leave type or Loss of Pay.`
       : splitOffer
-        ? `Not enough ${typeName} leave: this request needs ${daysLabel(requested!)} but only ${daysLabel(free)} ${free === 1 ? 'is' : 'are'} available.`
+        ? `Not enough ${typeName} leave: this request needs ${daysLabel(capPaid!)} but only ${daysLabel(free)} ${free === 1 ? 'is' : 'are'} available.`
         : null
+  // Over a monthly limit (and the balance isn't the problem): shown, no consent needed
+  const capSplit = !balanceShort && free != null && requested != null && capPaid != null && capPaid < requested
+    ? { paid: capPaid, lop: requested - capPaid }
+    : null
 
   // Days that already have pending or approved leave can't be requested again
   const clash = startDate && rangeEnd && rangeEnd >= startDate
@@ -361,6 +371,22 @@ export default function LeavePage() {
                   <button type="button" onClick={() => { setLeaveType('lop'); setSuccess(false) }} style={{ ...splitBtn, background: 'transparent' }}>
                     Take all as Loss of Pay
                   </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {isMonthCapped(leaveType) && capMonths.length > 0 && !formBlock && (
+            <div style={alertStyle(capSplit ? '#fffbeb' : '#f8fafc', capSplit ? '#fde68a' : '#e2e8f0', capSplit ? '#92400e' : '#475569')}>
+              {capMonths.map(m => (
+                <div key={m.month}>
+                  <b>{monthLabel(m.month.slice(0, 7))}</b> is limited to {daysLabel(m.max_days)} of Casual + Earned leave
+                  {m.note && ` (${m.note})`}. You’ve used or requested {fmtDays(m.used)}.
+                </div>
+              ))}
+              {capSplit && (
+                <div style={{ marginTop: '0.375rem' }}>
+                  This request: <b>{daysLabel(capSplit.paid)} {typeName}</b> + <b style={{ color: '#b91c1c' }}>{daysLabel(capSplit.lop)} Loss of Pay</b> (unpaid).
                 </div>
               )}
             </div>

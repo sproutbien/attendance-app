@@ -144,6 +144,13 @@ export type LeaveBalance = {
   available: number | null         // null for Loss of Pay
 }
 
+/** Admin-set limit on paid Casual + Earned days per employee in one month. See migration 026. */
+export type LeaveMonthCap = {
+  month: string        // first of the month, "YYYY-MM-01"
+  max_days: number
+  note: string | null
+}
+
 export type LeaveAdjustment = {
   id: string
   employee_id: string

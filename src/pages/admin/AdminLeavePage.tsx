@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useLeaveQueue } from '../../hooks/useLeaveQueue'
 import type { LeaveRequestWithEmployee } from '../../hooks/useLeaveQueue'
@@ -7,6 +7,8 @@ import { LEAVE_TYPE_LABELS, daysLabel, fmtDays } from '../../lib/leave'
 import { useLeaveBalances } from '../../hooks/useLeaveBalances'
 import AdminLeaveBalances from '../../components/AdminLeaveBalances'
 import LeaveTypeSettings from '../../components/LeaveTypeSettings'
+import MonthlyLeaveCaps from '../../components/MonthlyLeaveCaps'
+import { supabase } from '../../lib/supabase'
 import { VoiceNotePlayer } from '../../components/VoiceNote'
 import { LeaveDocsPanel } from '../../components/LeaveDocuments'
 import { useLeaveDocuments } from '../../hooks/useLeaveDocuments'
@@ -75,7 +77,7 @@ export default function AdminLeavePage() {
       <div>
         <h1 style={{ margin: '0 0 1rem', fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Leave</h1>
         {tabs}
-        {tab === 'balances' ? <AdminLeaveBalances /> : <LeaveTypeSettings />}
+        {tab === 'balances' ? <AdminLeaveBalances /> : <><LeaveTypeSettings /><MonthlyLeaveCaps /></>}
       </div>
     )
   }
@@ -314,17 +316,30 @@ function PendingCard({
 /** Type, working days and the employee's balance for it, with a warning if part will be LOP. */
 function PendingBalanceLine({ request: r }: { request: LeaveRequestWithEmployee }) {
   const { balances, loading } = useLeaveBalances(r.employee_id, r.start_date)
+  // What approving now would pay: balance and the monthly Casual / Earned limits (migration 026)
+  const [preview, setPreview] = useState<{ paid: number; capPaid: number } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    supabase.rpc('leave_approval_preview', { p_request: r.id }).then(({ data }) => {
+      if (!cancelled && data) setPreview({ paid: Number(data.paid), capPaid: Number(data.cap_paid) })
+    })
+    return () => { cancelled = true }
+  }, [r.id, r.days])
   const b = balances.find(x => x.leave_type === r.leave_type)
   const days = r.days ?? 0
   const available = b?.available ?? 0
-  const lop = r.leave_type === 'lop' ? days : Math.max(0, days - Math.max(0, Math.floor(available * 2) / 2))
+  const lop = r.leave_type === 'lop' ? days
+    : preview ? days - preview.paid
+    : Math.max(0, days - Math.max(0, Math.floor(available * 2) / 2))
+  const overMonthLimit = preview != null && preview.capPaid < days && preview.capPaid <= Math.floor(available * 2) / 2
   return (
     <div style={{ fontSize: '0.8125rem', color: '#475569', marginBottom: '0.25rem' }}>
       <b>{LEAVE_TYPE_LABELS[r.leave_type]}</b> · {daysLabel(days)}
       {r.leave_type !== 'lop' && !loading && b && <> · balance {fmtDays(b.available)}</>}
       {!loading && lop > 0 && r.leave_type !== 'lop' && (
         <span style={{ color: '#b91c1c', fontWeight: 600 }}>
-          {' · '}{fmtDays(lop)} will be Loss of Pay{r.split_with_lop && ' (employee agreed)'}
+          {' · '}{fmtDays(lop)} will be Loss of Pay
+          {overMonthLimit ? ' (over the monthly limit)' : r.split_with_lop && ' (employee agreed)'}
         </span>
       )}
     </div>

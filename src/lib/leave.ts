@@ -7,6 +7,11 @@ export const LEAVE_TYPE_LABELS: Record<LeaveTypeCode, string> = {
   lop:    'Loss of Pay',
 }
 
+/** Types the admin's monthly limits apply to. Mirrors leave_type_month_capped() in migration 026. */
+export function isMonthCapped(type: LeaveTypeCode) {
+  return type === 'casual' || type === 'earned'
+}
+
 /** Leave year containing a date: Apr 2026 – Mar 2027 → 2026. Mirrors leave_year_of() in migration 014. */
 export function leaveYearOf(date: string) {
   const [y, m] = date.split('-').map(Number)
