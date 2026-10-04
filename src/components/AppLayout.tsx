@@ -21,7 +21,8 @@ const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
 ]
 
 /**
- * Employee shell: a sidebar on desktop (collapsible to icons); on phones the same sidebar slides out from a ☰ button.
+ * Employee shell: a sidebar on desktop (collapsible to icons); on phones the same sidebar slides out
+ * from a ☰ button, with the pages also one tap away in a bottom tab bar.
  * `wide` lets the page lay out its own full-width sections (Dashboard); `medium` is a roomier single column (Leaves).
  */
 export default function AppLayout({ children, wide = false, medium = false }: { children: React.ReactNode; wide?: boolean; medium?: boolean }) {
@@ -68,6 +69,11 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
         <Header onMenu={drawer.show} menuOpen={drawer.open} />
         {wide ? children : <div className={medium ? 'sb-narrow sb-medium' : 'sb-narrow'}>{children}</div>}
       </div>
+      <nav className="sb-tabbar" aria-label="Main">
+        {NAV.map(({ to, label, Icon }) => (
+          <NavLink key={to} to={to}><Icon size={22} strokeWidth={2} />{label}</NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

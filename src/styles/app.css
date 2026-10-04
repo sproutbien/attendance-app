@@ -350,6 +350,9 @@
 .sb-menu-btn:hover, .sb-drawer-close:hover { background: rgba(255, 255, 255, 0.1); filter: none !important; }
 .sb-drawer-backdrop { display: none; }
 
+/* Bottom tab bar (phones) */
+.sb-tabbar { display: none; }
+
 /* Collapsed to icons: desktop only (the phone menu always shows labels) */
 @media (min-width: 761px) {
   .sb-header { display: none; }
@@ -656,6 +659,29 @@
   .sb-side-collapse { display: none; }
   .sb-menu-btn, .sb-drawer-close { display: inline-flex; }
   .sb-drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(16, 38, 26, 0.45); }
+
+  .sb-tabbar {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 20;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  }
+  .sb-tabbar a {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 6px 0;
+    border-radius: 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .sb-tabbar a.active { color: var(--green-dark); background: var(--green-soft); }
+  .sb-app { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
 
   .sb-header { height: 58px; padding: 0 12px 0 6px; gap: 6px; }
   .sb-brand img { width: 36px; height: 36px; }
