@@ -13,6 +13,7 @@ import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import GettingStartedCard from '../components/GettingStartedCard'
+import PolicyUpdateNotice from '../components/PolicyUpdateNotice'
 import { notStartedYet } from '../lib/onboarding'
 import { fmtHolidayDay } from '../lib/holidays'
 import AppLayout from '../components/AppLayout'
@@ -146,6 +147,7 @@ export default function DashboardPage() {
       <div className="sb-container">
         {error && <p className="sb-error">{error}</p>}
 
+        <PolicyUpdateNotice />
         <GettingStartedCard />
 
         <section className="sb-today">

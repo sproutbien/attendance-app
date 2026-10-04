@@ -21,7 +21,7 @@ export function leaveStartsAt(shift: Shift, r: Pick<LeaveRequest, 'start_date' |
 }
 
 // Must match cancel_leave_request() in migration 020
-const CANCEL_CUTOFF_MS = 10 * 60_000
+export const CANCEL_CUTOFF_MS = 10 * 60_000
 
 /** Last moment the employee can cancel: 10 minutes before the leave starts. */
 export function cancelDeadline(shift: Shift, r: Pick<LeaveRequest, 'start_date' | 'half_day_session'>) {
@@ -40,7 +40,7 @@ export function leaveLength(r: Pick<LeaveRequest, 'start_date' | 'end_date' | 'd
 }
 
 /** Full-day leave for today can be requested until an hour after the shift starts. */
-const FULL_DAY_GRACE_MIN = 60
+export const FULL_DAY_GRACE_MIN = 60
 
 /**
  * Why a leave starting today can't be requested right now, or null if it can.

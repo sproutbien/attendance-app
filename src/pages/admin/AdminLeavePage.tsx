@@ -8,6 +8,7 @@ import { useLeaveBalances } from '../../hooks/useLeaveBalances'
 import AdminLeaveBalances from '../../components/AdminLeaveBalances'
 import LeaveTypeSettings from '../../components/LeaveTypeSettings'
 import MonthlyLeaveCaps from '../../components/MonthlyLeaveCaps'
+import LeavePolicySettings from '../../components/LeavePolicySettings'
 import { supabase } from '../../lib/supabase'
 import { VoiceNotePlayer } from '../../components/VoiceNote'
 import { LeaveDocsPanel } from '../../components/LeaveDocuments'
@@ -77,7 +78,7 @@ export default function AdminLeavePage() {
       <div>
         <h1 style={{ margin: '0 0 1rem', fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Leave</h1>
         {tabs}
-        {tab === 'balances' ? <AdminLeaveBalances /> : <><LeaveTypeSettings /><MonthlyLeaveCaps /></>}
+        {tab === 'balances' ? <AdminLeaveBalances /> : <><LeaveTypeSettings /><MonthlyLeaveCaps /><LeavePolicySettings /></>}
       </div>
     )
   }

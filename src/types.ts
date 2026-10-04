@@ -140,10 +140,19 @@ export type OnboardingTask = {
   details: string | null
   assignee: 'admin' | 'employee'
   document_category: DocCategory | null   // done by uploading a document of this kind
+  action: 'leave_policy' | null           // done by acknowledging the leave policy
   sort_order: number
   done_at: string | null
   done_by: string | null
   created_at: string
+}
+
+/** The admin's part of the leave policy (the rest comes from live settings). See migration 031. */
+export type LeavePolicy = {
+  additional_rules: string
+  version: number            // times published to everyone; 0 = never
+  published_at: string | null
+  published_by: string | null
 }
 
 export type OnboardingTemplateTask = Pick<OnboardingTask, 'id' | 'title' | 'details' | 'assignee' | 'document_category' | 'sort_order'>

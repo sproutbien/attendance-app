@@ -165,6 +165,10 @@ export default function LeavePage() {
   return (
     <AppLayout medium>
       <LeaveBalanceCards balances={current.balances} loading={current.loading} error={current.error} />
+      <p style={{ margin: '-0.5rem 0 1.25rem', fontSize: '0.875rem' }}>
+        <Link to="/leave-policy" style={{ color: 'var(--green-dark, #1d5a1f)', fontWeight: 700 }}>Read the leave policy</Link>
+        <span style={{ color: 'var(--text-muted, #5b6f61)' }}> · how leave is credited, holidays, limits and timings</span>
+      </p>
 
       {missingDocs.length > 0 && (
         <div style={{ ...alertStyle('#fffbeb', '#fde68a', '#92400e'), marginBottom: '1.5rem' }}>

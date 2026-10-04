@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import type { CSSProperties } from 'react'
 import { Check, ListChecks, Paperclip } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -75,7 +76,10 @@ function Step({ task: t, data }: { task: OnboardingTask; data: ReturnType<typeof
         {t.details && <span style={{ display: 'block', fontSize: '0.8125rem', color: 'var(--text-muted, #5b6f61)' }}>{t.details}</span>}
         {error && <span style={{ display: 'block', fontSize: '0.8125rem', color: 'var(--red, #b42318)' }}>{error}</span>}
       </span>
-      {t.document_category ? (
+      {t.action === 'leave_policy' ? (
+        done ? <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--green, #3d7f1f)' }}>Read</span>
+          : <Link to="/leave-policy" style={{ ...btn, textDecoration: 'none' }}>Read it</Link>
+      ) : t.document_category ? (
         done ? <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--green, #3d7f1f)' }}>Uploaded</span> : (
           <>
             <button type="button" onClick={() => input.current?.click()} disabled={busy} style={btn}>
