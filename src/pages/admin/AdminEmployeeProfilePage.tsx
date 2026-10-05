@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Camera, ChartColumn } from 'lucide-react'
+import { ArrowLeft, Camera, ChartColumn, KeyRound } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { profileUpdates, useEmployeeManagement, useEmployeeOptions, useHrNotes } from '../../hooks/useEmployeeManagement'
 import type { EmployeeFormData } from '../../hooks/useEmployeeManagement'
@@ -11,6 +11,7 @@ import { useShifts } from '../../hooks/useShifts'
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar'
 import StatusBadge from '../../components/employees/StatusBadge'
 import EmployeeFormModal from '../../components/employees/EmployeeFormModal'
+import ResetPasswordModal from '../../components/employees/ResetPasswordModal'
 import { DocumentsCard, OnboardingCard } from '../../components/onboarding/AdminOnboarding'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { daysUntil, notStartedYet, relativeDays } from '../../lib/onboarding'
@@ -27,6 +28,7 @@ export default function AdminEmployeeProfilePage() {
   const lists = useEmployeeOptions()
   const shifts = useShifts()
   const [editing, setEditing] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [flash, setFlash] = useState<string | null>(null)
   const onboarding = useOnboarding(id)
 
@@ -90,13 +92,21 @@ export default function AdminEmployeeProfilePage() {
           {e.status === 'on_notice' && e.last_working_day && (
             <div style={{ color: '#92400e', fontSize: '0.8125rem', marginTop: 6 }}>Last working day {fmtDate(e.last_working_day)}.</div>
           )}
+          {e.must_change_password && !former && (
+            <div style={{ color: '#64748b', fontSize: '0.8125rem', marginTop: 6 }}>Still on a temporary password; asked to choose their own at the next login.</div>
+          )}
           {notStartedYet(e) && (
             <div style={{ color: '#1d4ed8', fontSize: '0.8125rem', marginTop: 6 }}>
               Joins {fmtDate(e.joining_date!)} ({relativeDays(daysUntil(e.joining_date!))}). Can log in to finish onboarding; check-in opens that day.
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {!former && e.id !== me?.id && (
+            <button onClick={() => setResetting(true)} style={{ ...ghostBtn, padding: '0.5rem 0.875rem', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <KeyRound size={16} /> Reset password
+            </button>
+          )}
           <Link to={`/admin/employees/${e.id}/stats`} style={{ ...ghostBtn, padding: '0.5rem 0.875rem', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
             <ChartColumn size={16} /> Statistics
           </Link>
@@ -170,6 +180,10 @@ export default function AdminEmployeeProfilePage() {
 
         <HrNotes key={`${e.id}-${e.status}`} employee={e} adminId={me?.id ?? ''} />
       </div>
+
+      {resetting && (
+        <ResetPasswordModal employee={e} onDone={refetch} onClose={() => setResetting(false)} />
+      )}
 
       {editing && (
         <EmployeeFormModal
