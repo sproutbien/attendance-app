@@ -21,6 +21,8 @@ export type Branding = {
   primary_color: string
   logo_path: string | null
   icon_path: string | null
+  admin_edit_look: boolean      // customer admins may change logo, icon, colour (migration 036)
+  admin_edit_details: boolean   // … and names + contact details
   updated_at?: string
 }
 
@@ -35,6 +37,8 @@ export const DEFAULT_BRANDING: Branding = {
   primary_color: '#2a7a22',
   logo_path: null,
   icon_path: null,
+  admin_edit_look: false,
+  admin_edit_details: false,
 }
 
 export const BRANDING_BUCKET = 'branding'

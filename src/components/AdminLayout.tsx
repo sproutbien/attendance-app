@@ -84,8 +84,8 @@ export default function AdminLayout() {
               </NavLink>
             )
           })}
-          {superadmin && (
-            <NavLink to="/superadmin" title="Branding">
+          {(superadmin || branding.admin_edit_look || branding.admin_edit_details) && (
+            <NavLink to={superadmin ? '/superadmin' : '/admin/branding'} title="Branding">
               <Palette size={20} strokeWidth={2} aria-hidden="true" />
               <span className="admin-side-label">Branding</span>
             </NavLink>

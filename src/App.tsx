@@ -21,6 +21,7 @@ import AdminCalendarPage from './pages/admin/AdminCalendarPage'
 import AdminCorrectionsPage from './pages/admin/AdminCorrectionsPage'
 import AdminHiringPage from './pages/admin/AdminHiringPage'
 import BrandingPage from './pages/superadmin/BrandingPage'
+import AdminBrandingPage from './pages/admin/AdminBrandingPage'
 
 export default function App() {
   return (
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="reports"    element={<AdminReportsPage />} />
               <Route path="team-stats" element={<AdminTeamStatsPage />} />
               <Route path="calendar"   element={<AdminCalendarPage />} />
+              <Route path="branding"   element={<AdminBrandingPage />} />
             </Route>
 
             {/* Vendor only (white-label branding); the page checks it's a superadmin */}
