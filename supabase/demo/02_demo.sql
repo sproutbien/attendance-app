@@ -458,13 +458,16 @@ BEGIN
     PERFORM demo_upsert_user(demo_id(p.n), p.email, p.full_name, 'Demo@2026');
     INSERT INTO employees (id, full_name, email, role, department, designation, status, monthly_salary,
                            phone, joining_date, employment_type, work_location, last_working_day,
-                           emergency_contact_name, emergency_contact_relation, emergency_contact_phone, created_at)
+                           emergency_contact_name, emergency_contact_relation, emergency_contact_phone, created_at, photo_path)
     VALUES (demo_id(p.n), p.full_name, p.email, p.role, p.department, p.designation, p.status, p.salary,
             '9198470' || lpad((10000 + p.n * 137)::text, 5, '0'),
             COALESCE(p.joined, v_today - p.joined_ago), p.emp_type, p.location,
             CASE WHEN p.lwd_off IS NOT NULL THEN v_today + p.lwd_off END,
             p.ec_name, p.ec_relation, '9194470' || lpad((20000 + p.n * 211)::text, 5, '0'),
-            demo_ts(COALESCE(p.joined, v_today - p.joined_ago), time '10:00') + make_interval(mins => p.n));
+            demo_ts(COALESCE(p.joined, v_today - p.joined_ago), time '10:00') + make_interval(mins => p.n),
+            -- Sample avatar uploaded once to avatars/<id>/demo.png (kept across resets)
+            (SELECT o.name FROM storage.objects o
+             WHERE o.bucket_id = 'avatars' AND o.name = demo_id(p.n)::text || '/demo.png'));
   END LOOP;
   FOR p IN SELECT * FROM demo_people WHERE manager IS NOT NULL LOOP
     UPDATE employees SET reporting_manager_id = demo_id(p.manager) WHERE id = demo_id(p.n);

@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import type { Employee, EmployeeOptionKind, EmployeeStatus } from '../types'
+import { IS_DEMO } from './demo'
 
 // Employment statuses — must match the CHECK constraint and login rules in migration 019.
 
@@ -84,7 +85,10 @@ export async function savePhoto(employee: Pick<Employee, 'id' | 'photo_path'>, f
   }
   const { error } = await supabase.rpc('set_employee_photo', { p_employee: employee.id, p_path: path })
   if (error) throw new Error(error.message)
-  if (employee.photo_path) await supabase.storage.from('avatars').remove([employee.photo_path])
+  // Demo: keep the sample avatars, the nightly reset puts them back
+  if (employee.photo_path && !(IS_DEMO && employee.photo_path.endsWith('/demo.png'))) {
+    await supabase.storage.from('avatars').remove([employee.photo_path])
+  }
   return path
 }
 
