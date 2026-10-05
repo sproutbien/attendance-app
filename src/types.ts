@@ -23,6 +23,7 @@ export type Employee = {
   emergency_contact_relation: string | null
   emergency_contact_phone: string | null
   probation_end_date: string | null
+  selfie_rule: 'default' | 'always' | 'never'   // check-in selfie: follow the company setting or override
   deleted_at: string | null       // set while in the bin; purged 6 months later
   created_at: string
 }
@@ -49,6 +50,8 @@ export type AttendanceRecord = {
   half_day_session: HalfDaySession | null  // set when half of this day is approved leave
   paid_leave: number               // part of the day covered by paid leave (0, 0.5, 1)
   notes: string | null
+  selfie_path: string | null           // check-in selfie in 'checkin-selfies' (deleted after 15 days)
+  selfie_missing_reason: string | null // checked in without the required selfie, and why
 }
 
 export const STATUS_COLORS: Record<AttendanceRecord['status'], { bg: string; text: string }> = {

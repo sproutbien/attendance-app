@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useAdminAttendance } from '../../hooks/useAdminAttendance'
 import type { AdminAttendanceRow } from '../../hooks/useAdminAttendance'
@@ -8,6 +8,8 @@ import { fmtDuration, minBreakTopUp, totalBreakSeconds } from '../../lib/breaks'
 import { useShifts } from '../../hooks/useShifts'
 import type { Shift } from '../../types'
 import { localDate } from '../../lib/calendar'
+import { selfieExpired, selfieUrls } from '../../lib/selfies'
+import { SelfieCell, SelfieReview, SelfieSetting } from '../../components/SelfieAdmin'
 
 const todayISO = () => localDate()
 
@@ -70,6 +72,18 @@ export default function AdminAttendancePage() {
 
   const isToday = selectedDate === today
 
+  // Signed links for the day's selfies (private bucket)
+  const [selfies, setSelfies] = useState<Record<string, string>>({})
+  const [reviewing, setReviewing] = useState<AdminAttendanceRow | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    setSelfies({})
+    if (selfieExpired(selectedDate)) return
+    const paths = rows.map(r => r.record?.selfie_path).filter(Boolean) as string[]
+    selfieUrls(paths).then(urls => { if (!cancelled) setSelfies(urls) })
+    return () => { cancelled = true }
+  }, [rows, selectedDate])
+
   return (
     <div>
       {/* Page header + date nav */}
@@ -109,6 +123,8 @@ export default function AdminAttendancePage() {
       <p style={{ margin: '-1rem 0 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
         {fmtDateLabel(selectedDate)}
       </p>
+
+      <SelfieSetting />
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -187,14 +203,20 @@ export default function AdminAttendancePage() {
           <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Employee', 'Department', 'Status', 'Check In', 'Check Out', 'Break'].map(h => (
+                {['Employee', 'Department', 'Status', 'Check In', 'Selfie', 'Check Out', 'Break'].map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filteredRows.map(row => (
-                <AttendanceTableRow key={row.employee.id} row={row} shift={shiftOn(row.employee.id, selectedDate)} />
+                <AttendanceTableRow
+                  key={row.employee.id}
+                  row={row}
+                  shift={shiftOn(row.employee.id, selectedDate)}
+                  selfieUrl={row.record?.selfie_path ? selfies[row.record.selfie_path] : undefined}
+                  onSelfie={() => setReviewing(row)}
+                />
               ))}
             </tbody>
           </table>
@@ -206,11 +228,25 @@ export default function AdminAttendancePage() {
           {filteredRows.length} of {rows.length} employee{rows.length !== 1 ? 's' : ''}
         </p>
       )}
+
+      {reviewing?.record && (
+        <SelfieReview
+          employee={reviewing.employee}
+          record={reviewing.record}
+          url={reviewing.record.selfie_path ? selfies[reviewing.record.selfie_path] : undefined}
+          onClose={() => setReviewing(null)}
+        />
+      )}
     </div>
   )
 }
 
-function AttendanceTableRow({ row, shift }: { row: AdminAttendanceRow; shift: Shift | null }) {
+function AttendanceTableRow({ row, shift, selfieUrl, onSelfie }: {
+  row: AdminAttendanceRow
+  shift: Shift | null
+  selfieUrl: string | undefined
+  onSelfie: () => void
+}) {
   const colors = STATUS_COLORS[row.effectiveStatus]
   const topUp = minBreakTopUp(row.record, shift)
   return (
@@ -231,6 +267,9 @@ function AttendanceTableRow({ row, shift }: { row: AdminAttendanceRow; shift: Sh
         </span>
       </td>
       <td style={tdStyle}>{fmtTime(row.record?.check_in_time)}</td>
+      <td style={{ ...tdStyle, paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+        <SelfieCell record={row.record} url={selfieUrl} onOpen={onSelfie} />
+      </td>
       <td style={tdStyle}>{fmtTime(row.record?.check_out_time)}</td>
       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
         {fmtDuration(totalBreakSeconds(row.record))}

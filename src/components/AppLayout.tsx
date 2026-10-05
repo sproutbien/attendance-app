@@ -6,6 +6,7 @@ import { photoUrl, savePhoto } from '../lib/employees'
 import { useTheme } from '../lib/theme'
 import type { ThemeChoice } from '../lib/theme'
 import { useDrawer, useSidebarCollapsed } from '../lib/sidebar'
+import { sweepExpiredSelfies } from '../lib/selfies'
 import '../styles/app.css'
 
 const NAV = [
@@ -31,6 +32,7 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
   const drawer = useDrawer('(min-width: 761px)')
   const closeBtn = useRef<HTMLButtonElement>(null)
   useEffect(() => { if (drawer.open) closeBtn.current?.focus() }, [drawer.open])
+  useEffect(() => { sweepExpiredSelfies() }, [])   // selfies past 15 days
 
   return (
     <div className={`sb-app sb-shell${side.collapsed ? ' is-collapsed' : ''}`} data-theme={theme.dataTheme}>

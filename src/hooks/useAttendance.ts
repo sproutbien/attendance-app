@@ -48,12 +48,13 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     fetchMonth()
   }, [fetchToday, fetchMonth])
 
-  async function checkIn() {
-    if (!employee || checkingIn.current) return
+  /** `selfie`: the uploaded check-in selfie, or why there isn't one (migration 032). */
+  async function checkIn(selfie?: { selfie_path: string } | { selfie_missing_reason: string }) {
+    if (!employee || checkingIn.current) return { record: null, error: null }
     checkingIn.current = true
     setIsSubmitting(true)
     setError(null)
-    const fields = { check_in_time: new Date().toISOString() }
+    const fields = { check_in_time: new Date().toISOString(), ...selfie }
 
     // A row for today may already exist (approved leave, admin entry, another tab),
     // so fill that row in instead of inserting a duplicate.
@@ -92,6 +93,7 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     }
     checkingIn.current = false
     setIsSubmitting(false)
+    return { record: (result.data ?? null) as AttendanceRecord | null, error: result.error?.message ?? null }
   }
 
   async function updateToday(changes: Partial<AttendanceRecord>) {

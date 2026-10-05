@@ -6,6 +6,8 @@ import {
 import type { EmployeeFormData } from '../../hooks/useEmployeeManagement'
 import { localDate } from '../../lib/calendar'
 import { shiftHours } from '../../lib/shifts'
+import { SELFIE_RULE_LABELS } from '../../lib/selfies'
+import type { SelfieRule } from '../../lib/selfies'
 import type { Employee, EmployeeOption, EmployeeStatus, Shift } from '../../types'
 import { errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn } from './styles'
 
@@ -48,6 +50,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
     ec_relation:    s(existing?.emergency_contact_relation),
     ec_phone:       s(existing?.emergency_contact_phone),
     probation_end:  s(existing?.probation_end_date),
+    selfie_rule:    existing?.selfie_rule ?? 'default' as SelfieRule,
   })
   const [startOnboarding, setStartOnboarding] = useState(true)
   // Shift changes start tomorrow by default (today's attendance keeps today's shift); new staff start today
@@ -92,6 +95,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
       emergency_contact_relation: t(f.ec_relation),
       emergency_contact_phone:    t(f.ec_phone),
       probation_end_date: f.status === 'probation' ? t(f.probation_end) : existing?.probation_end_date ?? null,
+      selfie_rule:    f.selfie_rule,
       startOnboarding: isEdit ? undefined : startOnboarding,
     })
   }
@@ -221,6 +225,18 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
                 <p style={hintStyle}>You're reminded on the Employees page two weeks before, with a button to make them Active.</p>
               </Field>
             )}
+            <Field label="Selfie at check-in">
+              <select value={f.selfie_rule} onChange={set('selfie_rule')} style={inputStyle}>
+                {(Object.keys(SELFIE_RULE_LABELS) as SelfieRule[]).map(r => <option key={r} value={r}>{SELFIE_RULE_LABELS[r]}</option>)}
+              </select>
+              <p style={hintStyle}>
+                {f.selfie_rule === 'default'
+                  ? 'Follows the switch on the Attendance page.'
+                  : f.selfie_rule === 'always'
+                    ? 'Takes a selfie to check in, even when the switch is off.'
+                    : 'Checks in without a selfie, even when the switch is on.'}
+              </p>
+            </Field>
             {leaving && (
               <Field label="Last working day">
                 <input type="date" value={f.last_working_day} onChange={set('last_working_day')} required={f.status === 'on_notice'} style={inputStyle} />

@@ -4,7 +4,7 @@ import { TRACKED_STATUSES } from '../lib/employees'
 import type { Employee, AttendanceRecord } from '../types'
 
 export type AdminAttendanceRow = {
-  employee: Pick<Employee, 'id' | 'full_name' | 'department'>
+  employee: Pick<Employee, 'id' | 'full_name' | 'department' | 'photo_path'>
   record: AttendanceRecord | null
   effectiveStatus: AttendanceRecord['status']
 }
@@ -24,7 +24,7 @@ export function useAdminAttendance(selectedDate: string) {
       const [{ data: employees, error: empErr }, { data: records, error: recErr }] = await Promise.all([
         supabase
           .from('employees')
-          .select('id, full_name, department, status, joining_date')
+          .select('id, full_name, department, photo_path, status, joining_date')
           .in('status', TRACKED_STATUSES)
           .order('full_name'),
         supabase

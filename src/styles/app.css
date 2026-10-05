@@ -815,6 +815,23 @@
 .sb-btn-primary { border: none; background: linear-gradient(90deg, var(--green-btn-1), var(--green-btn-2)); color: #fff; }
 .sb-btn-primary:disabled, .sb-btn-ghost:disabled { opacity: 0.6; cursor: not-allowed; }
 
+/* Check-in selfie */
+.sb-selfie { max-width: 420px; }
+.sb-selfie-frame {
+  position: relative; aspect-ratio: 1; margin-bottom: 14px; overflow: hidden;
+  border-radius: 14px; background: #0b1510;
+}
+.sb-selfie-frame video, .sb-selfie-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sb-selfie-frame video { transform: scaleX(-1); }   /* mirror, like the saved photo */
+.sb-selfie-wait { position: absolute; inset: 0; display: grid; place-items: center; color: #c9d9cd; font-size: 14px; }
+.sb-selfie .sb-modal-actions { justify-content: center; }
+.sb-selfie-snap { display: inline-flex; align-items: center; gap: 8px; }
+.sb-selfie-link {
+  display: block; margin: 12px auto 0; padding: 0; border: none; background: none;
+  font: inherit; font-size: 13px; color: var(--text-muted); text-decoration: underline; cursor: pointer;
+}
+.sb-selfie-privacy { margin: 14px 0 0; font-size: 12px; color: var(--text-faint); text-align: center; }
+
 @media (max-width: 480px) {
   .sb-modal-grid { grid-template-columns: 1fr; }
   .sb-corr-list li { flex-direction: column; }

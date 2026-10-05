@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
 import { useDrawer, useSidebarCollapsed } from '../lib/sidebar'
 import { initials } from '../lib/employees'
+import { sweepExpiredSelfies } from '../lib/selfies'
 
 /**
  * Nav badge counts: leave = pending requests + cancellations no admin has marked seen;
@@ -55,6 +56,7 @@ export default function AdminLayout() {
   const drawer = useDrawer('(min-width: 901px)')
   const closeBtn = useRef<HTMLButtonElement>(null)
   useEffect(() => { if (drawer.open) closeBtn.current?.focus() }, [drawer.open])
+  useEffect(() => { sweepExpiredSelfies() }, [])   // selfies past 15 days
   const totalAttention = attention.leave + attention.corrections
 
   return (

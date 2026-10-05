@@ -627,6 +627,11 @@ BEGIN
            leave_adjustments, payroll_settings, public_holidays, employee_shifts, shifts,
            employee_hr_notes, employee_options, demo_today_plan, employees CASCADE;
 
+  -- Single-row settings point at employees (updated_by / published_by), so the
+  -- TRUNCATE above empties them too: put them back (selfie switched off)
+  INSERT INTO attendance_settings (id) VALUES (true) ON CONFLICT (id) DO UPDATE SET selfie_required = false;
+  INSERT INTO leave_policy (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
+
   PERFORM demo_seed();
   PERFORM set_config('sb.demo_reset', 'off', true);
 END;

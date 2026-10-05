@@ -14,6 +14,8 @@ import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import GettingStartedCard from '../components/GettingStartedCard'
 import PolicyUpdateNotice from '../components/PolicyUpdateNotice'
+import SelfieCheckIn from '../components/SelfieCheckIn'
+import { selfieRequired } from '../lib/selfies'
 import { notStartedYet } from '../lib/onboarding'
 import { fmtHolidayDay } from '../lib/holidays'
 import AppLayout from '../components/AppLayout'
@@ -105,7 +107,21 @@ export default function DashboardPage() {
   const { shift, loaded: shiftLoaded } = useMyShift()
   const todaysLeave = useTodaysLeave(employee?.id)
   const [leavePopup, setLeavePopup] = useState(false)
+  const [selfieOpen, setSelfieOpen] = useState(false)
+  const [askingSelfie, setAskingSelfie] = useState(false)
   const navigate = useNavigate()
+
+  // Asks the server each time, so switching the selfie on applies straight away
+  async function startCheckIn() {
+    if (todaysLeave) { setLeavePopup(true); return }
+    if (!employee) return
+    setAskingSelfie(true)
+    const need = await selfieRequired(employee.id)
+    setAskingSelfie(false)
+    if (need) { setSelfieOpen(true); return }
+    const { error } = await checkIn()
+    if (error === 'A selfie is needed to check in.') setSelfieOpen(true)
+  }
 
   const state: DayState =
     todayRecord === undefined ? 'loading'
@@ -154,13 +170,13 @@ export default function DashboardPage() {
           <CheckInPanel
             state={state}
             record={todayRecord ?? null}
-            isSubmitting={isSubmitting}
+            isSubmitting={isSubmitting || askingSelfie}
             halfDay={halfDay}
             pastSplit={pastSplit}
             shift={shift}
             onLeave={!!todaysLeave}
             startsOn={startsOn}
-            onCheckIn={() => todaysLeave ? setLeavePopup(true) : checkIn()}
+            onCheckIn={startCheckIn}
             onCheckOut={() => setConfirmingOut(true)}
           />
           <TodayTime
@@ -202,6 +218,10 @@ export default function DashboardPage() {
           onSubmit={corrections.submit}
           onClose={() => setCorrecting(null)}
         />
+      )}
+
+      {selfieOpen && employee && (
+        <SelfieCheckIn employeeId={employee.id} onCheckIn={checkIn} onClose={() => setSelfieOpen(false)} />
       )}
 
       {leavePopup && todaysLeave && (
