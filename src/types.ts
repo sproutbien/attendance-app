@@ -24,7 +24,8 @@ export type Employee = {
   emergency_contact_phone: string | null
   probation_end_date: string | null
   must_change_password: boolean   // still on the admin's temporary password (migration 033)
-  selfie_rule: 'default' | 'always' | 'never'   // check-in selfie: follow the company setting or override
+  selfie_rule: 'default' | 'always' | 'never'
+  geofence_rule: 'default' | 'always' | 'never' // location check at check-in (migration 037)   // check-in selfie: follow the company setting or override
   deleted_at: string | null       // set while in the bin; purged 6 months later
   created_at: string
 }
@@ -35,6 +36,10 @@ export type EmployeeOption = {
   id: string
   kind: EmployeeOptionKind
   name: string
+  // Office area for a work location (migration 037); all null = not checked
+  lat?: number | null
+  lng?: number | null
+  radius_m?: number | null
 }
 
 export type HalfDaySession = 'morning' | 'afternoon'
@@ -53,6 +58,14 @@ export type AttendanceRecord = {
   notes: string | null
   selfie_path: string | null           // check-in selfie in 'checkin-selfies' (deleted after 15 days)
   selfie_missing_reason: string | null // checked in without the required selfie, and why
+  // Location check at check-in (migration 037); coordinates are cleared after 30 days
+  check_in_lat: number | null
+  check_in_lng: number | null
+  check_in_accuracy_m: number | null
+  check_in_distance_m: number | null
+  geofence_status: 'inside' | 'unsure' | 'outside' | 'no_location' | null
+  geofence_location: string | null
+  geofence_note: string | null
 }
 
 export const STATUS_COLORS: Record<AttendanceRecord['status'], { bg: string; text: string }> = {

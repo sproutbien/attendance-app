@@ -7,7 +7,7 @@ export type EmployeeProfileFields = Pick<Employee,
   | 'full_name' | 'role' | 'status' | 'department' | 'designation' | 'monthly_salary' | 'phone'
   | 'joining_date' | 'employment_type' | 'work_location' | 'reporting_manager_id' | 'last_working_day'
   | 'emergency_contact_name' | 'emergency_contact_relation' | 'emergency_contact_phone' | 'probation_end_date'
-  | 'selfie_rule'
+  | 'selfie_rule' | 'geofence_rule'
 > & { employee_code: string | null }   // null = assign the next SB number
 
 export type EmployeeFormData = EmployeeProfileFields & {
@@ -115,7 +115,7 @@ export function useEmployeeOptions() {
   const [options, setOptions] = useState<EmployeeOption[]>([])
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('employee_options').select('id, kind, name').order('name')
+    const { data } = await supabase.from('employee_options').select('id, kind, name, lat, lng, radius_m').order('name')
     setOptions(data ?? [])
   }, [])
 
@@ -135,6 +135,9 @@ export function useEmployeeOptions() {
     add:    (kind: EmployeeOptionKind, name: string) => run(supabase.from('employee_options').insert({ kind, name: name.trim() })),
     rename: (id: string, name: string) => run(supabase.rpc('rename_employee_option', { p_id: id, p_name: name })),
     remove: (id: string) => run(supabase.from('employee_options').delete().eq('id', id)),
+    /** Office area for a work location; null clears it (no location check there). */
+    setArea: (id: string, area: { lat: number; lng: number; radius_m: number } | null) =>
+      run(supabase.from('employee_options').update(area ?? { lat: null, lng: null, radius_m: null }).eq('id', id)),
   }
 }
 

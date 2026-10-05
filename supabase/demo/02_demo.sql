@@ -443,6 +443,9 @@ BEGIN
     ('employment_type', 'Full-time'), ('employment_type', 'Part-time'),
     ('employment_type', 'Intern'), ('employment_type', 'Contract')
   ON CONFLICT DO NOTHING;
+  -- Office areas for the location check (campus-sized; approximate centres)
+  UPDATE employee_options SET lat = 8.5574,  lng = 76.8810, radius_m = 800 WHERE kind = 'work_location' AND name = 'Trivandrum — Technopark';
+  UPDATE employee_options SET lat = 10.0103, lng = 76.3620, radius_m = 800 WHERE kind = 'work_location' AND name = 'Kochi — Infopark';
 
   -- Shifts
   INSERT INTO shifts (name, start_time, end_time, late_after, half_day_after, split_time, is_default, min_break_minutes)
@@ -633,7 +636,8 @@ BEGIN
 
   -- Single-row settings point at employees (updated_by / published_by), so the
   -- TRUNCATE above empties them too: put them back (selfie switched off)
-  INSERT INTO attendance_settings (id) VALUES (true) ON CONFLICT (id) DO UPDATE SET selfie_required = false;
+  INSERT INTO attendance_settings (id) VALUES (true)
+    ON CONFLICT (id) DO UPDATE SET selfie_required = false, geofence_required = false, geofence_strict = false;
   INSERT INTO leave_policy (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
 
   PERFORM demo_seed();

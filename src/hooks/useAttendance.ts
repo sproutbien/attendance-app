@@ -48,13 +48,16 @@ export function useAttendance(yearMonth = currentYearMonth()) {
     fetchMonth()
   }, [fetchToday, fetchMonth])
 
-  /** `selfie`: the uploaded check-in selfie, or why there isn't one (migration 032). */
-  async function checkIn(selfie?: { selfie_path: string } | { selfie_missing_reason: string }) {
+  /**
+   * `extra`: the check-in selfie or why there isn't one (migration 032), and the
+   * location reading or why there isn't one (migration 037).
+   */
+  async function checkIn(extra?: Partial<AttendanceRecord>) {
     if (!employee || checkingIn.current) return { record: null, error: null }
     checkingIn.current = true
     setIsSubmitting(true)
     setError(null)
-    const fields = { check_in_time: new Date().toISOString(), ...selfie }
+    const fields = { check_in_time: new Date().toISOString(), ...extra }
 
     // A row for today may already exist (approved leave, admin entry, another tab),
     // so fill that row in instead of inserting a duplicate.

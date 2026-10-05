@@ -10,6 +10,7 @@ import type { Shift } from '../../types'
 import { localDate } from '../../lib/calendar'
 import { selfieExpired, selfieUrls } from '../../lib/selfies'
 import { SelfieCell, SelfieReview, SelfieSetting } from '../../components/SelfieAdmin'
+import { GeofenceSetting, LocationCell } from '../../components/GeofenceAdmin'
 
 const todayISO = () => localDate()
 
@@ -125,6 +126,7 @@ export default function AdminAttendancePage() {
       </p>
 
       <SelfieSetting />
+      <GeofenceSetting />
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -203,7 +205,7 @@ export default function AdminAttendancePage() {
           <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Employee', 'Department', 'Status', 'Check In', 'Selfie', 'Check Out', 'Break'].map(h => (
+                {['Employee', 'Department', 'Status', 'Check In', 'Selfie', 'Location', 'Check Out', 'Break'].map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -270,6 +272,7 @@ function AttendanceTableRow({ row, shift, selfieUrl, onSelfie }: {
       <td style={{ ...tdStyle, paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
         <SelfieCell record={row.record} url={selfieUrl} onOpen={onSelfie} />
       </td>
+      <td style={tdStyle}><LocationCell record={row.record} /></td>
       <td style={tdStyle}>{fmtTime(row.record?.check_out_time)}</td>
       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
         {fmtDuration(totalBreakSeconds(row.record))}

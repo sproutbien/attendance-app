@@ -16,6 +16,8 @@ import GettingStartedCard from '../components/GettingStartedCard'
 import PolicyUpdateNotice from '../components/PolicyUpdateNotice'
 import SelfieCheckIn from '../components/SelfieCheckIn'
 import { selfieRequired } from '../lib/selfies'
+import { geofenceArea, readLocation } from '../lib/geofence'
+import type { LocationFields } from '../lib/geofence'
 import { notStartedYet } from '../lib/onboarding'
 import { fmtHolidayDay } from '../lib/holidays'
 import AppLayout from '../components/AppLayout'
@@ -108,18 +110,37 @@ export default function DashboardPage() {
   const todaysLeave = useTodaysLeave(employee?.id)
   const [leavePopup, setLeavePopup] = useState(false)
   const [selfieOpen, setSelfieOpen] = useState(false)
-  const [askingSelfie, setAskingSelfie] = useState(false)
+  const [preparing, setPreparing] = useState<'' | 'checking' | 'locating'>('')
+  // Location reading waiting to go with the check-in (and whether a selfie comes next)
+  const [pending, setPending] = useState<{ location: LocationFields | null; selfie: boolean } | null>(null)
+  const [locationProblem, setLocationProblem] = useState<{ note: string; strict: boolean } | null>(null)
   const navigate = useNavigate()
 
-  // Asks the server each time, so switching the selfie on applies straight away
+  // Asks the server each time, so switching the selfie or location check on applies straight away
   async function startCheckIn() {
     if (todaysLeave) { setLeavePopup(true); return }
     if (!employee) return
-    setAskingSelfie(true)
-    const need = await selfieRequired(employee.id)
-    setAskingSelfie(false)
-    if (need) { setSelfieOpen(true); return }
-    const { error } = await checkIn()
+    setLocationProblem(null)
+    setPreparing('checking')
+    const [needSelfie, area] = await Promise.all([selfieRequired(employee.id), geofenceArea(employee.id)])
+    let location: LocationFields | null = null
+    if (area) {
+      setPreparing('locating')
+      location = await readLocation()
+    }
+    setPreparing('')
+    setPending({ location, selfie: needSelfie })
+    if (location && 'geofence_note' in location) {
+      setLocationProblem({ note: location.geofence_note, strict: area!.is_strict })
+      return
+    }
+    finishCheckIn(location, needSelfie)
+  }
+
+  async function finishCheckIn(location: LocationFields | null, needSelfie: boolean) {
+    setLocationProblem(null)
+    if (needSelfie) { setSelfieOpen(true); return }
+    const { error } = await checkIn(location ?? undefined)
     if (error === 'A selfie is needed to check in.') setSelfieOpen(true)
   }
 
@@ -170,7 +191,7 @@ export default function DashboardPage() {
           <CheckInPanel
             state={state}
             record={todayRecord ?? null}
-            isSubmitting={isSubmitting || askingSelfie}
+            isSubmitting={isSubmitting || preparing !== ''}
             halfDay={halfDay}
             pastSplit={pastSplit}
             shift={shift}
@@ -221,7 +242,42 @@ export default function DashboardPage() {
       )}
 
       {selfieOpen && employee && (
-        <SelfieCheckIn employeeId={employee.id} onCheckIn={checkIn} onClose={() => setSelfieOpen(false)} />
+        <SelfieCheckIn
+          employeeId={employee.id}
+          onCheckIn={selfie => checkIn({ ...(pending?.location ?? {}), ...selfie })}
+          onClose={() => setSelfieOpen(false)}
+        />
+      )}
+
+      {preparing === 'locating' && (
+        <div className="sb-modal-backdrop">
+          <div className="sb-modal" role="dialog" aria-modal="true" aria-labelledby="locating-title">
+            <div className="sb-modal-head"><h2 id="locating-title">Checking your location…</h2></div>
+            <p className="sb-modal-sub" style={{ marginBottom: 0 }}>
+              If your browser asks, allow it to use your location. It’s only read when you check in.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {locationProblem && pending && (
+        <div className="sb-modal-backdrop" onClick={() => setLocationProblem(null)}>
+          <div className="sb-modal" role="dialog" aria-modal="true" aria-labelledby="noloc-title" onClick={e => e.stopPropagation()}>
+            <div className="sb-modal-head"><h2 id="noloc-title">We couldn’t get your location</h2></div>
+            <p className="sb-modal-sub">
+              <b>{locationProblem.note}.</b>{' '}
+              {locationProblem.strict
+                ? 'Your company needs your location to check in. Allow location access for this site in your browser or phone settings, then try again.'
+                : 'You can still check in. Your admin will see that today’s check-in has no location.'}
+            </p>
+            <div className="sb-modal-actions">
+              {locationProblem.strict
+                ? <button type="button" className="sb-btn-ghost" onClick={() => setLocationProblem(null)}>Cancel</button>
+                : <button type="button" className="sb-btn-ghost" onClick={() => finishCheckIn(pending.location, pending.selfie)}>Check in anyway</button>}
+              <button type="button" className="sb-btn-primary" onClick={startCheckIn}>Try again</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {leavePopup && todaysLeave && (

@@ -8,6 +8,8 @@ import { localDate } from '../../lib/calendar'
 import { shiftHours } from '../../lib/shifts'
 import { SELFIE_RULE_LABELS } from '../../lib/selfies'
 import type { SelfieRule } from '../../lib/selfies'
+import { GEOFENCE_RULE_LABELS } from '../../lib/geofence'
+import type { GeofenceRule } from '../../lib/geofence'
 import type { Employee, EmployeeOption, EmployeeStatus, Shift } from '../../types'
 import { errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn } from './styles'
 
@@ -51,6 +53,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
     ec_phone:       s(existing?.emergency_contact_phone),
     probation_end:  s(existing?.probation_end_date),
     selfie_rule:    existing?.selfie_rule ?? 'default' as SelfieRule,
+    geofence_rule:  existing?.geofence_rule ?? 'default' as GeofenceRule,
   })
   const [startOnboarding, setStartOnboarding] = useState(true)
   // Shift changes start tomorrow by default (today's attendance keeps today's shift); new staff start today
@@ -96,6 +99,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
       emergency_contact_phone:    t(f.ec_phone),
       probation_end_date: f.status === 'probation' ? t(f.probation_end) : existing?.probation_end_date ?? null,
       selfie_rule:    f.selfie_rule,
+      geofence_rule:  f.geofence_rule,
       startOnboarding: isEdit ? undefined : startOnboarding,
     })
   }
@@ -225,18 +229,32 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
                 <p style={hintStyle}>You're reminded on the Employees page two weeks before, with a button to make them Active.</p>
               </Field>
             )}
-            <Field label="Selfie at check-in">
-              <select value={f.selfie_rule} onChange={set('selfie_rule')} style={inputStyle}>
-                {(Object.keys(SELFIE_RULE_LABELS) as SelfieRule[]).map(r => <option key={r} value={r}>{SELFIE_RULE_LABELS[r]}</option>)}
-              </select>
-              <p style={hintStyle}>
-                {f.selfie_rule === 'default'
-                  ? 'Follows the switch on the Attendance page.'
-                  : f.selfie_rule === 'always'
-                    ? 'Takes a selfie to check in, even when the switch is off.'
-                    : 'Checks in without a selfie, even when the switch is on.'}
-              </p>
-            </Field>
+            <Grid>
+              <Field label="Selfie at check-in">
+                <select value={f.selfie_rule} onChange={set('selfie_rule')} style={inputStyle}>
+                  {(Object.keys(SELFIE_RULE_LABELS) as SelfieRule[]).map(r => <option key={r} value={r}>{SELFIE_RULE_LABELS[r]}</option>)}
+                </select>
+                <p style={hintStyle}>
+                  {f.selfie_rule === 'default'
+                    ? 'Follows the switch on the Attendance page.'
+                    : f.selfie_rule === 'always'
+                      ? 'Takes a selfie to check in, even when the switch is off.'
+                      : 'Checks in without a selfie, even when the switch is on.'}
+                </p>
+              </Field>
+              <Field label="Location check at check-in">
+                <select value={f.geofence_rule} onChange={set('geofence_rule')} style={inputStyle}>
+                  {(Object.keys(GEOFENCE_RULE_LABELS) as GeofenceRule[]).map(r => <option key={r} value={r}>{GEOFENCE_RULE_LABELS[r]}</option>)}
+                </select>
+                <p style={hintStyle}>
+                  {f.geofence_rule === 'default'
+                    ? 'Follows the switch on the Attendance page. Only work locations with an office area are checked.'
+                    : f.geofence_rule === 'always'
+                      ? 'Checked against their work location’s area, even when the switch is off.'
+                      : 'Never checked, even when the switch is on.'}
+                </p>
+              </Field>
+            </Grid>
             {leaving && (
               <Field label="Last working day">
                 <input type="date" value={f.last_working_day} onChange={set('last_working_day')} required={f.status === 'on_notice'} style={inputStyle} />
