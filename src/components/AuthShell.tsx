@@ -17,11 +17,6 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           {branding.product_name && <p className="auth-tagline">{branding.product_name}</p>}
         </div>
         {children}
-        {(branding.support_email || branding.support_phone) && (
-          <p className="auth-support">
-            Need help? {[branding.support_email, branding.support_phone].filter(Boolean).join(' · ')}
-          </p>
-        )}
       </div>
     </div>
   )

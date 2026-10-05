@@ -106,8 +106,6 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
         product_name: draft.product_name.trim(),
         company_name: draft.company_name.trim(),
         company_address: draft.company_address.trim(),
-        support_email: draft.support_email.trim(),
-        support_phone: draft.support_phone.trim(),
       })
       if (canLook) Object.assign(p, { primary_color: draft.primary_color.toLowerCase(), logo_path: logoPath, icon_path: iconPath })
       if (sup) Object.assign(p, { admin_edit_look: draft.admin_edit_look, admin_edit_details: draft.admin_edit_details })
@@ -144,7 +142,7 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
         <p style={{ margin: '0.25rem 0 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
           {sup
             ? 'The name, logo and colours everyone sees: login page, employee app, admin panel, PDFs and the browser tab.'
-            : `Your ${[canLook && 'logo and colours', canDetails && 'names and contact details'].filter(Boolean).join(' and ')}, as everyone sees them in the app.`}
+            : `Your ${[canLook && 'logo and colours', canDetails && 'names and company details'].filter(Boolean).join(' and ')}, as everyone sees them in the app.`}
         </p>
 
         <div className="brand-grid">
@@ -221,19 +219,6 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
               </ul>
             </section>}
 
-            {canDetails && <section style={card}>
-              <h2 style={sectionTitle}>Support contact</h2>
-              <p style={{ ...hintStyle, margin: '-0.5rem 0 0.875rem' }}>Shown at the bottom of the login page as “Need help?”. Leave both empty to hide it.</p>
-              <div style={grid2}>
-                <Field label="Email">
-                  <input type="email" value={draft.support_email} onChange={set('support_email')} maxLength={120} style={inputStyle} />
-                </Field>
-                <Field label="Phone / WhatsApp">
-                  <input value={draft.support_phone} onChange={set('support_phone')} maxLength={30} style={inputStyle} />
-                </Field>
-              </div>
-            </section>}
-
             {sup && (
               <section style={card}>
                 <h2 style={sectionTitle}>What the customer’s admins can change</h2>
@@ -243,7 +228,7 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
                 <Tick checked={draft.admin_edit_look} onChange={() => toggle('admin_edit_look')}
                   label="Logo and colours" hint="Logo, square icon and brand colour." />
                 <Tick checked={draft.admin_edit_details} onChange={() => toggle('admin_edit_details')}
-                  label="Names and contact details" hint="App name, tagline, product name, company name and address, support contact." />
+                  label="Names and company details" hint="App name, tagline, product name, company name and address." />
               </section>
             )}
 
