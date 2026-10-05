@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import ChangePasswordScreen from './ChangePasswordScreen'
 
 export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, employee, loading } = useAuth()
@@ -27,6 +28,8 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
       </div>
     )
   }
+
+  if (employee.must_change_password) return <ChangePasswordScreen />
 
   // Admins belong on the admin dashboard, not the employee screens
   if (employee.role === 'admin') return <Navigate to="/admin/attendance" replace />

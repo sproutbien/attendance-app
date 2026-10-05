@@ -136,7 +136,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
               ) : (
                 <Field label="Temporary password">
                   <input type="password" value={f.password} onChange={set('password')} required minLength={6} style={inputStyle} />
-                  <p style={hintStyle}>They use this to log in the first time.</p>
+                  <p style={hintStyle}>Share it with them. The first time they log in, they're asked to choose their own.</p>
                 </Field>
               )}
             </Grid>

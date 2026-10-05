@@ -23,6 +23,7 @@ export type Employee = {
   emergency_contact_relation: string | null
   emergency_contact_phone: string | null
   probation_end_date: string | null
+  must_change_password: boolean   // still on the admin's temporary password (migration 033)
   selfie_rule: 'default' | 'always' | 'never'   // check-in selfie: follow the company setting or override
   deleted_at: string | null       // set while in the bin; purged 6 months later
   created_at: string
