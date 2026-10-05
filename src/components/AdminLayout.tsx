@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
 import { useDrawer, useSidebarCollapsed } from '../lib/sidebar'
-import { initials } from '../lib/employees'
+import { initials, photoUrl } from '../lib/employees'
 import { sweepExpiredSelfies } from '../lib/selfies'
 
 /**
@@ -58,6 +58,7 @@ export default function AdminLayout() {
   useEffect(() => { if (drawer.open) closeBtn.current?.focus() }, [drawer.open])
   useEffect(() => { sweepExpiredSelfies() }, [])   // selfies past 15 days
   const totalAttention = attention.leave + attention.corrections
+  const photo = employee ? photoUrl(employee) : null
 
   return (
     <div className={`admin-shell${side.collapsed ? ' is-collapsed' : ''}`}>
@@ -84,7 +85,9 @@ export default function AdminLayout() {
         </nav>
         <div className="admin-side-foot">
           <div className="admin-side-user" title={employee?.full_name}>
-            <span className="admin-side-initials">{initials(employee?.full_name ?? '')}</span>
+            <span className="admin-side-initials">
+              {photo ? <img src={photo} alt="" /> : initials(employee?.full_name ?? '')}
+            </span>
             <span className="admin-side-who">
               <strong>{employee?.full_name}</strong>
               <span>Admin</span>
