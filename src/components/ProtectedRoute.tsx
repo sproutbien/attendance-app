@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ChangePasswordScreen from './ChangePasswordScreen'
 
@@ -27,6 +28,12 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
             Your login worked, but your account hasn't been created in the system yet.
             Contact your administrator.
           </p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            style={{ padding: '0.625rem 1.5rem', borderRadius: 8, border: '1px solid #e2e8f0', cursor: 'pointer', background: '#fff', color: '#374151' }}
+          >
+            Sign out
+          </button>
         </div>
       </div>
     )
