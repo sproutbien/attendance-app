@@ -199,6 +199,8 @@ export function brandCss(hex: string): string {
 html:root {
   ${STEPS.map(s => `--brand-${s}: ${p[s]};`).join(' ')}
   --brand-side: ${p.side}; --brand-side-muted: ${p.sideMuted};
+  --wordmark-fill: linear-gradient(180deg, #ffffff 0%, ${tone(0.93, 0.25)} 55%, ${tone(0.86, 0.4)} 100%);
+  --wordmark-sub: ${tone(0.92, 0.2)}d9;
   --auth-ink: ${tone(0.3, 0.7)}; --auth-accent: ${tone(0.6, 1)}; --auth-link: ${tone(0.52, 1)};
   --auth-focus: ${tone(0.7, 0.8)}; --auth-ring: ${tone(0.6, 1)}24;
   --auth-btn: linear-gradient(90deg, ${tone(0.4, 0.8)} 0%, ${tone(0.47, 0.9)} 45%, ${tone(0.6, 1)} 100%);

@@ -167,7 +167,7 @@
   font-weight: 800;
   font-variant: small-caps;
   letter-spacing: 0.01em;
-  background: linear-gradient(180deg, #c6f07a 0%, #8fd13a 55%, #6fb52a 100%);
+  background: var(--wordmark-fill, linear-gradient(180deg, #c6f07a 0%, #8fd13a 55%, #6fb52a 100%));   /* brand.ts sets it for a custom colour */
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -177,7 +177,7 @@
   margin-top: 2px;
   font-size: 10.5px;
   font-weight: 500;
-  color: rgba(225, 245, 210, 0.85);
+  color: var(--wordmark-sub, rgba(225, 245, 210, 0.85));
   letter-spacing: 0.01em;
 }
 

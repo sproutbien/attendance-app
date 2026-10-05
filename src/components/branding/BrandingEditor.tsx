@@ -326,7 +326,7 @@ function ImagePick({ label, hint, src, wide, round, onPick, onRemove }: {
       <span style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.375rem', color: '#374151' }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <div style={{ width: wide ? 120 : 64, height: 64, display: 'grid', placeItems: 'center', borderRadius: round ? '50%' : 10, border: '1px dashed #cbd5e1', background: '#f8fafc', overflow: 'hidden', flexShrink: 0 }}>
-          <img src={src} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: round ? 'cover' : 'contain', width: round ? '100%' : undefined, height: round ? '100%' : undefined }} />
+          <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: round ? 'cover' : 'contain', padding: round ? 0 : 4, boxSizing: 'border-box' }} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
           <button type="button" onClick={() => input.current?.click()} style={{ ...ghostBtn, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
