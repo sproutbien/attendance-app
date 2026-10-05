@@ -6,6 +6,8 @@ import type { Employee } from '../types'
 type AuthContextValue = {
   session: Session | null
   employee: Employee | null
+  /** The vendor's own login (migration 035): manages branding; not an employee. */
+  superadmin: boolean
   loading: boolean
   signOut: () => Promise<void>
   /** Re-reads the signed-in employee's row, e.g. after they change their photo. */
@@ -18,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [sessionReady, setSessionReady] = useState(false)
   // The employee row tagged with the user it was fetched for
-  const [profile, setProfile] = useState<{ userId: string; employee: Employee | null } | null>(null)
+  const [profile, setProfile] = useState<{ userId: string; employee: Employee | null; superadmin: boolean } | null>(null)
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -36,8 +38,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!userId) return
     let cancelled = false
-    fetchEmployee(userId).then(employee => {
-      if (!cancelled) setProfile({ userId, employee })
+    Promise.all([fetchEmployee(userId), fetchSuperadmin()]).then(([employee, superadmin]) => {
+      if (!cancelled) setProfile({ userId, employee, superadmin })
     })
     return () => { cancelled = true }
   }, [userId])
@@ -45,10 +47,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function refreshEmployee() {
     if (!userId) return
     const employee = await fetchEmployee(userId)
-    setProfile({ userId, employee })
+    setProfile(p => ({ userId, employee, superadmin: p?.userId === userId ? p.superadmin : false }))
   }
 
   const employee = profile && profile.userId === userId ? profile.employee : null
+  const superadmin = !!profile && profile.userId === userId && profile.superadmin
   // Loading until the session is known AND the profile for this exact user has arrived —
   // otherwise route guards briefly see a session with no employee ("Account not set up")
   const loading = !sessionReady || (userId !== null && profile?.userId !== userId)
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider value={{
       session,
       employee,
+      superadmin,
       loading,
       signOut: () => supabase.auth.signOut(),
       refreshEmployee,
@@ -69,6 +73,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 async function fetchEmployee(userId: string): Promise<Employee | null> {
   const { data } = await supabase.from('employees').select('*').eq('id', userId).maybeSingle()
   return data ?? null
+}
+
+async function fetchSuperadmin(): Promise<boolean> {
+  const { data } = await supabase.rpc('is_superadmin')
+  return data === true   // false too when the function doesn't exist yet
 }
 
 export function useAuth() {

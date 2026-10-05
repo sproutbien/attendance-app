@@ -63,8 +63,8 @@ export default function AdminLeavePage() {
           style={{
             padding: '0.5rem 1rem', border: 'none', background: 'none', cursor: 'pointer',
             fontSize: '0.9375rem', fontWeight: tab === value ? 700 : 500,
-            color: tab === value ? '#166534' : '#64748b',
-            borderBottom: tab === value ? '2px solid #16a34a' : '2px solid transparent', marginBottom: -1,
+            color: tab === value ? 'var(--brand-800)' : '#64748b',
+            borderBottom: tab === value ? '2px solid var(--brand-600)' : '2px solid transparent', marginBottom: -1,
           }}
         >
           {label}
@@ -198,9 +198,9 @@ export default function AdminLeavePage() {
                 style={{
                   padding: '0.3125rem 0.875rem',
                   borderRadius: 99,
-                  border: active ? '1px solid #16a34a' : '1px solid #e2e8f0',
-                  background: active ? '#dcfce7' : '#fff',
-                  color: active ? '#166534' : '#475569',
+                  border: active ? '1px solid var(--brand-600)' : '1px solid #e2e8f0',
+                  background: active ? 'var(--brand-100)' : '#fff',
+                  color: active ? 'var(--brand-800)' : '#475569',
                   fontWeight: active ? 600 : 500,
                   fontSize: '0.8125rem',
                   cursor: 'pointer',

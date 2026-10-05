@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, UserPlus, Users, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, Palette, UserPlus, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
 import { useDrawer, useHoverExpand } from '../lib/sidebar'
 import { initials, photoUrl } from '../lib/employees'
 import { sweepExpiredSelfies } from '../lib/selfies'
+import { useBranding } from '../contexts/BrandingContext'
 
 /**
  * Nav badge counts: leave = pending requests + cancellations no admin has marked seen;
@@ -50,7 +51,7 @@ const NAV = [
 
 /** Admin shell: a sidebar on desktop (collapsible to icons); on phones the same sidebar slides out from a ☰ button. */
 export default function AdminLayout() {
-  const { employee, signOut } = useAuth()
+  const { employee, superadmin, signOut } = useAuth()
   const attention = useAttentionCounts()
   const side = useHoverExpand()
   const drawer = useDrawer('(min-width: 901px)')
@@ -59,12 +60,13 @@ export default function AdminLayout() {
   useEffect(() => { sweepExpiredSelfies() }, [])   // selfies past 15 days
   const totalAttention = attention.leave + attention.corrections
   const photo = employee ? photoUrl(employee) : null
+  const { branding, logo, icon } = useBranding()
 
   return (
     <div className={`admin-shell${side.expanded ? '' : ' is-collapsed'}`}>
       <aside className={`admin-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu" {...side.handlers}>
         <div className="admin-side-brand">
-          <img src="/logo.jpg" alt="Sproutbien" />
+          <img src={icon} alt={branding.company_name} />
           <span className="admin-chip">Admin</span>
           <button type="button" ref={closeBtn} className="admin-drawer-close" onClick={drawer.hide} aria-label="Close menu">
             <X size={22} aria-hidden="true" />
@@ -82,6 +84,12 @@ export default function AdminLayout() {
               </NavLink>
             )
           })}
+          {superadmin && (
+            <NavLink to="/superadmin" title="Branding">
+              <Palette size={20} strokeWidth={2} aria-hidden="true" />
+              <span className="admin-side-label">Branding</span>
+            </NavLink>
+          )}
         </nav>
         <div className="admin-side-foot">
           <div className="admin-side-user" title={employee?.full_name}>
@@ -107,11 +115,11 @@ export default function AdminLayout() {
             <Menu size={22} aria-hidden="true" />
             {totalAttention > 0 && <span className="admin-menu-dot">{totalAttention}</span>}
           </button>
-          <img src="/logo.jpg" alt="Sproutbien" style={{ height: 32, display: 'block' }} />
+          <img src={logo} alt={branding.company_name} style={{ height: 32, display: 'block' }} />
           <span className="admin-chip">Admin</span>
         </header>
 
-        <div className="admin-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: '#f0fdf4', minHeight: '100vh', boxSizing: 'border-box' }}>
+        <div className="admin-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: 'var(--brand-50)', minHeight: '100vh', boxSizing: 'border-box' }}>
           <Outlet />
         </div>
       </div>

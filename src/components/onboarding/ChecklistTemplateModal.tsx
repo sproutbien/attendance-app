@@ -36,7 +36,7 @@ export default function ChecklistTemplateModal({ onClose }: { onClose: () => voi
 
         {t.loading ? <p style={{ color: '#94a3b8' }}>Loading…</p> : (['employee', 'admin'] as const).map(who => (
           <div key={who} style={{ marginBottom: '1rem' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.375rem' }}>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.375rem' }}>
               {who === 'employee' ? 'New joiner does' : 'Admin does'}
             </div>
             {t.items.filter(i => i.assignee === who).map(i => (

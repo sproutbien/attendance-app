@@ -70,4 +70,4 @@ const card: CSSProperties = { background: '#fff', borderRadius: 16, padding: '1.
 const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', padding: '0.75rem 1rem', border: '1px solid #e2e8f0', borderRadius: 12 }
 const label: CSSProperties = { display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: '#475569' }
 const input: CSSProperties = { width: 72, padding: '0.375rem 0.5rem', border: '1px solid #d1d5db', borderRadius: 6, fontSize: '0.875rem', fontFamily: 'inherit' }
-const btn: CSSProperties = { padding: '0.375rem 0.875rem', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 600, fontSize: '0.8125rem' }
+const btn: CSSProperties = { padding: '0.375rem 0.875rem', borderRadius: 8, border: 'none', background: 'var(--brand-600)', color: '#fff', fontWeight: 600, fontSize: '0.8125rem' }

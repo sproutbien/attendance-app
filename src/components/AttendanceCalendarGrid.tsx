@@ -33,7 +33,7 @@ export default function AttendanceCalendarGrid({ yearMonth, employees, holidays,
                     minWidth: 28, padding: '0.25rem 0', borderRadius: 6, fontWeight: 600,
                     background: holiday ? '#dbeafe' : 'transparent',
                     color: holiday ? '#1d4ed8' : isSunday(date) ? '#94a3b8' : '#64748b',
-                    outline: date === today ? '2px solid #16a34a' : undefined,
+                    outline: date === today ? '2px solid var(--brand-600)' : undefined,
                   }}
                 >
                   <div style={{ fontSize: '0.625rem', fontWeight: 500 }}>

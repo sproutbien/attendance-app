@@ -199,7 +199,7 @@ export default function LeavePage() {
             >
               Apply for new dates
             </button>
-            <Link to="/dashboard" style={{ ...confirmBtnStyle, background: '#16a34a', textDecoration: 'none' }}>Go to Check In</Link>
+            <Link to="/dashboard" style={{ ...confirmBtnStyle, background: 'var(--green-btn-1, #16a34a)', textDecoration: 'none' }}>Go to Check In</Link>
           </span>
         </div>
       )}
@@ -431,7 +431,7 @@ export default function LeavePage() {
             disabled={submitting || recording || !!formBlock}
             style={{
               padding: '0.625rem 1.5rem',
-              background: submitting || recording || formBlock ? '#86efac' : '#16a34a',
+              background: submitting || recording || formBlock ? 'var(--brand-300)' : 'var(--brand-600)',
               color: '#fff',
               border: 'none',
               borderRadius: 8,
@@ -769,7 +769,7 @@ function sessionCard(active: boolean): CSSProperties {
     padding: '0.75rem 0.875rem',
     textAlign: 'left',
     borderRadius: 10,
-    border: active ? '2px solid #16a34a' : '1px solid var(--border, #d1d5db)',
+    border: active ? '2px solid var(--brand-600)' : '1px solid var(--border, #d1d5db)',
     background: active ? 'var(--green-soft, #f0fdf4)' : 'var(--surface, #fff)',
     color: 'var(--text-strong, #1e293b)',
     fontWeight: active ? 600 : 500,

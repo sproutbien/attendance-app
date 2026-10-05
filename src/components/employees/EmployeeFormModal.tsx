@@ -266,7 +266,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
           {!isEdit && (
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', margin: '0 0 1rem', fontSize: '0.875rem', color: '#374151', cursor: 'pointer' }}>
               <input type="checkbox" checked={startOnboarding} onChange={e => setStartOnboarding(e.target.checked)}
-                style={{ width: 16, height: 16, marginTop: 2, accentColor: '#16a34a' }} />
+                style={{ width: 16, height: 16, marginTop: 2, accentColor: 'var(--brand-600)' }} />
               <span>
                 Start the onboarding checklist
                 <span style={{ display: 'block', ...hintStyle }}>They'll see their steps (documents to upload and so on) on their Dashboard.</span>
@@ -357,6 +357,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const legend: CSSProperties = {
-  padding: 0, marginBottom: '0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#16a34a',
+  padding: 0, marginBottom: '0.75rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-600)',
   textTransform: 'uppercase', letterSpacing: '0.06em',
 }

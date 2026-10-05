@@ -118,7 +118,7 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick, compact = f
               display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
               minHeight: compact ? 54 : 64, padding: compact ? '0.3125rem' : '0.375rem', borderRadius: 8, boxSizing: 'border-box',
               background: mark === 'none' ? 'var(--surface, #fff)' : mark === 'sunday' ? 'var(--surface-soft, #f8fafc)' : s.bg,
-              border: s.border ?? (date === today ? '2px solid #16a34a' : '1px solid var(--border, #e2e8f0)'),
+              border: s.border ?? (date === today ? '2px solid var(--brand-600)' : '1px solid var(--border, #e2e8f0)'),
               color: strong ? '#fff' : '#1e293b',
               cursor: onDayClick ? 'pointer' : 'default',
               textAlign: 'left', fontFamily: 'inherit', overflow: 'hidden',

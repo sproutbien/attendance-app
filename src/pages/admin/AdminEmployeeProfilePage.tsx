@@ -39,7 +39,7 @@ export default function AdminEmployeeProfilePage() {
     return (
       <div style={card}>
         <p style={{ margin: '0 0 1rem', color: '#64748b' }}>Employee not found.</p>
-        <Link to="/admin/employees" style={{ color: '#16a34a' }}>← Back to employees</Link>
+        <Link to="/admin/employees" style={{ color: 'var(--brand-600)' }}>← Back to employees</Link>
       </div>
     )
   }
@@ -264,7 +264,7 @@ function PhotoPicker({ employee, dim, onChanged }: { employee: Employee; dim: bo
         style={{ position: 'relative', padding: 0, border: 'none', background: 'none', cursor: 'pointer', borderRadius: '50%', opacity: busy ? 0.5 : 1 }}
       >
         <EmployeeAvatar employee={employee} size={84} dim={dim} />
-        <span style={{ position: 'absolute', right: 0, bottom: 0, background: '#16a34a', color: '#fff', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
+        <span style={{ position: 'absolute', right: 0, bottom: 0, background: 'var(--brand-600)', color: '#fff', borderRadius: '50%', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' }}>
           <Camera size={14} />
         </span>
       </button>
@@ -330,7 +330,7 @@ function InfoCard({ title, aside, children }: { title: string; aside?: string; c
   return (
     <section style={card}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-        <h2 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</h2>
+        <h2 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</h2>
         {aside && <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{aside}</span>}
       </div>
       {children}
@@ -347,4 +347,4 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-const link: CSSProperties = { color: '#15803d', textDecoration: 'none' }
+const link: CSSProperties = { color: 'var(--brand-700)', textDecoration: 'none' }

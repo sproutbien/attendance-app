@@ -8,6 +8,7 @@ import { LEAVE_DOC_ACCEPT, leaveDocProblem } from '../lib/leaveDocs'
 import { fmtHolidayDay } from '../lib/holidays'
 import { notStartedYet, progress } from '../lib/onboarding'
 import type { OnboardingTask } from '../types'
+import { useBranding } from '../contexts/BrandingContext'
 
 /**
  * Employee Dashboard: their onboarding steps (upload documents, tick the rest).
@@ -15,6 +16,7 @@ import type { OnboardingTask } from '../types'
  */
 export default function GettingStartedCard() {
   const { employee } = useAuth()
+  const { branding } = useBranding()
   const data = useOnboarding(employee?.id)
   const mine = data.tasks.filter(t => t.assignee === 'employee')
   const p = progress(mine)
@@ -25,7 +27,7 @@ export default function GettingStartedCard() {
     <div className="sb-card" style={{ marginBottom: '1.25rem' }}>
       <div className="sb-card-head">
         <ListChecks size={20} />
-        <h2>{early ? `Welcome to Sproutbien, ${employee!.full_name.split(' ')[0]}!` : 'Getting started'}</h2>
+        <h2>{early ? `Welcome to ${branding.company_name}, ${employee!.full_name.split(' ')[0]}!` : 'Getting started'}</h2>
         {mine.length > 0 && <span className="sb-chip">{p.done} of {p.total} done</span>}
       </div>
       {early && (

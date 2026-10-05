@@ -623,8 +623,9 @@ RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, e
 BEGIN
   PERFORM set_config('sb.demo_reset', 'on', true);
 
-  -- Anyone visitors added
-  DELETE FROM auth.users WHERE id NOT IN (SELECT demo_id(n) FROM demo_people);
+  -- Anyone visitors added (the vendor's superadmin logins stay)
+  DELETE FROM auth.users WHERE id NOT IN (SELECT demo_id(n) FROM demo_people)
+    AND id NOT IN (SELECT user_id FROM superadmins);
 
   TRUNCATE leave_documents, leave_requests, attendance_records, attendance_corrections,
            leave_adjustments, payroll_settings, public_holidays, employee_shifts, shifts,

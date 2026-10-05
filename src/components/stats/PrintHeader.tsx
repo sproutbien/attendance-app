@@ -6,6 +6,7 @@ import { fmtDays, fmtPct } from '../../lib/stats'
 import type { MonthStats } from '../../lib/stats'
 import { shiftHours } from '../../lib/shifts'
 import type { Employee, Shift } from '../../types'
+import { useBranding } from '../../contexts/BrandingContext'
 
 // Printed / PDF report only (hidden on screen): letterhead, the employee's
 // details in large type, and the month's key numbers.
@@ -16,6 +17,7 @@ export function PrintHeader({ employee: e, shift, yearMonth, m }: {
   yearMonth: string
   m: MonthStats | undefined
 }) {
+  const { branding, logo } = useBranding()
   const today = localDate()
   const inProgress = yearMonth === today.slice(0, 7)
   const period = inProgress
@@ -42,10 +44,10 @@ export function PrintHeader({ employee: e, shift, yearMonth, m }: {
   return (
     <div className="st-print-only pr-head">
       <div className="pr-letterhead">
-        <img src="/logo.jpg" alt="" />
+        <img src={logo} alt="" />
         <div>
           <div className="pr-title">Monthly Attendance Report</div>
-          <div className="pr-company">Sproutbien</div>
+          <div className="pr-company">{branding.company_name}{branding.company_address && <> · {branding.company_address}</>}</div>
         </div>
         <div className="pr-period">
           <b>{monthLabel(yearMonth)}</b>

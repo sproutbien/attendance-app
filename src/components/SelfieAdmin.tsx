@@ -39,7 +39,7 @@ export function SelfieSetting() {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.125rem', marginBottom: '1.5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-      <span style={{ display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: 10, background: on ? '#dcfce7' : '#f1f5f9', color: on ? '#166534' : '#64748b', flexShrink: 0 }}>
+      <span style={{ display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: 10, background: on ? 'var(--brand-100)' : '#f1f5f9', color: on ? 'var(--brand-800)' : '#64748b', flexShrink: 0 }}>
         <Camera size={18} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -56,7 +56,7 @@ export function SelfieSetting() {
         onClick={toggle} disabled={on === null || saving}
         style={{
           position: 'relative', width: 46, height: 26, flexShrink: 0, padding: 0, border: 'none', borderRadius: 99,
-          background: on ? '#16a34a' : '#cbd5e1', cursor: on === null || saving ? 'default' : 'pointer',
+          background: on ? 'var(--brand-600)' : '#cbd5e1', cursor: on === null || saving ? 'default' : 'pointer',
           opacity: saving ? 0.6 : 1, transition: 'background 0.15s',
         }}
       >

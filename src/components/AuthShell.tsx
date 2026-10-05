@@ -1,18 +1,27 @@
 import { useState } from 'react'
 import { ArrowRight, Eye, EyeOff, Lock } from 'lucide-react'
+import { useBranding } from '../contexts/BrandingContext'
+import { wordmarkParts } from '../lib/brand'
 import '../styles/auth.css'
 
 /** Background, card and brand block shared by the login / reset-password screens. */
 export default function AuthShell({ children }: { children: React.ReactNode }) {
+  const { branding, logo } = useBranding()
+  const [first, second] = wordmarkParts(branding.app_name)
   return (
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-brand">
-          <img src="/logo.jpg" alt="" />
-          <h1 className="auth-wordmark">Sprout<span>Bien</span></h1>
-          <p className="auth-tagline">Attendance Tracker</p>
+          <img src={logo} alt="" />
+          <h1 className={`auth-wordmark${second ? '' : ' is-plain'}`}>{first}{second && <span>{second}</span>}</h1>
+          {branding.product_name && <p className="auth-tagline">{branding.product_name}</p>}
         </div>
         {children}
+        {(branding.support_email || branding.support_phone) && (
+          <p className="auth-support">
+            Need help? {[branding.support_email, branding.support_phone].filter(Boolean).join(' · ')}
+          </p>
+        )}
       </div>
     </div>
   )

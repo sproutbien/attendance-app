@@ -42,7 +42,7 @@ export default function OnboardingOverview({ employees, progress, onConfirm }: {
                 </span>
                 <span style={{ width: 90 }}>
                   <span style={{ display: 'block', height: 6, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden' }}>
-                    <span style={{ display: 'block', width: `${(p.done / p.total) * 100}%`, height: '100%', background: '#16a34a' }} />
+                    <span style={{ display: 'block', width: `${(p.done / p.total) * 100}%`, height: '100%', background: 'var(--brand-600)' }} />
                   </span>
                   <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.done} of {p.total} done</span>
                 </span>
@@ -89,5 +89,5 @@ function ProbationRow({ employee: e, onConfirm }: { employee: Employee; onConfir
   )
 }
 
-const heading: CSSProperties = { margin: '0 0 0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em' }
+const heading: CSSProperties = { margin: '0 0 0.5rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.06em' }
 const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid #f1f5f9', textDecoration: 'none', fontSize: '0.875rem' }

@@ -14,6 +14,7 @@ import { fmtHM } from '../../lib/breaks'
 import { breakFlags, fmtDays, fmtMinutes, fmtPct, teamTotals } from '../../lib/stats'
 import type { DayKind, MonthStats } from '../../lib/stats'
 import '../../styles/stats.css'
+import { useBranding } from '../../contexts/BrandingContext'
 
 type SortKey = 'name' | 'attendance' | 'onTime' | 'avgWorked' | 'worked' | 'present' | 'late' | 'leave' | 'absent' | 'vsShift' | 'checkIn' | 'minBreak'
 
@@ -58,6 +59,7 @@ export default function AdminTeamStatsPage() {
   const yearMonth = asked && /^\d{4}-\d{2}$/.test(asked) && asked <= thisMonth && asked >= TRACKING_START.slice(0, 7) ? asked : thisMonth
   const setMonth = (ym: string) => setParams(ym === thisMonth ? {} : { month: ym }, { replace: true })
 
+  const { logo } = useBranding()
   const [dept, setDept] = useState('')
   const [includeAdmins, setIncludeAdmins] = useState(false)
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'attendance', asc: false })
@@ -110,7 +112,7 @@ export default function AdminTeamStatsPage() {
     <div className="sb-app st-admin" data-theme="light">
       <div className="st-print-only" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: '2px solid var(--green-dark)', paddingBottom: 10 }}>
-          <img src="/logo.jpg" alt="" style={{ height: 34 }} />
+          <img src={logo} alt="" style={{ height: 34 }} />
           <div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-strong)' }}>Team attendance · {monthLabel(yearMonth)}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>

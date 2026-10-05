@@ -197,9 +197,9 @@ function pill(active: boolean): CSSProperties {
   return {
     padding: '0.3125rem 0.875rem',
     borderRadius: 99,
-    border: active ? '1px solid #16a34a' : '1px solid #e2e8f0',
-    background: active ? '#dcfce7' : '#fff',
-    color: active ? '#166534' : '#475569',
+    border: active ? '1px solid var(--brand-600)' : '1px solid #e2e8f0',
+    background: active ? 'var(--brand-100)' : '#fff',
+    color: active ? 'var(--brand-800)' : '#475569',
     fontWeight: active ? 600 : 500,
     fontSize: '0.8125rem',
     cursor: 'pointer',

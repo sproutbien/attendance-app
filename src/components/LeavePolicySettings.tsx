@@ -36,7 +36,7 @@ export default function LeavePolicySettings() {
     <div style={{ ...card, marginTop: '1.5rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
         <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>Leave policy</h2>
-        <a href="/leave-policy" target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', fontSize: '0.8125rem', color: '#15803d', fontWeight: 600 }}>Preview what employees see ↗</a>
+        <a href="/leave-policy" target="_blank" rel="noreferrer" style={{ marginLeft: 'auto', fontSize: '0.8125rem', color: 'var(--brand-700)', fontWeight: 600 }}>Preview what employees see ↗</a>
       </div>
       <p style={{ margin: '0 0 1rem', fontSize: '0.875rem', color: '#64748b', lineHeight: 1.5 }}>
         The policy page is built from the settings above, your holidays and each person’s shift, so it’s always up to date.
@@ -83,6 +83,6 @@ export default function LeavePolicySettings() {
 }
 
 const card: CSSProperties = { background: '#fff', borderRadius: 16, padding: '1.5rem', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
-const btn: CSSProperties = { padding: '0.5rem 1rem', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', fontFamily: 'inherit' }
+const btn: CSSProperties = { padding: '0.5rem 1rem', borderRadius: 8, border: 'none', background: 'var(--brand-600)', color: '#fff', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', fontFamily: 'inherit' }
 const ghost: CSSProperties = { ...btn, background: '#fff', color: '#374151', border: '1px solid #d1d5db' }
-const link: CSSProperties = { marginLeft: 8, padding: 0, border: 'none', background: 'none', color: '#15803d', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }
+const link: CSSProperties = { marginLeft: 8, padding: 0, border: 'none', background: 'none', color: 'var(--brand-700)', textDecoration: 'underline', cursor: 'pointer', fontSize: 'inherit', fontFamily: 'inherit' }

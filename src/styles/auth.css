@@ -2,6 +2,24 @@
    Auth screens (login / forgot password / reset password)
    ============================================================ */
 
+:root {
+  /* Login screen colours; lib/brand.ts replaces them for a custom brand colour */
+  --auth-ink: #0f3b24;
+  --auth-accent: #3a9a1d;
+  --auth-link: #2d8a1a;
+  --auth-focus: #6aaa4f;
+  --auth-ring: rgba(58, 154, 29, 0.14);
+  --auth-btn: linear-gradient(90deg, #0f5a35 0%, #1f6f33 45%, #3c9d25 100%);
+  --auth-btn-shadow: rgba(40, 130, 40, 0.55);
+  --auth-card-shadow: rgba(30, 70, 35, 0.18);
+  --auth-bg-1: #f3f6f2;
+  --auth-bg-2: #e9efe8;
+  --auth-bg-3: #e4ebe4;
+  --auth-glow-1: #dfe9dc;
+  --auth-glow-2: #e3ece0;
+  --auth-glow-3: #e8eee6;
+}
+
 .auth-page {
   position: relative;
   min-height: 100vh;
@@ -15,7 +33,7 @@
   background:
     /* floor: brighter band across the lower fifth */
     linear-gradient(180deg, rgba(255,255,255,0) 76%, rgba(255,255,255,0.75) 79%, #f7f9f6 100%),
-    linear-gradient(135deg, #f3f6f2 0%, #e9efe8 55%, #e4ebe4 100%);
+    linear-gradient(135deg, var(--auth-bg-1) 0%, var(--auth-bg-2) 55%, var(--auth-bg-3) 100%);
 }
 
 /* Large soft green arch behind the card */
@@ -28,7 +46,7 @@
   aspect-ratio: 1;
   transform: translateX(-50%);
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 35%, #dfe9dc 0%, #e3ece0 45%, #e8eee6 70%);
+  background: radial-gradient(circle at 50% 35%, var(--auth-glow-1) 0%, var(--auth-glow-2) 45%, var(--auth-glow-3) 70%);
   box-shadow: inset 0 40px 80px rgba(255,255,255,0.6);
   pointer-events: none;
 }
@@ -63,7 +81,7 @@
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 24px;
   box-shadow:
-    0 30px 60px -20px rgba(30, 70, 35, 0.18),
+    0 30px 60px -20px var(--auth-card-shadow),
     0 8px 24px rgba(30, 70, 35, 0.06);
 }
 
@@ -90,12 +108,15 @@
   font-weight: 800;
   font-variant: small-caps;
   letter-spacing: 0.01em;
-  color: #0f3b24;
+  color: var(--auth-ink);
 }
 
 .auth-wordmark span {
-  color: #3a9a1d;
+  color: var(--auth-accent);
 }
+
+.auth-wordmark.is-plain { font-variant: normal; font-size: 2.2rem; }
+.auth-support { margin: 1.25rem 0 0; text-align: center; font-size: 0.85rem; color: #5b6f61; overflow-wrap: anywhere; }
 
 .auth-tagline {
   margin: 0.25rem 0 0;
@@ -134,8 +155,8 @@
 
 .auth-field:focus-within {
   background: #fff;
-  border-color: #6aaa4f;
-  box-shadow: 0 0 0 3px rgba(58, 154, 29, 0.14);
+  border-color: var(--auth-focus);
+  box-shadow: 0 0 0 3px var(--auth-ring);
 }
 
 .auth-field > svg {
@@ -177,7 +198,7 @@
 }
 
 .auth-eye:focus-visible {
-  outline: 2px solid #3a9a1d;
+  outline: 2px solid var(--auth-accent);
 }
 
 /* ── Links / messages ──────────────────────────────────────── */
@@ -195,7 +216,7 @@
   font: inherit;
   font-size: 0.9rem;
   font-weight: 500;
-  color: #2d8a1a;
+  color: var(--auth-link);
   cursor: pointer;
   text-decoration: none;
 }
@@ -243,8 +264,8 @@
   border: none;
   border-radius: 999px;
   height: 80px;
-  background: linear-gradient(90deg, #0f5a35 0%, #1f6f33 45%, #3c9d25 100%);
-  box-shadow: 0 14px 28px -10px rgba(40, 130, 40, 0.55);
+  background: var(--auth-btn);
+  box-shadow: 0 14px 28px -10px var(--auth-btn-shadow);
   color: #fff;
   font: inherit;
   font-size: 1.5rem;
@@ -307,9 +328,9 @@
   flex-direction: column;
   gap: 0.15rem;
   padding: 0.7rem 0.8rem;
-  border: 1px solid #cde6c1;
+  border: 1px solid color-mix(in srgb, var(--auth-accent) 28%, #fff);
   border-radius: 12px;
-  background: #f3faef;
+  background: color-mix(in srgb, var(--auth-accent) 6%, #fff);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -317,7 +338,7 @@
 
 .auth-demo-btn strong {
   font-size: 0.9rem;
-  color: #1f5a1d;
+  color: var(--auth-ink);
 }
 
 .auth-demo-btn span {
@@ -326,7 +347,7 @@
 }
 
 .auth-demo-btn:hover {
-  border-color: #3a9a1d;
+  border-color: var(--auth-accent);
 }
 
 .auth-demo-btn:disabled {

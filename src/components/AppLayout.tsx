@@ -8,6 +8,7 @@ import type { ThemeChoice } from '../lib/theme'
 import { useDrawer, useHoverExpand } from '../lib/sidebar'
 import { sweepExpiredSelfies } from '../lib/selfies'
 import '../styles/app.css'
+import { useBranding } from '../contexts/BrandingContext'
 
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', Icon: House },
@@ -28,6 +29,7 @@ const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
  */
 export default function AppLayout({ children, wide = false, medium = false }: { children: React.ReactNode; wide?: boolean; medium?: boolean }) {
   const theme = useTheme()
+  const { branding, icon } = useBranding()
   const [accountOpen, setAccountOpen] = useState(false)
   const side = useHoverExpand(accountOpen)
   const drawer = useDrawer('(min-width: 761px)')
@@ -39,11 +41,11 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
     <div className={`sb-app sb-shell${side.expanded ? '' : ' is-collapsed'}`} data-theme={theme.dataTheme}>
       <aside className={`sb-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu" {...side.handlers}>
         <div className="sb-side-top">
-          <Link to="/dashboard" className="sb-side-brand" aria-label="Sproutbien home">
-            <img src="/logo.jpg" alt="" />
+          <Link to="/dashboard" className="sb-side-brand" aria-label={`${branding.app_name} home`}>
+            <img src={icon} alt="" />
             <span className="sb-wordmark sb-side-label">
-              <strong>SproutBien</strong>
-              <span>nurturing businesses digitally</span>
+              <strong>{branding.app_name}</strong>
+              {branding.tagline && <span>{branding.tagline}</span>}
             </span>
           </Link>
           <button type="button" ref={closeBtn} className="sb-drawer-close" onClick={drawer.hide} aria-label="Close menu">
@@ -80,16 +82,17 @@ type Theme = ReturnType<typeof useTheme>
 
 /** Phones only (desktop has the sidebar): ☰ opens the sidebar as a slide-out menu */
 function Header({ onMenu, menuOpen }: { onMenu: () => void; menuOpen: boolean }) {
+  const { branding, icon } = useBranding()
   return (
     <header className="sb-header">
       <button type="button" className="sb-menu-btn" onClick={onMenu} aria-label="Open menu" aria-expanded={menuOpen}>
         <Menu size={24} aria-hidden="true" />
       </button>
-      <Link to="/dashboard" className="sb-brand" aria-label="Sproutbien home">
-        <img src="/logo.jpg" alt="" />
+      <Link to="/dashboard" className="sb-brand" aria-label={`${branding.app_name} home`}>
+        <img src={icon} alt="" />
         <span className="sb-wordmark">
-          <strong>SproutBien</strong>
-          <span>nurturing businesses digitally</span>
+          <strong>{branding.app_name}</strong>
+          {branding.tagline && <span>{branding.tagline}</span>}
         </span>
       </Link>
     </header>

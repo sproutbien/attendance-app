@@ -39,7 +39,7 @@ export function OnboardingCard({ employee, data }: { employee: Employee; data: D
         ) : (
           <>
             <div style={{ height: 8, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden', marginBottom: '0.875rem' }}>
-              <div style={{ width: `${(p.done / p.total) * 100}%`, height: '100%', background: '#16a34a' }} />
+              <div style={{ width: `${(p.done / p.total) * 100}%`, height: '100%', background: 'var(--brand-600)' }} />
             </div>
             {p.complete && !showDone ? (
               <p style={{ margin: 0, fontSize: '0.875rem', color: '#166534' }}>
@@ -90,7 +90,7 @@ function TaskRow({ task: t, busy, onToggle, onRemove }: { task: OnboardingTask; 
   return (
     <li style={{ display: 'flex', alignItems: 'flex-start', gap: '0.625rem', padding: '0.4375rem 0', borderBottom: '1px solid #f1f5f9' }}>
       <input type="checkbox" checked={!!t.done_at} onChange={onToggle} disabled={busy} aria-label={t.title}
-        style={{ width: 18, height: 18, marginTop: 1, accentColor: '#16a34a', flexShrink: 0, cursor: 'pointer' }} />
+        style={{ width: 18, height: 18, marginTop: 1, accentColor: 'var(--brand-600)', flexShrink: 0, cursor: 'pointer' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: '0.875rem', color: t.done_at ? '#94a3b8' : '#1e293b', textDecoration: t.done_at ? 'line-through' : 'none' }}>{t.title}</div>
         {(t.details || t.document_category) && (
@@ -147,7 +147,7 @@ export function DocumentsCard({ employee, data }: { employee: Employee; data: Da
             {g.docs.map(d => (
               <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3125rem 0', fontSize: '0.875rem' }}>
                 <button onClick={async () => { const e = await openEmployeeDocument(d); if (e) setProblems([e]) }} title={`Open ${d.file_name}`}
-                  style={{ ...iconBtn, color: '#15803d', display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1, fontSize: '0.875rem', textAlign: 'left' }}>
+                  style={{ ...iconBtn, color: 'var(--brand-700)', display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1, fontSize: '0.875rem', textAlign: 'left' }}>
                   <FileText size={15} style={{ flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.file_name}</span>
                 </button>
@@ -183,7 +183,7 @@ export function DocumentsCard({ employee, data }: { employee: Employee; data: Da
 function Head({ title, aside }: { title: string; aside?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '0.875rem' }}>
-      <h2 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</h2>
+      <h2 style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</h2>
       {aside && <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{aside}</span>}
     </div>
   )
@@ -192,5 +192,5 @@ function Head({ title, aside }: { title: string; aside?: string }) {
 const muted: CSSProperties = { margin: 0, color: '#94a3b8', fontSize: '0.875rem' }
 const groupLabel: CSSProperties = { fontSize: '0.75rem', fontWeight: 600, color: '#64748b', margin: '0.25rem 0 0.125rem' }
 const iconBtn: CSSProperties = { padding: 4, border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', display: 'inline-flex', fontFamily: 'inherit' }
-const linkBtn: CSSProperties = { padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: '#15803d', textDecoration: 'underline', fontSize: 'inherit', fontFamily: 'inherit' }
+const linkBtn: CSSProperties = { padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--brand-700)', textDecoration: 'underline', fontSize: 'inherit', fontFamily: 'inherit' }
 const docTag: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 3, marginRight: 6, padding: '0 6px', borderRadius: 99, background: '#f1f5f9', color: '#475569' }

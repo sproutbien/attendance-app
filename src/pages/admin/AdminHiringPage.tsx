@@ -132,7 +132,7 @@ export default function AdminHiringPage() {
                     <span style={{ color: '#64748b', flex: 1 }}>{x.role}</span>
                     <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>{fmtDate(new Date(x.stage_changed_at))}</span>
                     {x.stage === 'hired' && x.employee_id && (
-                      <Link to={`/admin/employees/${x.employee_id}`} style={{ color: '#15803d', fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center' }}>
+                      <Link to={`/admin/employees/${x.employee_id}`} style={{ color: 'var(--brand-700)', fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center' }}>
                         Profile <ChevronRight size={14} />
                       </Link>
                     )}
@@ -366,4 +366,4 @@ const candCard: CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 2, width: '100%', textAlign: 'left', padding: '0.625rem 0.75rem',
   background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', color: '#1e293b',
 }
-const linkBtn: CSSProperties = { padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: '#15803d', fontSize: '0.875rem', fontFamily: 'inherit', textAlign: 'left' }
+const linkBtn: CSSProperties = { padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--brand-700)', fontSize: '0.875rem', fontFamily: 'inherit', textAlign: 'left' }

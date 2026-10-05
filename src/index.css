@@ -6,6 +6,24 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Brand colour scale. These defaults are the built-in green; a custom brand
+   colour replaces them at runtime (lib/brand.ts → <style id="brand-theme">). */
+:root {
+  --brand-50:  #f0fdf4;
+  --brand-100: #dcfce7;
+  --brand-200: #bbf7d0;
+  --brand-300: #86efac;
+  --brand-400: #4ade80;
+  --brand-500: #22c55e;
+  --brand-600: #16a34a;
+  --brand-700: #15803d;
+  --brand-800: #166534;
+  --brand-900: #14532d;
+  --brand-950: #052e16;
+  --brand-side: #14532d;          /* admin sidebar + phone header */
+  --brand-side-muted: #a7d7b4;    /* secondary text on the sidebar */
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -139,8 +157,8 @@ a {
   flex-direction: column;
   gap: 2px;
   padding: 18px 12px 14px;
-  background: #14532d;
-  color: #dcfce7;
+  background: var(--brand-side);
+  color: var(--brand-100);
   box-shadow: 1px 0 3px rgba(0, 0, 0, 0.25);
   z-index: 10;
   transition: flex-basis 0.15s ease, width 0.15s ease;
@@ -150,14 +168,14 @@ a {
 .admin-side-brand img { width: 36px; height: 36px; border-radius: 50%; background: #fff; object-fit: cover; flex-shrink: 0; }
 .admin-chip {
   font-size: 0.625rem;
-  background: rgba(187, 247, 208, 0.15);
-  color: #bbf7d0;
+  background: color-mix(in srgb, var(--brand-200) 15%, transparent);
+  color: var(--brand-200);
   padding: 2px 8px;
   border-radius: 4px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  border: 1px solid rgba(187, 247, 208, 0.25);
+  border: 1px solid color-mix(in srgb, var(--brand-200) 25%, transparent);
 }
 
 .admin-side nav { display: flex; flex-direction: column; gap: 2px; }
@@ -173,7 +191,7 @@ a {
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: rgba(220, 252, 231, 0.82);
+  color: color-mix(in srgb, var(--brand-100) 82%, transparent);
   font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
@@ -182,7 +200,7 @@ a {
   cursor: pointer;
 }
 .admin-side nav a:hover, .admin-side-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
-.admin-side nav a.active { background: rgba(187, 247, 208, 0.16); color: #fff; font-weight: 700; }
+.admin-side nav a.active { background: color-mix(in srgb, var(--brand-200) 16%, transparent); color: #fff; font-weight: 700; }
 .admin-side svg { flex-shrink: 0; }
 .admin-side-label { flex: 1; white-space: nowrap; overflow: hidden; }
 .admin-side-badge {
@@ -203,13 +221,13 @@ a {
   height: 8px;
   border-radius: 50%;
   background: #f87171;
-  box-shadow: 0 0 0 2px #14532d;
+  box-shadow: 0 0 0 2px var(--brand-side);
 }
 
 .admin-side-foot {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid rgba(187, 247, 208, 0.18);
+  border-top: 1px solid color-mix(in srgb, var(--brand-200) 18%, transparent);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -220,8 +238,8 @@ a {
   height: 32px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #bbf7d0;
-  color: #14532d;
+  background: var(--brand-200);
+  color: var(--brand-side);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -232,7 +250,7 @@ a {
 .admin-side-initials img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .admin-side-who { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .admin-side-who strong { color: #fff; font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.admin-side-who span { color: #a7d7b4; font-size: 0.75rem; }
+.admin-side-who span { color: var(--brand-side-muted); font-size: 0.75rem; }
 
 /* Desktop with a mouse: icons only, opening over the page on hover (useHoverExpand).
    The open sidebar keeps taking 72px of the layout (negative margin), so the page doesn't move.
@@ -278,7 +296,7 @@ a {
   padding: 0 1rem;
   align-items: center;
   gap: 0.75rem;
-  background: #14532d;
+  background: var(--brand-side);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
@@ -397,3 +415,10 @@ a {
 /* Shown only on phones (e.g. "swipe sideways" hints) */
 .phone-only { display: none; }
 @media (max-width: 640px) { .phone-only { display: block; } }
+
+/* Superadmin Branding page: form + sticky live preview */
+.brand-grid { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 1.5rem; align-items: start; }
+@media (max-width: 980px) {
+  .brand-grid { grid-template-columns: minmax(0, 1fr); }
+  .brand-grid > aside { position: static !important; }
+}

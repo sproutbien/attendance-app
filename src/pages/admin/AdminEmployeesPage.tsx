@@ -358,7 +358,7 @@ function BinList({ employees, saving, onRestore, onPurge }: {
                     {fmtDate(purge)} <span style={{ color: '#94a3b8' }}>({daysLeft} day{daysLeft === 1 ? '' : 's'} left)</span>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <button onClick={() => onRestore(e)} disabled={saving} style={{ ...ghostBtn, color: '#16a34a', borderColor: '#bbf7d0' }}>Restore</button>
+                    <button onClick={() => onRestore(e)} disabled={saving} style={{ ...ghostBtn, color: 'var(--brand-600)', borderColor: 'var(--brand-200)' }}>Restore</button>
                     <button onClick={() => onPurge(e)} disabled={saving} style={{ ...dangerBtn, marginLeft: '0.5rem' }}>Delete forever</button>
                   </td>
                 </tr>

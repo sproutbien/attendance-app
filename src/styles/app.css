@@ -21,6 +21,10 @@
   --green-soft:    #e6f2e1;   /* chips, icon wells */
   --green-btn-1:   #2f8a2a;
   --green-btn-2:   #1a661b;
+  /* "Present" / done stays green whatever the brand colour */
+  --ok:            #2e9b2a;
+  --ok-soft:       #e6f2e1;
+  --ok-dark:       #1d5a1f;
   --amber:         #c27a0e;
   --amber-soft:    #fbefd3;
   --red:           #b42318;
@@ -60,6 +64,9 @@
   --green-soft:    #1b3322;
   --green-btn-1:   #2f8a2a;
   --green-btn-2:   #1c611c;
+  --ok:            #2e9b2a;
+  --ok-soft:       #1b3322;
+  --ok-dark:       #8fdc6a;
   --amber:         #f0b44c;
   --amber-soft:    #3a2c12;
   --red:           #f28b82;
@@ -96,6 +103,9 @@
     --green-soft:    #1b3322;
     --green-btn-1:   #2f8a2a;
     --green-btn-2:   #1c611c;
+    --ok:            #2e9b2a;
+    --ok-soft:       #1b3322;
+    --ok-dark:       #8fdc6a;
     --amber:         #f0b44c;
     --amber-soft:    #3a2c12;
     --red:           #f28b82;
@@ -189,7 +199,7 @@
   height: 38px;
   border-radius: 50%;
   background: #fff;
-  color: #2a7a22;
+  color: var(--green-btn-1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -466,11 +476,11 @@
 }
 .sb-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-faint); display: inline-block; }
 .sb-chip.is-working { background: var(--green-soft); }
-.sb-chip.is-working i { background: #2e9b2a; }
+.sb-chip.is-working i { background: var(--ok); }
 .sb-chip.is-break { background: var(--amber-soft); }
 .sb-chip.is-break i { background: #e59a1c; animation: sb-pulse 1.4s ease-in-out infinite; }
-.sb-chip.is-done { background: var(--green-soft); color: var(--green-dark); }
-.sb-chip.is-done i { background: var(--green); }
+.sb-chip.is-done { background: var(--ok-soft); color: var(--ok-dark); }
+.sb-chip.is-done i { background: var(--ok); }
 
 @keyframes sb-pulse { 50% { opacity: 0.35; } }
 
@@ -596,8 +606,8 @@
   white-space: nowrap;
 }
 .sb-status i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
-.sb-status.s-present  { background: var(--green-soft);  color: var(--green-dark); }
-.sb-status.s-present i { background: #2e9b2a; }
+.sb-status.s-present  { background: var(--ok-soft);  color: var(--ok-dark); }
+.sb-status.s-present i { background: var(--ok); }
 .sb-status.s-late     { background: var(--amber-soft);  color: var(--amber); }
 .sb-status.s-absent   { background: var(--red-soft);    color: var(--red); }
 .sb-status.s-leave    { background: var(--purple-soft); color: var(--purple); }
@@ -832,13 +842,13 @@
 .sb-rec-btn {
   display: inline-flex; align-items: center; gap: 0.625rem;
   padding: 0.3rem 1rem 0.3rem 0.3rem;
-  border: 1.5px solid #16a34a; border-radius: 999px;
+  border: 1.5px solid var(--green); border-radius: 999px;
   background: var(--green-soft, #e6f2e1); color: var(--green-dark, #1d5a1f);
   font: inherit; font-size: 0.875rem; font-weight: 700; cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
-.sb-rec-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25); }
-.sb-rec-btn:focus-visible { outline: 2px solid #16a34a; outline-offset: 2px; }
+.sb-rec-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px color-mix(in srgb, var(--green) 25%, transparent); }
+.sb-rec-btn:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .sb-rec-badge {
   display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
   background: linear-gradient(135deg, #22c55e, #0ea5e9); color: #fff;

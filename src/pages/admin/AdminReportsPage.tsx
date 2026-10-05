@@ -7,6 +7,7 @@ import { useHolidayChoices } from '../../hooks/useHolidayChoices'
 import AttendanceCalendarGrid from '../../components/AttendanceCalendarGrid'
 import { CalendarLegend } from '../../components/MonthCalendar'
 import { suggestedWorkingDays } from '../../lib/calendar'
+import { useBranding } from '../../contexts/BrandingContext'
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ function fmt(n: number) {
   return n.toLocaleString('en-IN', { maximumFractionDigits: 0 })
 }
 
-function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays: number | null) {
+function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays: number | null, companyName: string) {
   const label = monthLabel(yearMonth)
   const hasPayroll = workingDays != null && summaries.some(s => s.employee.monthly_salary != null)
 
@@ -68,7 +69,7 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays:
   ) : null
 
   const lines = [
-    [`Sproutbien Attendance Report — ${label}` + (workingDays != null ? ` (${workingDays} working days)` : '')].map(csvEscape).join(','),
+    [`${companyName} Attendance Report — ${label}` + (workingDays != null ? ` (${workingDays} working days)` : '')].map(csvEscape).join(','),
     '',
     headers.map(csvEscape).join(','),
     ...dataRows.map(row => row.map(csvEscape).join(',')),
@@ -92,6 +93,7 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays:
 // ── Page ─────────────────────────────────────────────────────
 
 export default function AdminReportsPage() {
+  const { branding } = useBranding()
   const currentMonth = new Date().toISOString().slice(0, 7)
   const [yearMonth, setYearMonth] = useState(currentMonth)
   const { summaries, loading, error, workingDays, savingWorkingDays, saveWorkingDays } = useMonthlyReport(yearMonth)
@@ -136,14 +138,14 @@ export default function AdminReportsPage() {
           />
         </div>
         <button
-          onClick={() => exportCSV(summaries, yearMonth, workingDays)}
+          onClick={() => exportCSV(summaries, yearMonth, workingDays, branding.company_name)}
           disabled={loading || summaries.length === 0}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
             padding: '0.5rem 1.125rem',
-            background: loading || summaries.length === 0 ? '#f1f5f9' : '#16a34a',
+            background: loading || summaries.length === 0 ? '#f1f5f9' : 'var(--brand-600)',
             color: loading || summaries.length === 0 ? '#94a3b8' : '#fff',
             border: 'none',
             borderRadius: 8,

@@ -15,8 +15,8 @@ export default function EmployeeAvatar({ employee, size = 36, dim = false }: {
   return (
     <div style={{
       ...base,
-      background: dim ? '#f1f5f9' : '#dcfce7',
-      color: dim ? '#94a3b8' : '#166534',
+      background: dim ? '#f1f5f9' : 'var(--brand-100)',
+      color: dim ? '#94a3b8' : 'var(--brand-800)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontWeight: 700, fontSize: size * 0.36,
     }}>

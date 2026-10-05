@@ -163,5 +163,5 @@ export default function ShiftsModal({ shifts: s, employeeIds, onClose }: {
 
 const label = { display: 'block', fontSize: '0.8125rem', fontWeight: 500, marginBottom: '0.3125rem', color: '#374151' } as const
 const defaultTag = {
-  marginLeft: 8, padding: '1px 8px', borderRadius: 99, background: '#dcfce7', color: '#166534', fontSize: '0.6875rem', fontWeight: 700,
+  marginLeft: 8, padding: '1px 8px', borderRadius: 99, background: 'var(--brand-100)', color: 'var(--brand-800)', fontSize: '0.6875rem', fontWeight: 700,
 } as const

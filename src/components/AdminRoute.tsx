@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import ChangePasswordScreen from './ChangePasswordScreen'
 
 export default function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { session, employee, loading } = useAuth()
+  const { session, employee, superadmin, loading } = useAuth()
 
   if (loading) {
     return (
@@ -15,6 +15,9 @@ export default function AdminRoute({ children }: { children: React.ReactNode }) 
   }
 
   if (!session) return <Navigate to="/login" replace />
+
+  // The vendor's login has no employee record: it only manages branding
+  if (!employee && superadmin) return <Navigate to="/superadmin" replace />
 
   if (!employee) {
     return (

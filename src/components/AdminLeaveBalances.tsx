@@ -194,4 +194,4 @@ const th: CSSProperties = { textAlign: 'left', padding: '0.5rem 0.75rem', fontSi
 const td: CSSProperties = { padding: '0.625rem 0.75rem', verticalAlign: 'middle' }
 const input: CSSProperties = { padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: 8, fontSize: '0.875rem', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
 const smallBtn: CSSProperties = { padding: '0.3125rem 0.75rem', borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 600, fontSize: '0.8125rem', cursor: 'pointer', whiteSpace: 'nowrap' }
-const primaryBtn: CSSProperties = { padding: '0.5rem 1.125rem', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }
+const primaryBtn: CSSProperties = { padding: '0.5rem 1.125rem', borderRadius: 8, border: 'none', background: 'var(--brand-600)', color: '#fff', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }
