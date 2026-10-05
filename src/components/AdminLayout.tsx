@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, PanelLeftClose, PanelLeftOpen, UserPlus, Users, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, UserPlus, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
-import { useDrawer, useSidebarCollapsed } from '../lib/sidebar'
+import { useDrawer, useHoverExpand } from '../lib/sidebar'
 import { initials, photoUrl } from '../lib/employees'
 import { sweepExpiredSelfies } from '../lib/selfies'
 
@@ -52,7 +52,7 @@ const NAV = [
 export default function AdminLayout() {
   const { employee, signOut } = useAuth()
   const attention = useAttentionCounts()
-  const side = useSidebarCollapsed('sb.adminSidebarCollapsed')
+  const side = useHoverExpand()
   const drawer = useDrawer('(min-width: 901px)')
   const closeBtn = useRef<HTMLButtonElement>(null)
   useEffect(() => { if (drawer.open) closeBtn.current?.focus() }, [drawer.open])
@@ -61,8 +61,8 @@ export default function AdminLayout() {
   const photo = employee ? photoUrl(employee) : null
 
   return (
-    <div className={`admin-shell${side.collapsed ? ' is-collapsed' : ''}`}>
-      <aside className={`admin-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu">
+    <div className={`admin-shell${side.expanded ? '' : ' is-collapsed'}`}>
+      <aside className={`admin-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu" {...side.handlers}>
         <div className="admin-side-brand">
           <img src="/logo.jpg" alt="Sproutbien" />
           <span className="admin-chip">Admin</span>
@@ -96,11 +96,6 @@ export default function AdminLayout() {
           <button type="button" className="admin-side-btn" onClick={signOut} title="Sign out">
             <LogOut size={20} aria-hidden="true" />
             <span className="admin-side-label">Sign out</span>
-          </button>
-          <button type="button" className="admin-side-btn admin-side-collapse" onClick={side.toggle}
-            aria-label={side.collapsed ? 'Expand menu' : 'Collapse menu'} title={side.collapsed ? 'Expand menu' : 'Collapse menu'}>
-            {side.collapsed ? <PanelLeftOpen size={20} aria-hidden="true" /> : <PanelLeftClose size={20} aria-hidden="true" />}
-            <span className="admin-side-label">Collapse</span>
           </button>
         </div>
       </aside>

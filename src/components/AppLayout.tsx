@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
-import { House, CalendarDays, ChartColumn, ChevronUp, User, LogOut, Sun, Moon, Monitor, Camera, PanelLeftClose, PanelLeftOpen, Menu, X } from 'lucide-react'
+import { House, CalendarDays, ChartColumn, ChevronUp, User, LogOut, Sun, Moon, Monitor, Camera, Menu, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { photoUrl, savePhoto } from '../lib/employees'
 import { useTheme } from '../lib/theme'
 import type { ThemeChoice } from '../lib/theme'
-import { useDrawer, useSidebarCollapsed } from '../lib/sidebar'
+import { useDrawer, useHoverExpand } from '../lib/sidebar'
 import { sweepExpiredSelfies } from '../lib/selfies'
 import '../styles/app.css'
 
@@ -28,15 +28,16 @@ const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
  */
 export default function AppLayout({ children, wide = false, medium = false }: { children: React.ReactNode; wide?: boolean; medium?: boolean }) {
   const theme = useTheme()
-  const side = useSidebarCollapsed('sb.sidebarCollapsed')
+  const [accountOpen, setAccountOpen] = useState(false)
+  const side = useHoverExpand(accountOpen)
   const drawer = useDrawer('(min-width: 761px)')
   const closeBtn = useRef<HTMLButtonElement>(null)
   useEffect(() => { if (drawer.open) closeBtn.current?.focus() }, [drawer.open])
   useEffect(() => { sweepExpiredSelfies() }, [])   // selfies past 15 days
 
   return (
-    <div className={`sb-app sb-shell${side.collapsed ? ' is-collapsed' : ''}`} data-theme={theme.dataTheme}>
-      <aside className={`sb-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu">
+    <div className={`sb-app sb-shell${side.expanded ? '' : ' is-collapsed'}`} data-theme={theme.dataTheme}>
+      <aside className={`sb-side st-no-print${drawer.open ? ' is-open' : ''}`} aria-label="Menu" {...side.handlers}>
         <div className="sb-side-top">
           <Link to="/dashboard" className="sb-side-brand" aria-label="Sproutbien home">
             <img src="/logo.jpg" alt="" />
@@ -58,12 +59,7 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
           ))}
         </nav>
         <div className="sb-side-foot">
-          <UserMenu theme={theme} />
-          <button type="button" className="sb-side-collapse" onClick={side.toggle}
-            aria-label={side.collapsed ? 'Expand menu' : 'Collapse menu'} title={side.collapsed ? 'Expand menu' : 'Collapse menu'}>
-            {side.collapsed ? <PanelLeftOpen size={20} aria-hidden="true" /> : <PanelLeftClose size={20} aria-hidden="true" />}
-            <span className="sb-side-label">Collapse</span>
-          </button>
+          <UserMenu theme={theme} onOpenChange={setAccountOpen} />
         </div>
       </aside>
       {drawer.open && <div className="sb-drawer-backdrop st-no-print" onClick={drawer.hide} />}
@@ -101,9 +97,10 @@ function Header({ onMenu, menuOpen }: { onMenu: () => void; menuOpen: boolean })
 }
 
 /** Account menu at the foot of the sidebar; opens upward. */
-function UserMenu({ theme }: { theme: Theme }) {
+function UserMenu({ theme, onOpenChange }: { theme: Theme; onOpenChange: (open: boolean) => void }) {
   const { employee, signOut, refreshEmployee } = useAuth()
   const [open, setOpen] = useState(false)
+  useEffect(() => { onOpenChange(open) }, [open])  // eslint-disable-line react-hooks/exhaustive-deps
   const [photoBusy, setPhotoBusy] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)

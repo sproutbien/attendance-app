@@ -314,23 +314,6 @@
 .sb-side-who span { color: rgba(225, 245, 210, 0.8); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sb-menu-up { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; }
 
-.sb-side-collapse {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 44px;
-  padding: 0 14px;
-  border: none;
-  border-radius: 12px;
-  background: transparent;
-  color: rgba(225, 245, 210, 0.8);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.sb-side-collapse:hover { background: rgba(255, 255, 255, 0.08); color: #fff; filter: none !important; }
 
 /* Menu button (top bar) and close button (slide-out menu): phones only */
 .sb-menu-btn, .sb-drawer-close {
@@ -353,17 +336,23 @@
 /* Bottom tab bar (phones) */
 .sb-tabbar { display: none; }
 
-/* Collapsed to icons: desktop only (the phone menu always shows labels) */
 @media (min-width: 761px) {
   .sb-header { display: none; }
-  .sb-shell.is-collapsed .sb-side { flex-basis: 78px; width: 78px; }
+}
+
+/* Desktop with a mouse: icons only, opening over the page on hover (useHoverExpand).
+   The open sidebar keeps taking 78px of the layout (negative margin), so the page doesn't move.
+   Touch screens keep it open; phones use the slide-out menu. */
+@media (min-width: 761px) and (hover: hover) and (pointer: fine) {
+  .sb-side { margin-right: -170px; transition: flex-basis 0.18s ease, width 0.18s ease, margin-right 0.18s ease, box-shadow 0.18s ease; }
+  .sb-shell:not(.is-collapsed) .sb-side { z-index: 40; box-shadow: 8px 0 28px rgba(0, 0, 0, 0.28); }
+  .sb-shell.is-collapsed .sb-side { flex-basis: 78px; width: 78px; margin-right: 0; }
   .sb-shell.is-collapsed .sb-side-label,
   .sb-shell.is-collapsed .sb-side-who,
   .sb-shell.is-collapsed .sb-side .sb-user-btn > svg { display: none; }
   .sb-shell.is-collapsed .sb-side-brand,
   .sb-shell.is-collapsed .sb-side .sb-user-btn { justify-content: center; }
-  .sb-shell.is-collapsed .sb-side-nav a,
-  .sb-shell.is-collapsed .sb-side-collapse { justify-content: center; padding: 0; }
+  .sb-shell.is-collapsed .sb-side-nav a { justify-content: center; padding: 0; }
 }
 
 /* ── Page containers ───────────────────────────────────────── */
@@ -656,7 +645,6 @@
     box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
   }
   .sb-side.is-open { transform: none; visibility: visible; transition: transform 0.22s ease, visibility 0s; }
-  .sb-side-collapse { display: none; }
   .sb-menu-btn, .sb-drawer-close { display: inline-flex; }
   .sb-drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(16, 38, 26, 0.45); }
 
