@@ -33,6 +33,23 @@ export async function deleteEmployeeDocument(doc: EmployeeDocument): Promise<str
   return null
 }
 
+/** How long an employee can remove their own upload (migration 038). */
+export const OWN_UPLOAD_REMOVABLE_HOURS = 24
+
+/** An upload this employee can still remove themselves. */
+export function canRemoveOwn(doc: EmployeeDocument, employeeId: string | undefined, now = Date.now()) {
+  return !!employeeId && doc.employee_id === employeeId && doc.uploaded_by === employeeId
+    && now - new Date(doc.uploaded_at).getTime() < OWN_UPLOAD_REMOVABLE_HOURS * 3_600_000
+}
+
+/** Employee: removes their own recent upload; the step unticks if it was the last file (migration 038). */
+export async function removeOwnDocument(doc: EmployeeDocument): Promise<string | null> {
+  const { error } = await supabase.rpc('remove_own_document', { p_document: doc.id })
+  if (error) return error.message
+  await supabase.storage.from(EMPLOYEE_DOC_BUCKET).remove([doc.path])
+  return null
+}
+
 /** Opens a document in a new tab (Word files download). */
 export async function openEmployeeDocument(doc: EmployeeDocument) {
   const tab = window.open('', '_blank')   // opened now so pop-up blockers allow it

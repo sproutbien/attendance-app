@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { uploadEmployeeDocument } from '../lib/onboarding'
+import { removeOwnDocument, uploadEmployeeDocument } from '../lib/onboarding'
 import type { DocCategory, EmployeeDocument, OnboardingTask, OnboardingTemplateTask } from '../types'
 
 /** One employee's checklist and documents (an employee sees their own; admins anyone's). */
@@ -46,6 +46,12 @@ export function useOnboarding(employeeId: string | undefined) {
       }
       await refresh()
       return errors
+    },
+    /** Employee: remove their own upload from the last 24 hours. */
+    removeOwn: async (doc: EmployeeDocument) => {
+      const error = await removeOwnDocument(doc)
+      await refresh()
+      return error
     },
   }
 }
