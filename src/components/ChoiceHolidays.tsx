@@ -19,14 +19,14 @@ export default function ChoiceHolidays({ yearMonth, data }: { yearMonth: string;
         <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>Choice holidays in {monthLabel(yearMonth)}</h2>
         {!editing && (
           <button type="button" style={{ ...btn, marginLeft: 'auto' }}
-            onClick={() => setEditing({ id: null, draft: { name: '', pick_count: 1, choose_by: '', dates: [blankDate(), blankDate()] } })}>
+            onClick={() => setEditing({ id: null, draft: { name: '', pick_count: 1, opens_on: today, choose_by: '', dates: [blankDate(), blankDate()] } })}>
             + New choice holiday
           </button>
         )}
       </div>
       <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>
-        Let each employee choose which day(s) to take, e.g. Onam on 27 <i>or</i> 28 Aug. They choose on their Dashboard or Leaves page
-        until the deadline; until then, and for anyone who doesn’t choose, the default applies. You can change anyone’s date at any time.
+        Let each employee choose which day(s) to take, e.g. Onam on 27 <i>or</i> 28 Aug. From the day choosing opens, they see it on their Dashboard,
+        Leaves and Holidays pages and choose until the deadline; until then, and for anyone who doesn’t choose, the default applies. You can change anyone’s date at any time.
         Their day counts as a holiday only for them. Leave people already have on these dates is recounted automatically.
       </p>
 
@@ -56,7 +56,7 @@ export default function ChoiceHolidays({ yearMonth, data }: { yearMonth: string;
                 picks={data.picks.filter(p => p.choice_id === c.id)}
                 employees={data.employees}
                 today={today}
-                onEdit={() => setEditing({ id: c.id, draft: { name: c.name, pick_count: c.pick_count, choose_by: c.choose_by, dates: c.dates } })}
+                onEdit={() => setEditing({ id: c.id, draft: { name: c.name, pick_count: c.pick_count, opens_on: c.opens_on ?? '', choose_by: c.choose_by, dates: c.dates } })}
                 onDelete={() => data.remove(c.id)}
                 onSetFor={(emp, dates) => data.setFor(c.id, emp, dates)}
               />
@@ -107,8 +107,13 @@ function ChoiceForm({ yearMonth, initial, isNew, onSave, onCancel }: {
             onChange={e => set({ pick_count: Number(e.target.value) })} style={input} />
         </label>
         <label style={{ ...label, flex: '0 1 170px' }}>
+          Choosing opens on
+          <input type="date" required value={d.opens_on} max={d.choose_by || undefined}
+            onChange={e => set({ opens_on: e.target.value })} style={input} />
+        </label>
+        <label style={{ ...label, flex: '0 1 170px' }}>
           Last day to choose
-          <input type="date" required value={d.choose_by} max={d.dates.map(x => x.date).filter(Boolean).sort()[0]}
+          <input type="date" required value={d.choose_by} min={d.opens_on || undefined} max={d.dates.map(x => x.date).filter(Boolean).sort()[0]}
             onChange={e => set({ choose_by: e.target.value })} style={input} />
         </label>
       </div>
@@ -142,6 +147,7 @@ function ChoiceForm({ yearMonth, initial, isNew, onSave, onCancel }: {
       </button>
       {onLeave.length > 0 && <RecountNote leave={onLeave} what="these dates" />}
       <p style={{ margin: '0 0 0.875rem', fontSize: '0.75rem', color: '#64748b' }}>
+        Employees see this and can choose from the opening day until the last day to choose. Until then, the default applies.{' '}
         Tick {d.pick_count} default date{d.pick_count === 1 ? '' : 's'} for anyone who doesn’t choose in time.
         {!isNew && ' Changing the number of days, or removing a date, clears everyone’s choices so they choose again.'}
       </p>
@@ -169,13 +175,14 @@ function ChoiceItem({ choice: c, picks, employees, today, onEdit, onDelete, onSe
   const [error, setError] = useState<string | null>(null)
   const started = c.dates[0].date <= today
   const deadlinePassed = today > c.choose_by
+  const notOpenYet = !!c.opens_on && today < c.opens_on
 
   const rows = employees.map(e => {
     const own = picks.filter(p => p.employee_id === e.id)
     const eff = effectiveChoice(c, own.map(p => p.date))
     const how = eff.source === 'picked'
       ? (own[0].picked_by === e.id ? 'Chose' : 'Set by admin')
-      : deadlinePassed ? 'Default' : 'Not chosen yet (default)'
+      : deadlinePassed ? 'Default' : notOpenYet ? 'Choosing not open yet (default)' : 'Not chosen yet (default)'
     return { employee: e, dates: eff.dates, how }
   })
   const notChosen = rows.filter(r => r.how === 'Not chosen yet (default)').length
@@ -185,7 +192,9 @@ function ChoiceItem({ choice: c, picks, employees, today, onEdit, onDelete, onSe
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', flexWrap: 'wrap' }}>
         <b style={{ color: '#1d4ed8', fontSize: '0.9375rem' }}>{c.name}</b>
         <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
-          Take {c.pick_count} of {c.dates.length} · {deadlinePassed ? 'choices closed' : `choose by ${fmtHolidayDay(c.choose_by)}`}
+          Take {c.pick_count} of {c.dates.length} · {deadlinePassed ? 'choices closed'
+            : notOpenYet ? `choosing opens ${fmtHolidayDay(c.opens_on!)}, until ${fmtHolidayDay(c.choose_by)}`
+            : `choose by ${fmtHolidayDay(c.choose_by)}`}
           {!deadlinePassed && notChosen > 0 && <b style={{ color: '#b45309' }}> · {notChosen} haven’t chosen</b>}
         </span>
         <span style={{ marginLeft: 'auto', display: 'flex', gap: '0.5rem' }}>

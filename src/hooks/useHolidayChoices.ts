@@ -6,7 +6,7 @@ import type { HolidayChoice, HolidayChoiceDate } from '../types'
 
 export type ChoicePick = { choice_id: string; employee_id: string; date: string; picked_by: string | null }
 export type ChoiceEmployee = { id: string; full_name: string; department: string | null }
-export type ChoiceDraft = { name: string; pick_count: number; choose_by: string; dates: HolidayChoiceDate[] }
+export type ChoiceDraft = { name: string; pick_count: number; opens_on: string; choose_by: string; dates: HolidayChoiceDate[] }
 
 /** Admin: the choice holidays with dates in a month, everyone's picks, and the people they apply to. */
 export function useHolidayChoices(yearMonth: string) {
@@ -24,7 +24,7 @@ export function useHolidayChoices(yearMonth: string) {
       .select('choice_id, date, is_default, max_people').gte('date', start).lte('date', end).order('date')
     const ids = [...new Set((dates ?? []).map(d => d.choice_id as string))]
     const [ch, pk, emp] = await Promise.all([
-      ids.length ? supabase.from('holiday_choices').select('id, name, pick_count, choose_by').in('id', ids) : Promise.resolve({ data: [], error: null }),
+      ids.length ? supabase.from('holiday_choices').select('id, name, pick_count, choose_by, opens_on').in('id', ids) : Promise.resolve({ data: [], error: null }),
       ids.length ? supabase.from('holiday_picks').select('choice_id, employee_id, date, picked_by').in('choice_id', ids) : Promise.resolve({ data: [], error: null }),
       supabase.from('employees').select('id, full_name, department')
         .in('status', TRACKED_STATUSES).is('deleted_at', null).order('full_name'),
@@ -47,7 +47,7 @@ export function useHolidayChoices(yearMonth: string) {
   /** Add (id null) or edit a choice holiday. Returns an error message or null. */
   async function save(id: string | null, d: ChoiceDraft) {
     const { error } = await supabase.rpc('save_holiday_choice', {
-      p_id: id, p_name: d.name, p_pick_count: d.pick_count, p_choose_by: d.choose_by, p_dates: d.dates,
+      p_id: id, p_name: d.name, p_pick_count: d.pick_count, p_choose_by: d.choose_by, p_dates: d.dates, p_opens_on: d.opens_on || null,
     })
     if (!error) await refresh()
     return error?.message ?? null

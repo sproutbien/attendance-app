@@ -4,6 +4,7 @@ import { PartyPopper } from 'lucide-react'
 import { useMyHolidayChoices } from '../hooks/useHolidayChoices'
 import type { MyHolidayChoice } from '../hooks/useHolidayChoices'
 import { fmtHolidayDay } from '../lib/holidays'
+import { localDate } from '../lib/calendar'
 
 /** Employee: choose the date(s) for choice holidays (e.g. Onam: 27 or 28 Aug). Renders nothing when there are none. */
 export default function ChoiceHolidayCard({ onChanged }: { onChanged?: () => void }) {
@@ -64,8 +65,12 @@ function ChoiceRow({ choice: c, onChoose }: { choice: MyHolidayChoice; onChoose:
       <div style={{ fontSize: '0.875rem', color: 'var(--text, #2c4234)', marginBottom: '0.625rem', lineHeight: 1.5 }}>
         <b style={{ color: 'var(--text-strong, #10261a)' }}>{c.name}</b>: take {days} off from these dates.{' '}
         {c.chosen
-          ? <>You chose <b style={{ color: 'var(--blue, #1f5fbf)' }}>{c.my_dates.map(fmtHolidayDay).join(' and ')}</b>. You can change it until {fmtHolidayDay(c.choose_by)}.</>
-          : <>Choose by <b>{fmtHolidayDay(c.choose_by)}</b>. If you don’t, you’ll get {defaults}.</>}
+          ? <>You chose <b style={{ color: 'var(--blue, #1f5fbf)' }}>{c.my_dates.map(fmtHolidayDay).join(' and ')}</b>. You can change it until the last day.</>
+          : <>If you don’t choose, you’ll get {defaults}.</>}
+      </div>
+      <div style={deadline}>
+        Last day to choose: <b>{fmtHolidayDay(c.choose_by)}</b>
+        <span style={{ fontWeight: 500, opacity: 0.85 }}> · {daysLeft(c.choose_by)}</span>
       </div>
       <div role="group" aria-label={`${c.name} dates`} style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
         {c.dates.map(d => {
@@ -97,6 +102,17 @@ function ChoiceRow({ choice: c, onChoose }: { choice: MyHolidayChoice; onChoose:
       {error && <div style={{ marginTop: '0.5rem', fontSize: '0.8125rem', color: 'var(--red, #b42318)' }}>{error}</div>}
     </div>
   )
+}
+
+/** "today is the last day" / "1 day left" / "5 days left" */
+function daysLeft(chooseBy: string) {
+  const n = Math.round((new Date(`${chooseBy}T00:00:00`).getTime() - new Date(`${localDate()}T00:00:00`).getTime()) / 86_400_000)
+  return n <= 0 ? 'today is the last day' : n === 1 ? '1 day left' : `${n} days left`
+}
+
+const deadline: CSSProperties = {
+  display: 'inline-block', marginBottom: '0.625rem', padding: '3px 10px', borderRadius: 8, fontSize: '0.8125rem',
+  background: 'var(--amber-soft, #fbefd3)', color: 'var(--text-strong, #10261a)',
 }
 
 function chip(on: boolean, full: boolean): CSSProperties {

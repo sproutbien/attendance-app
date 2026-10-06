@@ -241,6 +241,7 @@ export type HolidayChoice = {
   name: string
   pick_count: number      // how many of the dates each employee takes
   choose_by: string       // last day employees can choose; the defaults apply after it
+  opens_on: string | null // first day employees can choose and see it; null = straight away (migration 041)
   dates: HolidayChoiceDate[]
 }
 
