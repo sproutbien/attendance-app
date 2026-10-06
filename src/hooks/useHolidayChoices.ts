@@ -92,7 +92,7 @@ export function useLeaveOnDates(dates: string[]) {
   return leave
 }
 
-export type MyHolidayChoice = HolidayChoice & {
+export type MyHolidayChoice = Omit<HolidayChoice, 'dates'> & {
   open: boolean            // can still choose (deadline not passed)
   chosen: boolean          // they've made their own choice
   my_dates: string[]       // their holiday date(s) right now
