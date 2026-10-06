@@ -38,13 +38,14 @@ export function useEmployeeStats(employee: Pick<Employee, 'id' | 'joining_date' 
     async function load() {
       setLoading(true)
       setError(null)
-      const [rec, hol, lv, sh, asg] = await Promise.all([
+      const [rec, hol, lv, sh, asg, chg] = await Promise.all([
         supabase.from('attendance_records').select('*').eq('employee_id', employeeId).gte('date', start).lte('date', end),
         loadHolidays(start, end),
         supabase.from('leave_requests').select('*').eq('employee_id', employeeId).eq('status', 'approved')
           .lte('start_date', end).gte('end_date', start),
         supabase.from('shifts').select('*'),
         supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').eq('employee_id', employeeId).order('effective_from'),
+        supabase.from('shift_changes').select('employee_id, date, shift_id').eq('status', 'approved').eq('employee_id', employeeId).gte('date', start).lte('date', end),
       ])
       if (cancelled) return
       const err = (rec.error ?? lv.error ?? sh.error ?? asg.error)?.message ?? hol.error
@@ -55,6 +56,7 @@ export function useEmployeeStats(employee: Pick<Employee, 'id' | 'joining_date' 
         leaves: lv.data ?? [],
         shifts: sh.data ?? [],
         assignments: asg.data ?? [],
+        changes: chg.data ?? [],
         activeFrom,
         activeTo,
       })

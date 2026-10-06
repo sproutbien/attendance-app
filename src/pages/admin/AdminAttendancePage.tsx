@@ -6,6 +6,8 @@ import { STATUS_COLORS, STATUS_LABELS } from '../../types'
 import type { AttendanceRecord } from '../../types'
 import { fmtDuration, minBreakTopUp, totalBreakSeconds } from '../../lib/breaks'
 import { useShifts } from '../../hooks/useShifts'
+import { supabase } from '../../lib/supabase'
+import { fmtPermissionTime } from '../../lib/requests'
 import type { Shift } from '../../types'
 import { localDate } from '../../lib/calendar'
 import { selfieExpired, selfieUrls } from '../../lib/selfies'
@@ -42,12 +44,13 @@ const SUMMARY_CONFIG: Array<{ status: AttendanceRecord['status']; label: string;
 export default function AdminAttendancePage() {
   const today = todayISO()
   const [selectedDate, setSelectedDate] = useState(today)
-  const { shiftOn } = useShifts()
+  const { dayShift } = useShifts()
   const [search, setSearch] = useState('')
   const [deptFilter, setDeptFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<AttendanceRecord['status'] | ''>('')
 
   const { rows, loading, error } = useAdminAttendance(selectedDate)
+  const dayRequests = useDayRequests(selectedDate)
 
   // Summary counts from unfiltered rows
   const summaryCounts = useMemo(() => {
@@ -224,7 +227,8 @@ export default function AdminAttendancePage() {
                 <AttendanceTableRow
                   key={row.employee.id}
                   row={row}
-                  shift={shiftOn(row.employee.id, selectedDate)}
+                  shift={dayShift(row.employee.id, selectedDate)}
+                  tags={dayRequests.get(row.employee.id)}
                   selfieUrl={row.record?.selfie_path ? selfies[row.record.selfie_path] : undefined}
                   onSelfie={() => setReviewing(row)}
                   showSelfie={showSelfie}
@@ -261,9 +265,10 @@ export default function AdminAttendancePage() {
   )
 }
 
-function AttendanceTableRow({ row, shift, selfieUrl, onSelfie, showSelfie, showLocation }: {
+function AttendanceTableRow({ row, shift, tags, selfieUrl, onSelfie, showSelfie, showLocation }: {
   row: AdminAttendanceRow
   shift: Shift | null
+  tags?: string[]
   selfieUrl: string | undefined
   onSelfie: () => void
   showSelfie: boolean
@@ -273,7 +278,12 @@ function AttendanceTableRow({ row, shift, selfieUrl, onSelfie, showSelfie, showL
   const topUp = minBreakTopUp(row.record, shift)
   return (
     <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-      <td style={{ ...tdStyle, fontWeight: 500, color: '#1e293b' }}>{row.employee.full_name}</td>
+      <td style={{ ...tdStyle, fontWeight: 500, color: '#1e293b' }}>
+        {row.employee.full_name}
+        {tags?.map(t => (
+          <span key={t} style={{ display: 'inline-block', marginLeft: 6, padding: '1px 8px', borderRadius: 99, background: '#eff6ff', color: '#1d4ed8', fontSize: '0.6875rem', fontWeight: 600, whiteSpace: 'nowrap' }}>{t}</span>
+        ))}
+      </td>
       <td style={{ ...tdStyle, color: '#64748b' }}>{row.employee.department ?? '—'}</td>
       <td style={tdStyle}>
         <span style={{
@@ -373,4 +383,25 @@ const thStyle: CSSProperties = {
 
 const tdStyle: CSSProperties = {
   padding: '0.75rem 1rem',
+}
+
+/** Approved one-day shift changes and permissions on a date, as short tags per employee (migration 042). */
+function useDayRequests(date: string) {
+  const [tags, setTags] = useState<Map<string, string[]>>(new Map())
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      supabase.from('shift_changes').select('employee_id, shift:shifts!shift_id(name)').eq('date', date).eq('status', 'approved'),
+      supabase.from('permission_requests').select('employee_id, start_time, end_time').eq('date', date).eq('status', 'approved'),
+    ]).then(([c, p]) => {
+      if (cancelled) return
+      const m = new Map<string, string[]>()
+      const add = (id: string, t: string) => m.set(id, [...(m.get(id) ?? []), t])
+      for (const r of (c.data ?? []) as unknown as { employee_id: string; shift: { name: string } | null }[]) add(r.employee_id, `${r.shift?.name ?? 'Shift'} shift today`)
+      for (const r of (p.data ?? []) as { employee_id: string; start_time: string; end_time: string }[]) add(r.employee_id, `Permission ${fmtPermissionTime(r)}`)
+      setTags(m)
+    })
+    return () => { cancelled = true }
+  }, [date])
+  return tags
 }

@@ -1,8 +1,11 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { CSSProperties } from 'react'
 import { useCorrectionQueue } from '../../hooks/useCorrectionQueue'
 import type { CorrectionWithEmployee } from '../../hooks/useCorrectionQueue'
 import { fmtClockTime, fromTimeInput, toTimeInput } from '../../lib/corrections'
+import { useRequestQueue } from '../../hooks/useRequests'
+import { PermissionsTab, ShiftChangesTab } from '../../components/requests/AdminRequestTabs'
 
 function fmtDay(date: string) {
   return new Date(date + 'T00:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
@@ -14,21 +17,53 @@ const STATUS_STYLES = {
   rejected: { bg: '#fee2e2', text: '#991b1b', label: 'Rejected' },
 }
 
+type Tab = 'corrections' | 'shifts' | 'permissions'
+
+/** Admin: employee requests other than leave. Corrections · Shift changes · Permissions (migration 042). */
 export default function AdminCorrectionsPage() {
-  const { pending, history, loading, actioning, approve, reject } = useCorrectionQueue()
+  const corrections = useCorrectionQueue()
+  const q = useRequestQueue()
+  const [params, setParams] = useSearchParams()
+  const tab = (['corrections', 'shifts', 'permissions'].includes(params.get('tab') ?? '') ? params.get('tab') : 'corrections') as Tab
+  const counts: Record<Tab, number> = {
+    corrections: corrections.pending.length,
+    shifts: q.shiftChanges.filter(c => c.status === 'pending').length,
+    permissions: q.permissions.filter(p => p.status === 'pending').length,
+  }
+  const TABS: [Tab, string][] = [['corrections', 'Corrections'], ['shifts', 'Shift changes'], ['permissions', 'Permissions']]
+
+  return (
+    <div>
+      <h1 style={{ margin: '0 0 1rem', fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Requests</h1>
+      <div role="tablist" aria-label="Request type" style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+        {TABS.map(([t, label]) => (
+          <button key={t} role="tab" aria-selected={tab === t} onClick={() => setParams(t === 'corrections' ? {} : { tab: t })} style={tabBtn(tab === t)}>
+            {label}
+            {counts[t] > 0 && <span style={{ marginLeft: 6, padding: '0 7px', borderRadius: 99, background: tab === t ? 'rgba(255,255,255,0.25)' : '#fef9c3', color: tab === t ? '#fff' : '#854d0e', fontSize: '0.75rem', fontWeight: 700 }}>{counts[t]}</span>}
+          </button>
+        ))}
+      </div>
+      {tab === 'corrections' && <CorrectionsTab queue={corrections} />}
+      {tab === 'shifts' && <ShiftChangesTab q={q} />}
+      {tab === 'permissions' && <PermissionsTab q={q} />}
+    </div>
+  )
+}
+
+function tabBtn(on: boolean): CSSProperties {
+  return {
+    display: 'inline-flex', alignItems: 'center', padding: '0.5rem 1rem', borderRadius: 99, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+    border: `1px solid ${on ? 'var(--brand-600)' : '#e2e8f0'}`, background: on ? 'var(--brand-600)' : '#fff', color: on ? '#fff' : '#334155',
+  }
+}
+
+function CorrectionsTab({ queue }: { queue: ReturnType<typeof useCorrectionQueue> }) {
+  const { pending, history, loading, actioning, approve, reject } = queue
   const [filter, setFilter] = useState<'all' | 'approved' | 'rejected'>('all')
   const shown = history.filter(r => filter === 'all' || r.status === filter)
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Attendance Corrections</h1>
-        {!loading && pending.length > 0 && (
-          <span style={{ background: '#fef9c3', color: '#854d0e', fontWeight: 700, fontSize: '0.8125rem', padding: '2px 10px', borderRadius: 99 }}>
-            {pending.length} pending
-          </span>
-        )}
-      </div>
 
       <div style={{ ...card, marginBottom: '1.5rem' }}>
         <h2 style={sectionTitle}>Pending Approval</h2>

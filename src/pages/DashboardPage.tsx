@@ -13,6 +13,7 @@ import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import GettingStartedCard from '../components/GettingStartedCard'
+import TodayRequestNote from '../components/TodayRequestNote'
 import PolicyUpdateNotice from '../components/PolicyUpdateNotice'
 import SelfieCheckIn from '../components/SelfieCheckIn'
 import { selfieRequired } from '../lib/selfies'
@@ -186,6 +187,7 @@ export default function DashboardPage() {
 
         <PolicyUpdateNotice />
         <GettingStartedCard />
+        <TodayRequestNote />
 
         <section className="sb-today">
           <CheckInPanel

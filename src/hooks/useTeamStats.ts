@@ -21,6 +21,7 @@ type Raw = {
   leaves: LeaveRequest[]
   shifts: Shift[]
   assignments: EmployeeShift[]
+  changes: { employee_id: string; date: string; shift_id: string }[]
 }
 
 /** Admin: every current employee's stats for a month, plus team totals and a team trend. */
@@ -47,7 +48,7 @@ export function useTeamStats(yearMonth: string) {
     async function load() {
       setLoading(true)
       setError(null)
-      const [emp, rec, hol, lv, sh, asg] = await Promise.all([
+      const [emp, rec, hol, lv, sh, asg, chg] = await Promise.all([
         // Current staff, plus anyone whose last working day falls in the period
         supabase.from('employees')
           .select('id, full_name, employee_code, designation, department, role, status, photo_path, joining_date, last_working_day')
@@ -62,6 +63,7 @@ export function useTeamStats(yearMonth: string) {
             .order('id').range(from, to)),
         supabase.from('shifts').select('*'),
         supabase.from('employee_shifts').select('employee_id, effective_from, shift_id').order('effective_from'),
+        supabase.from('shift_changes').select('employee_id, date, shift_id').eq('status', 'approved').gte('date', start).lte('date', end),
       ])
       if (cancelled) return
       const err = (emp.error ?? rec.error ?? lv.error ?? sh.error ?? asg.error)?.message ?? hol.error
@@ -73,6 +75,7 @@ export function useTeamStats(yearMonth: string) {
         leaves: lv.data ?? [],
         shifts: sh.data ?? [],
         assignments: asg.data ?? [],
+        changes: chg.data ?? [],
       })
       setLoading(false)
     }
@@ -92,13 +95,13 @@ export function useTeamStats(yearMonth: string) {
       }
       return map
     }
-    const recs = byEmp(raw.records), leaves = byEmp(raw.leaves), asg = byEmp(raw.assignments)
+    const recs = byEmp(raw.records), leaves = byEmp(raw.leaves), asg = byEmp(raw.assignments), chg = byEmp(raw.changes)
 
     // Per person, per month (oldest first)
     const perPerson = raw.employees.map(e => {
       const input = {
         records: recs.get(e.id) ?? [], holidays: new Set(holidaysFor(raw.holidays, e.id).keys()), leaves: leaves.get(e.id) ?? [],
-        shifts: raw.shifts, assignments: asg.get(e.id) ?? [], activeFrom: e.joining_date, activeTo: e.last_working_day,
+        shifts: raw.shifts, assignments: asg.get(e.id) ?? [], changes: chg.get(e.id) ?? [], activeFrom: e.joining_date, activeTo: e.last_working_day,
       }
       return { employee: e, trend: months.map(ym => computeMonthStats(ym, input, today)) }
     })

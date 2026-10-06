@@ -287,3 +287,34 @@ export type EmployeeShift = {
   effective_from: string   // "YYYY-MM-DD"
   shift_id: string
 }
+
+export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
+
+/** Work another shift on one day (migration 042). Approved ones drive shift_for(). */
+export type ShiftChange = {
+  id: string
+  employee_id: string
+  date: string
+  shift_id: string
+  from_shift_id: string | null
+  reason: string
+  status: RequestStatus
+  admin_note: string | null
+  requested_by: string | null
+  requested_at: string
+  reviewed_at: string | null
+}
+
+/** A few hours out on one day, made up the same day (migration 042). */
+export type PermissionRequest = {
+  id: string
+  employee_id: string
+  date: string
+  start_time: string   // "14:00:00"
+  end_time: string
+  reason: string
+  status: RequestStatus
+  admin_note: string | null
+  requested_at: string
+  reviewed_at: string | null
+}

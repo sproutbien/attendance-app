@@ -1,4 +1,4 @@
-import type { AttendanceRecord, EmployeeShift, LeaveRequest, LeaveTypeCode, Shift } from '../types'
+import type { AttendanceRecord, EmployeeShift, LeaveRequest, LeaveTypeCode, Shift, ShiftChange } from '../types'
 import { TRACKING_START, isSunday, monthDates } from './calendar'
 import { minBreakTopUp, shiftSeconds, spanSeconds, totalBreakSeconds, workedSeconds } from './breaks'
 import { FALLBACK_SHIFT, minutesOf } from './shifts'
@@ -56,13 +56,14 @@ export type StatsInput = {
   leaves: LeaveRequest[]       // approved
   shifts: Shift[]
   assignments: EmployeeShift[] // sorted by effective_from
+  changes?: Pick<ShiftChange, 'date' | 'shift_id'>[]  // approved one-day shift changes (migration 042)
   activeFrom?: string | null   // joining date: earlier days aren't counted
   activeTo?: string | null     // last working day: later days aren't counted
 }
 
-export function shiftOnDate(input: Pick<StatsInput, 'shifts' | 'assignments'>, date: string): Shift {
-  let id: string | null = null
-  for (const a of input.assignments) if (a.effective_from <= date) id = a.shift_id
+export function shiftOnDate(input: Pick<StatsInput, 'shifts' | 'assignments' | 'changes'>, date: string): Shift {
+  let id: string | null = input.changes?.find(c => c.date === date)?.shift_id ?? null
+  if (!id) for (const a of input.assignments) if (a.effective_from <= date) id = a.shift_id
   return input.shifts.find(s => s.id === id) ?? input.shifts.find(s => s.is_default) ?? FALLBACK_SHIFT
 }
 

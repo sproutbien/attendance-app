@@ -11,7 +11,8 @@ import { useBranding } from '../contexts/BrandingContext'
 
 /**
  * Nav badge counts: leave = pending requests + cancellations no admin has marked seen;
- * corrections = pending correction requests. Refreshes on page change and after admin actions.
+ * corrections = pending corrections, one-day shift changes and permissions (the Requests page).
+ * Refreshes on page change and after admin actions.
  */
 function useAttentionCounts() {
   const { pathname } = useLocation()
@@ -19,7 +20,7 @@ function useAttentionCounts() {
   useEffect(() => {
     let cancelled = false
     const load = async () => {
-      const [leave, corrections] = await Promise.all([
+      const [leave, corrections, shiftChanges, permissions] = await Promise.all([
         supabase
           .from('leave_requests')
           .select('id', { count: 'exact', head: true })
@@ -28,8 +29,10 @@ function useAttentionCounts() {
           .from('attendance_corrections')
           .select('id', { count: 'exact', head: true })
           .eq('status', 'pending'),
+        supabase.from('shift_changes').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+        supabase.from('permission_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
       ])
-      if (!cancelled) setCounts({ leave: leave.count ?? 0, corrections: corrections.count ?? 0 })
+      if (!cancelled) setCounts({ leave: leave.count ?? 0, corrections: (corrections.count ?? 0) + (shiftChanges.count ?? 0) + (permissions.count ?? 0) })
     }
     load()
     window.addEventListener(LEAVE_CHANGED, load)
@@ -41,7 +44,7 @@ function useAttentionCounts() {
 const NAV = [
   { to: '/admin/attendance',  label: 'Attendance',  Icon: Clock },
   { to: '/admin/leave',       label: 'Leave',       Icon: CalendarCheck, badge: 'leave' },
-  { to: '/admin/corrections', label: 'Corrections', Icon: FilePen,       badge: 'corrections' },
+  { to: '/admin/corrections', label: 'Requests',    Icon: FilePen,       badge: 'corrections' },
   { to: '/admin/employees',   label: 'Employees',   Icon: Users },
   { to: '/admin/hiring',      label: 'Hiring',      Icon: UserPlus },
   { to: '/admin/reports',     label: 'Reports',     Icon: ChartColumn },

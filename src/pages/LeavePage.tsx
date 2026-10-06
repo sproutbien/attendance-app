@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useHolidayDates, useLeaveBalances, useLeaveCapPreview } from '../hooks/useLeaveBalances'
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
 import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
+import OtherRequests from '../components/OtherRequests'
 import { LEAVE_TYPE_LABELS, addDays, bookableAsOf, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, isMonthCapped, workingDays } from '../lib/leave'
 import { localDate, monthLabel } from '../lib/calendar'
 import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
@@ -444,6 +445,8 @@ export default function LeavePage() {
           </button>
         </form>
       </div>
+
+      <OtherRequests />
 
       {/* Request history */}
       <div style={{ ...card, marginTop: '1.5rem' }}>
