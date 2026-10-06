@@ -1,42 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, CheckCircle2, Clock, FileText, Scale, ScrollText } from 'lucide-react'
+import { CalendarDays, CheckCircle2, Clock, FileText, Repeat, Scale, ScrollText } from 'lucide-react'
 import AppLayout from '../components/AppLayout'
 import { useAuth } from '../contexts/AuthContext'
 import { useLeaveMonthCaps, useLeaveTypes } from '../hooks/useLeaveBalances'
 import { useLeavePolicy } from '../hooks/useLeavePolicy'
 import { useMyShift } from '../hooks/useShifts'
-import { supabase } from '../lib/supabase'
 import { currentYearMonth, localDate, monthLabel } from '../lib/calendar'
 import { fmtDays, leaveYearLabel, leaveYearOf } from '../lib/leave'
 import { fmtHolidayDay } from '../lib/holidays'
 import { CANCEL_CUTOFF_MS, FULL_DAY_GRACE_MIN } from '../lib/halfDay'
 import { fmtClock, minutesOf, shiftHours } from '../lib/shifts'
 import { MAX_LEAVE_DOCS, LEAVE_DOC_WINDOW_DAYS } from '../lib/leaveDocs'
-
-type ChoiceRow = { id: string; name: string; pick_count: number; choose_by: string; dates: { date: string; is_default: boolean }[] }
-
-/** Public and choice holidays in a leave year (everyone can read both). */
-function useYearHolidays(year: number) {
-  const [publicHolidays, setPublic] = useState<{ date: string; name: string }[]>([])
-  const [choices, setChoices] = useState<ChoiceRow[]>([])
-  useEffect(() => {
-    const from = `${year}-04-01`, to = `${year + 1}-03-31`
-    Promise.all([
-      supabase.from('public_holidays').select('date, name').gte('date', from).lte('date', to).order('date'),
-      supabase.from('holiday_choice_dates').select('choice_id, date, is_default').gte('date', from).lte('date', to).order('date'),
-    ]).then(async ([pub, dates]) => {
-      setPublic(pub.data ?? [])
-      const ids = [...new Set((dates.data ?? []).map(d => d.choice_id))]
-      if (!ids.length) return setChoices([])
-      const { data } = await supabase.from('holiday_choices').select('id, name, pick_count, choose_by').in('id', ids)
-      setChoices((data ?? []).map(c => ({ ...c, dates: (dates.data ?? []).filter(d => d.choice_id === c.id) }))
-        .sort((a, b) => a.dates[0].date.localeCompare(b.dates[0].date)))
-    })
-  }, [year])
-  return { publicHolidays, choices }
-}
 
 /** "13:30" + 60 minutes → "14:30" */
 function addMinutes(time: string, minutes: number) {
@@ -47,12 +23,10 @@ function addMinutes(time: string, minutes: number) {
 /** Employee: the leave policy, built from the live settings plus the admin's additional rules. */
 export default function LeavePolicyPage() {
   const { employee } = useAuth()
-  const today = localDate()
-  const year = leaveYearOf(today)
+  const year = leaveYearOf(localDate())
   const { types } = useLeaveTypes()
   const { caps } = useLeaveMonthCaps(`${currentYearMonth()}-01`)
   const { shift, loaded: shiftLoaded } = useMyShift()
-  const { publicHolidays, choices } = useYearHolidays(year)
   const p = useLeavePolicy(employee?.id)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,7 +57,7 @@ export default function LeavePolicyPage() {
           <table style={table}>
             <thead>
               <tr>
-                <th style={th}>Type</th><th style={th}>Per year</th><th style={th}>Credited</th><th style={th}>Unused on 31 March</th>
+                <th style={th}>Type</th><th style={th}>Per year</th><th style={th}>Credited</th>
               </tr>
             </thead>
             <tbody>
@@ -92,19 +66,61 @@ export default function LeavePolicyPage() {
                   <td style={{ ...td, fontWeight: 700 }}>{t.name}</td>
                   <td style={td}>{fmtDays(t.yearly_quota)} days</td>
                   <td style={td}>{fmtDays(t.yearly_quota / 12)} day{t.yearly_quota / 12 === 1 ? '' : 's'} on the 1st of each month</td>
-                  <td style={td}>{t.carry_forward_cap > 0 ? `Carried into next year, up to ${fmtDays(t.carry_forward_cap)} days` : 'Lapses'}</td>
                 </tr>
               ))}
               {lop && (
                 <tr>
                   <td style={{ ...td, fontWeight: 700 }}>{lop.name}</td>
-                  <td style={td} colSpan={3}>Unpaid, taken when needed. Deducted from your salary.</td>
+                  <td style={td} colSpan={2}>Unpaid, taken when needed. Deducted from your salary.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
       </Section>
+
+      {paid.length > 0 && (
+        <Section icon={<Repeat size={18} />} title="Carrying leave forward">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={table}>
+              <thead>
+                <tr><th style={th}>Type</th><th style={th}>To the next month</th><th style={th}>To the next leave year (1 April)</th></tr>
+              </thead>
+              <tbody>
+                {paid.map(t => (
+                  <tr key={t.code}>
+                    <td style={{ ...td, fontWeight: 700 }}>{t.name}</td>
+                    <td style={td}>Yes, every month until 31 March</td>
+                    <td style={td}>
+                      {t.carry_forward_cap > 0
+                        ? <>Yes, up to <b>{fmtDays(t.carry_forward_cap)} days</b>. No time limit.</>
+                        : <>No. Unused days <b>lapse on 31 March</b>.</>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <ul style={{ ...list, marginTop: 12 }}>
+            <li>
+              <b>Within the leave year:</b> days you don’t use stay in your balance and roll into the next month, and the month after, until 31 March.
+              A day credited on 1 April can still be used the following March, up to 11 months later.
+            </li>
+            {paid.some(t => t.carry_forward_cap > 0) && (
+              <li>
+                <b>Into the next leave year:</b> on 1 April, unused{' '}
+                {paid.filter(t => t.carry_forward_cap > 0).map(t => `${t.name} (up to ${fmtDays(t.carry_forward_cap)} days)`).join(' and ')}{' '}
+                moves to the new year. Carried days keep rolling over every year with no expiry, but the amount carried into a year is never more than the limit; anything above it lapses.
+              </li>
+            )}
+            {paid.some(t => t.carry_forward_cap === 0) && (
+              <li>
+                <b>Lapses on 31 March:</b> {paid.filter(t => t.carry_forward_cap === 0).map(t => t.name).join(' and ')}. Use these within the leave year.
+              </li>
+            )}
+          </ul>
+        </Section>
+      )}
 
       <Section icon={<FileText size={18} />} title="How leave works">
         <ul style={list}>
@@ -128,34 +144,6 @@ export default function LeavePolicyPage() {
           </ul>
         </Section>
       )}
-
-      <Section icon={<CalendarDays size={18} />} title={`Holidays, ${leaveYearLabel(year)}`}>
-        {publicHolidays.length === 0 && choices.length === 0 ? <p style={para}>No holidays announced yet.</p> : (
-          <>
-            {publicHolidays.length > 0 && (
-              <ul style={{ ...list, columns: '2 220px' }}>
-                {publicHolidays.map(h => (
-                  <li key={h.date} style={{ color: h.date < today ? 'var(--text-faint, #93a397)' : undefined, breakInside: 'avoid' }}>
-                    <b>{fmtHolidayDay(h.date)}</b> · {h.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {choices.length > 0 && (
-              <>
-                <p style={{ ...para, marginTop: 12 }}><b>Choice holidays:</b> you pick your day(s) on your Dashboard before the deadline; otherwise you get the default.</p>
-                <ul style={list}>
-                  {choices.map(c => (
-                    <li key={c.id}>
-                      <b>{c.name}</b>: take {c.pick_count} of {c.dates.map(d => fmtHolidayDay(d.date) + (d.is_default ? ' (default)' : '')).join(', ')} · choose by {fmtHolidayDay(c.choose_by)}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </>
-        )}
-      </Section>
 
       {shiftLoaded && (
         <>
