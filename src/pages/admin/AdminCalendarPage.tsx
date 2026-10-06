@@ -21,6 +21,7 @@ export default function AdminCalendarPage() {
   const [name, setName] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
+  const [choiceMode, setChoiceMode] = useState(false)   // the tick box: add a choice holiday instead
   // Leave already on these days is recounted when a holiday is added or removed
   const onLeave = useLeaveOnDates([date, ...holidays.map(h => h.date)])
   const leaveOn = (d: string) => onLeave.filter(l => l.start_date <= d && l.end_date >= d)
@@ -35,6 +36,7 @@ export default function AdminCalendarPage() {
     setDate('')
     setName('')
     setFormError(null)
+    setChoiceMode(false)
   }
 
   function pickDay(d: string) {
@@ -100,6 +102,20 @@ export default function AdminCalendarPage() {
             <h2 style={{ margin: '0 0 1rem', fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
               {editing ? 'Rename holiday' : 'Add holiday'}
             </h2>
+            {!editing && (
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.875rem', fontSize: '0.8125rem', color: '#374151', cursor: 'pointer' }}>
+                <input type="checkbox" checked={choiceMode} onChange={e => { setChoiceMode(e.target.checked); setFormError(null) }}
+                  style={{ width: 16, height: 16, marginTop: 1, accentColor: '#0d9488' }} />
+                <span>
+                  <b>Choice holiday</b>: employees pick their day from a few dates (e.g. Onam on 27 or 28 Aug)
+                </span>
+              </label>
+            )}
+            {choiceMode && !editing ? (
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: '#0f766e', lineHeight: 1.5 }}>
+                Fill in the choice holiday below the calendar. Untick to add a normal public holiday instead.
+              </p>
+            ) : <>
             <label style={labelStyle}>Date</label>
             <input
               type="date"
@@ -144,6 +160,7 @@ export default function AdminCalendarPage() {
             >
               {saving ? 'Saving…' : editing ? 'Save name' : 'Add holiday'}
             </button>
+            </>}
           </form>
 
           <div style={card}>
@@ -187,7 +204,7 @@ export default function AdminCalendarPage() {
       </div>
 
       <div style={{ marginTop: '1.25rem' }}>
-        <ChoiceHolidays yearMonth={yearMonth} data={choices} />
+        <ChoiceHolidays yearMonth={yearMonth} data={choices} creating={choiceMode} onCreatingDone={() => setChoiceMode(false)} />
       </div>
     </div>
   )

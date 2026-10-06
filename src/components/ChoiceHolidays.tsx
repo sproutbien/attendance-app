@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useLeaveOnDates } from '../hooks/useHolidayChoices'
 import type { ChoiceDraft, ChoiceEmployee, ChoicePick, LeaveOnDate, useHolidayChoices } from '../hooks/useHolidayChoices'
@@ -8,37 +8,55 @@ import type { HolidayChoice } from '../types'
 
 type Data = ReturnType<typeof useHolidayChoices>
 
-/** Admin: holidays employees take on one of several dates (e.g. Onam: 27 or 28 Aug). */
-export default function ChoiceHolidays({ yearMonth, data }: { yearMonth: string; data: Data }) {
+/**
+ * Admin: holidays employees take on one of several dates (e.g. Onam: 27 or 28 Aug).
+ * Shown only when the month has one, or while the admin is adding one (`creating`,
+ * from the "choice holiday" tick box on the Add holiday form).
+ */
+export default function ChoiceHolidays({ yearMonth, data, creating = false, onCreatingDone }: {
+  yearMonth: string
+  data: Data
+  creating?: boolean
+  onCreatingDone?: () => void
+}) {
   const [editing, setEditing] = useState<{ id: string | null; draft: ChoiceDraft } | null>(null)
   const today = localDate()
+  const box = useRef<HTMLDivElement>(null)
+
+  // The tick box opens a new one; closing the form (saved or cancelled) unticks it
+  useEffect(() => {
+    if (creating && !editing) {
+      setEditing({ id: null, draft: { name: '', pick_count: 1, opens_on: today, choose_by: '', dates: [blankDate(), blankDate()] } })
+      setTimeout(() => box.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    }
+    if (!creating && editing?.id === null) setEditing(null)
+  }, [creating])  // eslint-disable-line react-hooks/exhaustive-deps
+  const close = () => { if (editing?.id === null) onCreatingDone?.(); setEditing(null) }
+
+  if (!editing && !data.error && (data.loading || data.choices.length === 0)) return null
 
   return (
-    <div style={card}>
+    <div ref={box} style={{ ...card, scrollMarginTop: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
-        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>Choice holidays in {monthLabel(yearMonth)}</h2>
-        {!editing && (
-          <button type="button" style={{ ...btn, marginLeft: 'auto' }}
-            onClick={() => setEditing({ id: null, draft: { name: '', pick_count: 1, opens_on: today, choose_by: '', dates: [blankDate(), blankDate()] } })}>
-            + New choice holiday
-          </button>
-        )}
+        <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color: '#1e293b' }}>
+          {editing?.id === null ? 'New choice holiday' : `Choice holidays in ${monthLabel(yearMonth)}`}
+        </h2>
       </div>
-      <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>
+      {editing && <p style={{ margin: '0 0 1rem', fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>
         Let each employee choose which day(s) to take, e.g. Onam on 27 <i>or</i> 28 Aug. From the day choosing opens, they see it on their Dashboard,
         Leaves and Holidays pages and choose until the deadline; until then, and for anyone who doesn’t choose, the default applies. You can change anyone’s date at any time.
         Their day counts as a holiday only for them. Leave people already have on these dates is recounted automatically.
-      </p>
+      </p>}
 
       {editing && (
         <ChoiceForm
           yearMonth={yearMonth}
           initial={editing.draft}
           isNew={editing.id === null}
-          onCancel={() => setEditing(null)}
+          onCancel={close}
           onSave={async d => {
             const err = await data.save(editing.id, d)
-            if (!err) setEditing(null)
+            if (!err) close()
             return err
           }}
         />
@@ -46,7 +64,7 @@ export default function ChoiceHolidays({ yearMonth, data }: { yearMonth: string;
 
       {data.error && <div style={errorBox}>{data.error}</div>}
       {data.loading ? <p style={muted}>Loading…</p>
-        : data.choices.length === 0 ? (!editing && <p style={muted}>None this month.</p>)
+        : data.choices.length === 0 ? null
         : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {data.choices.map(c => (
