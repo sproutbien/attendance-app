@@ -9,8 +9,9 @@ import { useShifts } from '../../hooks/useShifts'
 import type { Shift } from '../../types'
 import { localDate } from '../../lib/calendar'
 import { selfieExpired, selfieUrls } from '../../lib/selfies'
-import { SelfieCell, SelfieReview, SelfieSetting } from '../../components/SelfieAdmin'
-import { GeofenceSetting, LocationCell } from '../../components/GeofenceAdmin'
+import { SelfieCell, SelfieReview } from '../../components/SelfieAdmin'
+import { LocationCell } from '../../components/GeofenceAdmin'
+import { CheckInRulesButton, CheckInRulesDrawer, useCheckInRules } from '../../components/CheckInRules'
 
 const todayISO = () => localDate()
 
@@ -73,6 +74,14 @@ export default function AdminAttendancePage() {
 
   const isToday = selectedDate === today
 
+  // Selfie / Location columns: shown while the rule is on, or when the day has data for them
+  const [rules, setRules] = useCheckInRules()
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const showSelfie = !!rules?.selfie || rows.some(r => r.record?.selfie_path || r.record?.selfie_missing_reason)
+  const showLocation = !!rules?.location || rows.some(r => r.record?.geofence_status)
+  const columns = ['Employee', 'Department', 'Status', 'Check In',
+    ...(showSelfie ? ['Selfie'] : []), ...(showLocation ? ['Location'] : []), 'Check Out', 'Break']
+
   // Signed links for the day's selfies (private bucket)
   const [selfies, setSelfies] = useState<Record<string, string>>({})
   const [reviewing, setReviewing] = useState<AdminAttendanceRow | null>(null)
@@ -92,41 +101,41 @@ export default function AdminAttendancePage() {
         <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>
           Attendance
         </h1>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button onClick={() => setSelectedDate(d => shiftDate(d, -1))} style={navBtn}>‹</button>
-          <input
-            type="date"
-            value={selectedDate}
-            max={today}
-            onChange={e => setSelectedDate(e.target.value)}
-            style={{
-              padding: '0.4rem 0.625rem',
-              border: '1px solid #d1d5db',
-              borderRadius: 8,
-              fontSize: '0.875rem',
-              color: '#1e293b',
-              outline: 'none',
-            }}
-          />
-          <button
-            onClick={() => setSelectedDate(d => shiftDate(d, 1))}
-            disabled={isToday}
-            style={{ ...navBtn, opacity: isToday ? 0.35 : 1, cursor: isToday ? 'default' : 'pointer' }}
-          >
-            ›
-          </button>
-          {!isToday && (
-            <button onClick={() => setSelectedDate(today)} style={todayBtn}>Today</button>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <CheckInRulesButton rules={rules} onClick={() => setRulesOpen(true)} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button onClick={() => setSelectedDate(d => shiftDate(d, -1))} style={navBtn}>‹</button>
+            <input
+              type="date"
+              value={selectedDate}
+              max={today}
+              onChange={e => setSelectedDate(e.target.value)}
+              style={{
+                padding: '0.4rem 0.625rem',
+                border: '1px solid #d1d5db',
+                borderRadius: 8,
+                fontSize: '0.875rem',
+                color: '#1e293b',
+                outline: 'none',
+              }}
+            />
+            <button
+              onClick={() => setSelectedDate(d => shiftDate(d, 1))}
+              disabled={isToday}
+              style={{ ...navBtn, opacity: isToday ? 0.35 : 1, cursor: isToday ? 'default' : 'pointer' }}
+            >
+              ›
+            </button>
+            {!isToday && (
+              <button onClick={() => setSelectedDate(today)} style={todayBtn}>Today</button>
+            )}
+          </div>
         </div>
       </div>
 
       <p style={{ margin: '-1rem 0 1.5rem', color: '#64748b', fontSize: '0.875rem' }}>
         {fmtDateLabel(selectedDate)}
       </p>
-
-      <SelfieSetting />
-      <GeofenceSetting />
 
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -205,7 +214,7 @@ export default function AdminAttendancePage() {
           <table className="rt" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                {['Employee', 'Department', 'Status', 'Check In', 'Selfie', 'Location', 'Check Out', 'Break'].map(h => (
+                {columns.map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -218,6 +227,8 @@ export default function AdminAttendancePage() {
                   shift={shiftOn(row.employee.id, selectedDate)}
                   selfieUrl={row.record?.selfie_path ? selfies[row.record.selfie_path] : undefined}
                   onSelfie={() => setReviewing(row)}
+                  showSelfie={showSelfie}
+                  showLocation={showLocation}
                 />
               ))}
             </tbody>
@@ -239,15 +250,24 @@ export default function AdminAttendancePage() {
           onClose={() => setReviewing(null)}
         />
       )}
+
+      {rulesOpen && (
+        <CheckInRulesDrawer
+          onChange={changes => setRules(r => ({ selfie: false, location: false, ...r, ...changes }))}
+          onClose={() => setRulesOpen(false)}
+        />
+      )}
     </div>
   )
 }
 
-function AttendanceTableRow({ row, shift, selfieUrl, onSelfie }: {
+function AttendanceTableRow({ row, shift, selfieUrl, onSelfie, showSelfie, showLocation }: {
   row: AdminAttendanceRow
   shift: Shift | null
   selfieUrl: string | undefined
   onSelfie: () => void
+  showSelfie: boolean
+  showLocation: boolean
 }) {
   const colors = STATUS_COLORS[row.effectiveStatus]
   const topUp = minBreakTopUp(row.record, shift)
@@ -269,10 +289,12 @@ function AttendanceTableRow({ row, shift, selfieUrl, onSelfie }: {
         </span>
       </td>
       <td style={tdStyle}>{fmtTime(row.record?.check_in_time)}</td>
-      <td style={{ ...tdStyle, paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
-        <SelfieCell record={row.record} url={selfieUrl} onOpen={onSelfie} />
-      </td>
-      <td style={tdStyle}><LocationCell record={row.record} /></td>
+      {showSelfie && (
+        <td style={{ ...tdStyle, paddingTop: '0.375rem', paddingBottom: '0.375rem' }}>
+          <SelfieCell record={row.record} url={selfieUrl} onOpen={onSelfie} />
+        </td>
+      )}
+      {showLocation && <td style={tdStyle}><LocationCell record={row.record} /></td>}
       <td style={tdStyle}>{fmtTime(row.record?.check_out_time)}</td>
       <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
         {fmtDuration(totalBreakSeconds(row.record))}

@@ -9,7 +9,7 @@ import type { AttendanceRecord, Employee } from '../types'
 import { overlayStyle, modalStyle, ghostBtn } from './employees/styles'
 
 /** Company-wide "Selfie at check-in" switch (Attendance page). */
-export function SelfieSetting() {
+export function SelfieSetting({ onChange }: { onChange?: (on: boolean) => void } = {}) {
   const { employee } = useAuth()
   const [on, setOn] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
@@ -33,12 +33,12 @@ export function SelfieSetting() {
       .select('selfie_required')
     if (error) setError(error.message)
     else if (!data?.length) setError('The setting is missing in the database (migration 032).')
-    else setOn(!on)
+    else { setOn(!on); onChange?.(!on) }
     setSaving(false)
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.125rem', marginBottom: '1.5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', padding: '0.875rem 1.125rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
       <span style={{ display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: 10, background: on ? 'var(--brand-100)' : '#f1f5f9', color: on ? 'var(--brand-800)' : '#64748b', flexShrink: 0 }}>
         <Camera size={18} />
       </span>

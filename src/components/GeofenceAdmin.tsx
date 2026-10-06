@@ -11,7 +11,7 @@ import type { AttendanceRecord, EmployeeOption } from '../types'
 import { errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn } from './employees/styles'
 
 /** Company-wide "Location check at check-in" switch, Strict option and office areas (migration 037). */
-export function GeofenceSetting() {
+export function GeofenceSetting({ onChange }: { onChange?: (on: boolean) => void } = {}) {
   const { employee } = useAuth()
   const lists = useEmployeeOptions()
   const [settings, setSettings] = useState<{ geofence_required: boolean; geofence_strict: boolean } | null>(null)
@@ -36,7 +36,7 @@ export function GeofenceSetting() {
       .select('geofence_required, geofence_strict')
     if (error) setError(error.message)
     else if (!data?.length) setError('The setting is missing in the database (migration 037).')
-    else setSettings(data[0])
+    else { setSettings(data[0]); onChange?.(data[0].geofence_required) }
     setSaving(false)
   }
 
@@ -45,7 +45,7 @@ export function GeofenceSetting() {
   const withArea = locations.filter(l => l.lat != null)
 
   return (
-    <div style={{ padding: '0.875rem 1.125rem', marginBottom: '1.5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+    <div style={{ padding: '0.875rem 1.125rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
         <span style={{ display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: 10, background: on ? 'var(--brand-100)' : '#f1f5f9', color: on ? 'var(--brand-800)' : '#64748b', flexShrink: 0 }}>
           <MapPin size={18} />
@@ -88,14 +88,16 @@ export function GeofenceSetting() {
             {locations.length === 0 ? (
               <p style={{ ...hintStyle, margin: 0 }}>No work locations yet. Add them under Employees → Lists, then set an area here.</p>
             ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 6 }}>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
                 {locations.map(l => (
-                  <li key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.875rem' }}>
-                    <span style={{ fontWeight: 600, color: '#1e293b', minWidth: 160 }}>{l.name}</span>
-                    {l.lat != null && l.lng != null
-                      ? <span style={{ color: '#475569' }}>within {fmtDistance(l.radius_m!)} · <a href={mapLink(l.lat, l.lng)} target="_blank" rel="noreferrer" style={{ color: 'var(--brand-700)' }}>view on map</a></span>
-                      : <span style={{ color: '#94a3b8' }}>No area: not checked</span>}
-                    <button type="button" onClick={() => setEditing(l)} style={{ ...ghostBtn, marginLeft: 'auto' }}>
+                  <li key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.875rem' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, color: '#1e293b' }}>{l.name}</div>
+                      {l.lat != null && l.lng != null
+                        ? <div style={{ color: '#475569', fontSize: '0.8125rem' }}>within {fmtDistance(l.radius_m!)} · <a href={mapLink(l.lat, l.lng)} target="_blank" rel="noreferrer" style={{ color: 'var(--brand-700)' }}>view on map</a></div>
+                        : <div style={{ color: '#94a3b8', fontSize: '0.8125rem' }}>No area: not checked</div>}
+                    </div>
+                    <button type="button" onClick={() => setEditing(l)} style={{ ...ghostBtn, flexShrink: 0 }}>
                       {l.lat != null ? 'Edit area' : 'Set area'}
                     </button>
                   </li>
