@@ -173,10 +173,10 @@ export default function AdminCalendarPage() {
                       style={{
                         background: 'none', border: '1px solid #fecaca', color: '#dc2626',
                         borderRadius: 6, padding: '0.25rem 0.625rem', fontSize: '0.75rem',
-                        cursor: 'pointer', fontFamily: 'inherit',
+                        cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', flexShrink: 0,
                       }}
                     >
-                      {removing === h.date ? '…' : 'Remove'}
+                      {removing === h.date ? 'Cancelling…' : 'Cancel holiday'}
                     </button>
                   </li>
                 ))}
@@ -220,13 +220,13 @@ const inputStyle: CSSProperties = {
   fontFamily: 'inherit',
 }
 
-/** Under a public holiday: who has leave over it, and what removing the holiday does to that leave. */
+/** Under a public holiday: who has leave over it, and what cancelling the holiday does to that leave. */
 function leaveOverNote(names: string[]) {
   const people = [...new Set(names)]
   const who = people.length <= 3
     ? people.join(people.length === 2 ? ' and ' : ', ')
     : `${people.slice(0, 3).join(', ')} and ${people.length - 3} more`
   return people.length === 1
-    ? `${who} has leave over this date. Removing the holiday adds a day to their leave (from their balance, or as Loss of Pay).`
-    : `${who} have leave over this date. Removing the holiday adds a day to each of their leaves (from their balance, or as Loss of Pay).`
+    ? `${who} has leave over this date. Cancelling the holiday adds a day to their leave (from their balance, or as Loss of Pay).`
+    : `${who} have leave over this date. Cancelling the holiday adds a day to each of their leaves (from their balance, or as Loss of Pay).`
 }
