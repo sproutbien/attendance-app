@@ -164,9 +164,7 @@ export default function AdminCalendarPage() {
                         {fmtDate(h.date)}{isSunday(h.date) && ' · falls on a Sunday'}
                       </div>
                       {leaveOn(h.date).length > 0 && (
-                        <div style={{ fontSize: '0.75rem', color: '#92400e' }} title={leaveOn(h.date).map(l => l.full_name).join(', ')}>
-                          {leaveOn(h.date).length} on leave around it — removing it recounts their leave
-                        </div>
+                        <div style={{ fontSize: '0.75rem', color: '#92400e' }}>{leaveOverNote(leaveOn(h.date).map(l => l.full_name))}</div>
                       )}
                     </div>
                     <button
@@ -220,4 +218,15 @@ const inputStyle: CSSProperties = {
   boxSizing: 'border-box',
   color: '#1e293b',
   fontFamily: 'inherit',
+}
+
+/** Under a public holiday: who has leave over it, and what removing the holiday does to that leave. */
+function leaveOverNote(names: string[]) {
+  const people = [...new Set(names)]
+  const who = people.length <= 3
+    ? people.join(people.length === 2 ? ' and ' : ', ')
+    : `${people.slice(0, 3).join(', ')} and ${people.length - 3} more`
+  return people.length === 1
+    ? `${who} has leave over this date. Removing the holiday adds a day to their leave (from their balance, or as Loss of Pay).`
+    : `${who} have leave over this date. Removing the holiday adds a day to each of their leaves (from their balance, or as Loss of Pay).`
 }
