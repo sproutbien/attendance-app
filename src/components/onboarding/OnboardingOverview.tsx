@@ -6,6 +6,7 @@ import { daysUntil, notStartedYet, probationDue, relativeDays } from '../../lib/
 import EmployeeAvatar from '../employees/EmployeeAvatar'
 import { card, ghostBtn, primaryBtn } from '../employees/styles'
 import type { Employee } from '../../types'
+import type { OnboardingProgress } from '../../hooks/useOnboarding'
 
 /**
  * Admin, Employees page: people still onboarding and probations ending within two weeks.
@@ -13,11 +14,11 @@ import type { Employee } from '../../types'
  */
 export default function OnboardingOverview({ employees, progress, onConfirm }: {
   employees: Employee[]                                     // current staff
-  progress: Map<string, { done: number; total: number }>
+  progress: Map<string, OnboardingProgress>
   onConfirm: (e: Employee) => Promise<string | null>
 }) {
   const onboarding = employees
-    .filter(e => { const p = progress.get(e.id); return p && p.done < p.total })
+    .filter(e => { const p = progress.get(e.id); return p && (p.done < p.total || p.review === 'ready' || p.review === 'resend') })
     .sort((a, b) => (a.joining_date ?? '').localeCompare(b.joining_date ?? ''))
   const probation = employees
     .filter(e => probationDue(e))
@@ -40,12 +41,19 @@ export default function OnboardingOverview({ employees, progress, onConfirm }: {
                     {notStartedYet(e) ? `Joins ${fmtDate(e.joining_date!)}` : e.joining_date ? `Joined ${fmtDate(e.joining_date)}` : 'No joining date'}
                   </span>
                 </span>
-                <span style={{ width: 90 }}>
-                  <span style={{ display: 'block', height: 6, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden' }}>
-                    <span style={{ display: 'block', width: `${(p.done / p.total) * 100}%`, height: '100%', background: 'var(--brand-600)' }} />
+                {p.review === 'ready' || p.review === 'resend' ? (
+                  <span style={{ padding: '2px 10px', borderRadius: 99, fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
+                    ...(p.review === 'ready' ? { background: 'var(--brand-100)', color: 'var(--brand-800)' } : { background: '#fef3c7', color: '#92400e' }) }}>
+                    {p.review === 'ready' ? 'Ready for review' : 'Re-send requested'}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.done} of {p.total} done</span>
-                </span>
+                ) : (
+                  <span style={{ width: 90 }}>
+                    <span style={{ display: 'block', height: 6, borderRadius: 99, background: '#e2e8f0', overflow: 'hidden' }}>
+                      <span style={{ display: 'block', width: `${(p.done / p.total) * 100}%`, height: '100%', background: 'var(--brand-600)' }} />
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{p.done} of {p.total} done</span>
+                  </span>
+                )}
               </Link>
             )
           })}

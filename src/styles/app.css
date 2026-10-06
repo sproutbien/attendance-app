@@ -484,6 +484,17 @@
 
 @keyframes sb-pulse { 50% { opacity: 0.35; } }
 
+/* A card asking for attention (e.g. onboarding steps left): soft pulsing ring */
+.sb-attention { --attn: var(--green); animation: sb-attention 2s ease-in-out infinite; }
+.sb-attention.is-amber { --attn: var(--amber); }
+@keyframes sb-attention {
+  0%, 100% { box-shadow: var(--shadow), 0 0 0 0 color-mix(in srgb, var(--attn) 0%, transparent); }
+  50%      { box-shadow: var(--shadow), 0 0 0 4px color-mix(in srgb, var(--attn) 40%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-attention { animation: none; box-shadow: var(--shadow), 0 0 0 2px color-mix(in srgb, var(--attn) 45%, transparent); }
+}
+
 .sb-stats { display: grid; grid-template-columns: 1fr 1px 1fr; align-items: center; gap: 0; margin-bottom: 16px; }
 .sb-stats-divider { height: 44px; background: var(--border); }
 .sb-stat { display: flex; align-items: center; gap: 14px; padding: 0 10px; }

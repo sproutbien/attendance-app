@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { docMimeType } from './leaveDocs'
 import { localDate } from './calendar'
-import type { DocCategory, Employee, EmployeeDocument, OnboardingTask } from '../types'
+import type { DocCategory, Employee, EmployeeDocument, OnboardingReview, OnboardingTask } from '../types'
 
 // Onboarding checklist, employee documents and probation — must match migration 029.
 
@@ -48,6 +48,22 @@ export async function removeOwnDocument(doc: EmployeeDocument): Promise<string |
   if (error) return error.message
   await supabase.storage.from(EMPLOYEE_DOC_BUCKET).remove([doc.path])
   return null
+}
+
+/** Deletes files whose records are already gone (e.g. replaced re-send requests). */
+export async function removeDocumentFiles(paths: string[]) {
+  await supabase.storage.from(EMPLOYEE_DOC_BUCKET).remove(paths)
+}
+
+export type VerificationState = 'none' | 'todo' | 'resend' | 'ready' | 'verified'
+
+/** Where an employee's onboarding documents stand (migration 039). Admin steps don't count. */
+export function verificationState(tasks: OnboardingTask[], docs: EmployeeDocument[], review: OnboardingReview | null): VerificationState {
+  if (docs.some(d => d.resend_reason)) return 'resend'
+  if (review) return 'verified'
+  const mine = tasks.filter(t => t.assignee === 'employee')
+  if (!mine.length) return 'none'
+  return mine.every(t => t.done_at) ? 'ready' : 'todo'
 }
 
 /** Opens a document in a new tab (Word files download). */

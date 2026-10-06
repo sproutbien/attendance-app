@@ -147,6 +147,16 @@ export type EmployeeDocument = {
   size_bytes: number
   uploaded_by: string | null
   uploaded_at: string
+  resend_reason: string | null        // HR asked for it again (migration 039)
+  resend_requested_at: string | null
+}
+
+/** HR passed an employee's onboarding documents (migration 039). */
+export type OnboardingReview = {
+  employee_id: string
+  verified_at: string
+  verified_by: string | null
+  seen_at: string | null              // employee pressed Done on the notice
 }
 
 /** One step of an onboarding checklist (a template row has the same shape minus employee / done). */
