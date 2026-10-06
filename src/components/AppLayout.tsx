@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
-import { House, CalendarDays, ChartColumn, ChevronUp, User, LogOut, Sun, Moon, Monitor, Camera, Menu, X } from 'lucide-react'
+import { House, CalendarDays, ChartColumn, ChevronUp, User, LogOut, Sun, Moon, Monitor, Camera, Menu, X, PartyPopper, CircleUser } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { photoUrl, savePhoto } from '../lib/employees'
 import { useTheme } from '../lib/theme'
@@ -11,9 +11,11 @@ import '../styles/app.css'
 import { useBranding } from '../contexts/BrandingContext'
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard', Icon: House },
-  { to: '/leave',     label: 'Leave',     Icon: CalendarDays },
-  { to: '/reports',   label: 'Reports',   Icon: ChartColumn },
+  { to: '/dashboard', label: 'Dashboard',  short: 'Dashboard', Icon: House },
+  { to: '/leave',     label: 'Leave',      short: 'Leave',     Icon: CalendarDays },
+  { to: '/holidays',  label: 'Holidays',   short: 'Holidays',  Icon: PartyPopper },
+  { to: '/reports',   label: 'Reports',    short: 'Reports',   Icon: ChartColumn },
+  { to: '/profile',   label: 'My profile', short: 'Me',        Icon: CircleUser },
 ]
 
 const THEMES: Array<{ value: ThemeChoice; label: string; Icon: typeof Sun }> = [
@@ -70,8 +72,8 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
         {wide ? children : <div className={medium ? 'sb-narrow sb-medium' : 'sb-narrow'}>{children}</div>}
       </div>
       <nav className="sb-tabbar" aria-label="Main">
-        {NAV.map(({ to, label, Icon }) => (
-          <NavLink key={to} to={to}><Icon size={22} strokeWidth={2} />{label}</NavLink>
+        {NAV.map(({ to, short, Icon }) => (
+          <NavLink key={to} to={to}><Icon size={22} strokeWidth={2} />{short}</NavLink>
         ))}
       </nav>
     </div>
@@ -162,6 +164,9 @@ function UserMenu({ theme, onOpenChange }: { theme: Theme; onOpenChange: (open: 
               </button>
             ))}
           </div>
+          <Link className="sb-menu-item" role="menuitem" to="/profile" onClick={() => setOpen(false)} style={{ textDecoration: 'none' }}>
+            <CircleUser size={18} /> My profile
+          </Link>
           <button className="sb-menu-item" role="menuitem" disabled={photoBusy} onClick={() => fileInput.current?.click()}>
             <Camera size={18} /> {photoBusy ? 'Saving photo…' : photo ? 'Change photo' : 'Add photo'}
           </button>

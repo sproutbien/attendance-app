@@ -52,3 +52,33 @@ export function effectiveChoice(choice: HolidayChoice, picked: string[]) {
 export function fmtHolidayDay(iso: string) {
   return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 }
+
+/** Downloads holidays as an .ics file the phone's calendar app can import (all-day events). */
+export function downloadHolidayCalendar(holidays: { date: string; name: string }[], fileName: string, calendarName: string) {
+  const ymd = (d: string) => d.replace(/-/g, '')
+  const nextDay = (d: string) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10) }
+  const esc = (t: string) => t.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n')
+  const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15) + 'Z'
+  const lines = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Sproutbien//Holidays//EN', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${esc(calendarName)}`,
+    ...holidays.flatMap(h => [
+      'BEGIN:VEVENT',
+      `UID:holiday-${ymd(h.date)}-${esc(h.name).replace(/[^A-Za-z0-9]/g, '')}@sproutbien`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${ymd(h.date)}`,
+      `DTEND;VALUE=DATE:${ymd(nextDay(h.date))}`,
+      `SUMMARY:${esc(h.name)}`,
+      'TRANSP:TRANSPARENT',
+      'END:VEVENT',
+    ]),
+    'END:VCALENDAR',
+  ]
+  const url = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}

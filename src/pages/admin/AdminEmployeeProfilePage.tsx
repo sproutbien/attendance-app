@@ -150,12 +150,12 @@ export default function AdminEmployeeProfilePage() {
           <Row label="Account created" value={fmtDate(new Date(e.created_at))} />
         </InfoCard>
 
-        <InfoCard title="Contact">
+        <InfoCard title="Contact" aside={e.contact_updated_at ? `Updated by ${e.full_name.split(' ')[0]} on ${fmtDate(new Date(e.contact_updated_at))}` : undefined}>
           <Row label="Email" value={<a href={`mailto:${e.email}`} style={link}>{e.email}</a>} />
           <Row label="Phone / WhatsApp" value={e.phone && fmtPhone(e.phone)} />
         </InfoCard>
 
-        <InfoCard title="Emergency contact">
+        <InfoCard title="Emergency contact" aside={e.contact_updated_at ? `Updated by ${e.full_name.split(' ')[0]} on ${fmtDate(new Date(e.contact_updated_at))}` : undefined}>
           <Row label="Name" value={e.emergency_contact_name} />
           <Row label="Relationship" value={e.emergency_contact_relation} />
           <Row label="Phone" value={e.emergency_contact_phone} />

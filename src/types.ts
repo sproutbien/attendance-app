@@ -22,6 +22,7 @@ export type Employee = {
   emergency_contact_name: string | null
   emergency_contact_relation: string | null
   emergency_contact_phone: string | null
+  contact_updated_at: string | null  // employee last edited their contact details (migration 040)
   probation_end_date: string | null
   must_change_password: boolean   // still on the admin's temporary password (migration 033)
   selfie_rule: 'default' | 'always' | 'never'

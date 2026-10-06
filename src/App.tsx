@@ -10,6 +10,8 @@ import DashboardPage from './pages/DashboardPage'
 import LeavePage from './pages/LeavePage'
 import ReportsPage from './pages/ReportsPage'
 import LeavePolicyPage from './pages/LeavePolicyPage'
+import HolidaysPage from './pages/HolidaysPage'
+import ProfilePage from './pages/ProfilePage'
 import AdminAttendancePage from './pages/admin/AdminAttendancePage'
 import AdminLeavePage from './pages/admin/AdminLeavePage'
 import AdminEmployeesPage from './pages/admin/AdminEmployeesPage'
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="/leave"     element={<ProtectedRoute><LeavePage /></ProtectedRoute>} />
             <Route path="/reports"   element={<ProtectedRoute><ReportsPage /></ProtectedRoute>} />
             <Route path="/leave-policy" element={<ProtectedRoute><LeavePolicyPage /></ProtectedRoute>} />
+            <Route path="/holidays" element={<ProtectedRoute><HolidaysPage /></ProtectedRoute>} />
+            <Route path="/profile"  element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
             {/* Admin routes — nested so AdminLayout wraps all sub-pages via <Outlet /> */}
             <Route
