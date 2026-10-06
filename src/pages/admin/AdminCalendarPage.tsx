@@ -82,12 +82,12 @@ export default function AdminCalendarPage() {
             <>
               <MonthGrid
                 yearMonth={yearMonth}
-                markFor={d => byDate.has(d) ? 'holiday' : isSunday(d) ? 'sunday' : 'none'}
+                markFor={d => byDate.has(d) ? 'holiday' : choiceDateName.has(d) ? 'choice_holiday' : isSunday(d) ? 'sunday' : 'none'}
                 noteFor={d => byDate.get(d) ?? (choiceDateName.has(d) ? `${choiceDateName.get(d)} (choice)` : undefined)}
                 onDayClick={pickDay}
               />
               <div style={{ marginTop: '0.875rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <CalendarLegend marks={['holiday', 'sunday']} />
+                <CalendarLegend marks={['holiday', 'choice_holiday', 'sunday']} />
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Click a day to add or rename its holiday.</span>
               </div>
             </>

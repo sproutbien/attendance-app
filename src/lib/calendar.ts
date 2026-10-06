@@ -63,10 +63,11 @@ export function suggestedWorkingDays(yearMonth: string, holidayDates: Iterable<s
 
 // ── Day marks ─────────────────────────────────────────────────
 
-export type DayMark = 'holiday' | 'leave' | 'half_leave' | 'leave_pending' | 'present' | 'late' | 'absent' | 'sunday' | 'none'
+export type DayMark = 'holiday' | 'choice_holiday' | 'leave' | 'half_leave' | 'leave_pending' | 'present' | 'late' | 'absent' | 'sunday' | 'none'
 
 export const MARK_STYLES: Record<DayMark, { bg: string; text: string; border?: string; code: string; label: string }> = {
   holiday:       { bg: '#2563eb', text: '#fff',    code: 'H',  label: 'Public holiday' },
+  choice_holiday: { bg: '#0d9488', text: '#fff',   code: 'CH', label: 'Choice holiday' },
   leave:         { bg: '#dc2626', text: '#fff',    code: 'LV', label: 'Leave' },
   half_leave:    { bg: '#fecaca', text: '#991b1b', code: 'HD', label: 'Half-day leave' },
   leave_pending: { bg: '#fee2e2', text: '#b91c1c', border: '1px dashed #dc2626', code: 'LV', label: 'Leave (pending)' },
@@ -86,12 +87,13 @@ export function resolveMark(
   today: string,
   opts: {
     holiday: boolean
+    choice?: boolean    // the holiday is the employee's choice holiday, not a public one
     attendance?: AttendanceRecord['status']
     leave?: 'approved' | 'pending'
     halfDay?: boolean   // approved half-day leave on this date
   },
 ): DayMark {
-  if (opts.holiday) return 'holiday'
+  if (opts.holiday) return opts.choice ? 'choice_holiday' : 'holiday'
   if (opts.halfDay) return 'half_leave'
   if (opts.leave === 'approved' || opts.attendance === 'on_leave') return 'leave'
   if (opts.leave === 'pending') return 'leave_pending'

@@ -36,7 +36,7 @@ type DayState = 'loading' | 'idle' | 'working' | 'break' | 'done'
 
 const MARK_LABELS: Record<DayMark, string> = {
   present: 'Present', late: 'Late', absent: 'Absent', leave: 'On Leave', half_leave: 'Half-day leave', leave_pending: 'Leave pending',
-  holiday: 'Holiday', sunday: 'Weekly off', none: 'Not checked in',
+  holiday: 'Holiday', choice_holiday: 'Choice holiday', sunday: 'Weekly off', none: 'Not checked in',
 }
 
 const CHIP: Record<DayState, { label: string; cls: string }> = {
@@ -597,7 +597,7 @@ function useMonthLog(
         const mark: DayMark = isHalf ? 'half_leave'
           : rec?.check_in_time
           ? (rec.status === 'late' ? 'late' : 'present')
-          : resolveMark(date, today, { holiday, attendance: rec?.status, leave: leave?.get(date) })
+          : resolveMark(date, today, { holiday, choice: holiday && calendar.isChoiceHoliday(date), attendance: rec?.status, leave: leave?.get(date) })
         const complete = !!rec?.check_in_time && (!!rec.check_out_time || date === today)
         const shift = rec?.check_in_time ? shiftOn(date) : null
         return {
@@ -662,7 +662,7 @@ function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingC
 
   const status = (r: LogRow) => (
     <span className={`sb-status s-${r.mark}`} title={r.note}>
-      <i />{r.mark === 'holiday' && r.note ? r.note : MARK_LABELS[r.mark]}
+      <i />{(r.mark === 'holiday' || r.mark === 'choice_holiday') && r.note ? r.note : MARK_LABELS[r.mark]}
     </span>
   )
 

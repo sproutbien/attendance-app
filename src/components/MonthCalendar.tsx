@@ -72,7 +72,7 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 // Short tag shown inside a day cell (cells are narrow on the employee layout)
 const CELL_TAGS: Record<DayMark, string> = {
-  holiday: 'HOLIDAY', leave: 'LEAVE', half_leave: 'HALF DAY', leave_pending: 'PENDING',
+  holiday: 'HOLIDAY', choice_holiday: 'CHOICE', leave: 'LEAVE', half_leave: 'HALF DAY', leave_pending: 'PENDING',
   present: 'PRESENT', late: 'LATE', absent: 'ABSENT', sunday: '', none: '',
 }
 
@@ -105,7 +105,7 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick, compact = f
         const mark = markFor(date)
         const s = MARK_STYLES[mark]
         const note = noteFor?.(date)
-        const strong = mark === 'holiday' || mark === 'leave'
+        const strong = mark === 'holiday' || mark === 'choice_holiday' || mark === 'leave'
         return (
           <div
             key={date}

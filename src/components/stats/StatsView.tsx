@@ -184,7 +184,7 @@ export default function StatsView({ employee, title, actions }: {
               <>
                 <MonthGrid yearMonth={yearMonth} markFor={d => calendar.markFor(employee.id, d)} noteFor={d => calendar.holidays.get(d)} compact />
                 <div style={{ marginTop: 14 }}>
-                  <CalendarLegend marks={['leave', 'half_leave', 'leave_pending', 'holiday', 'present', 'late', 'absent', 'sunday']} compact />
+                  <CalendarLegend marks={['leave', 'half_leave', 'leave_pending', 'holiday', 'choice_holiday', 'present', 'late', 'absent', 'sunday']} compact />
                 </div>
               </>
             )}

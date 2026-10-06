@@ -116,6 +116,7 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
 
   const markFor = useCallback((empId: string, date: string): DayMark => resolveMark(date, localDate(), {
     holiday: holidayName(data.holidays, empId, date) !== undefined,
+    choice: !data.holidays.common.has(date),
     attendance: data.attendance.get(empId)?.get(date),
     leave: data.leave.get(empId)?.get(date),
     halfDay: data.halfDay.get(empId)?.has(date),
@@ -132,5 +133,8 @@ export function useMonthCalendar(yearMonth: string, employeeId?: string) {
   // One employee: their holidays (public + their own choice dates). Everyone: public holidays only.
   const holidays = useMemo(() => employeeId ? holidaysFor(data.holidays, employeeId) : data.holidays.common, [data, employeeId])
 
-  return { holidays, holidayFor, leave: data.leave, halfDay: data.halfDay, markFor, statusFor, loading, error }
+  /** True when an employee's holiday on a date is their choice holiday, not a public one */
+  const isChoiceHoliday = useCallback((date: string) => !data.holidays.common.has(date), [data])
+
+  return { holidays, holidayFor, isChoiceHoliday, leave: data.leave, halfDay: data.halfDay, markFor, statusFor, loading, error }
 }
