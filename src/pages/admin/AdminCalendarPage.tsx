@@ -87,6 +87,7 @@ export default function AdminCalendarPage() {
                 markFor={d => byDate.has(d) ? 'holiday' : choiceDateName.has(d) ? 'choice_holiday' : isSunday(d) ? 'sunday' : 'none'}
                 noteFor={d => byDate.get(d) ?? (choiceDateName.has(d) ? `${choiceDateName.get(d)} (choice)` : undefined)}
                 onDayClick={pickDay}
+                selected={date || undefined}
               />
               <div style={{ marginTop: '0.875rem', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <CalendarLegend marks={['holiday', 'choice_holiday', 'sunday']} />

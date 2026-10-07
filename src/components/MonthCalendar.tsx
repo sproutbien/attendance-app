@@ -76,11 +76,12 @@ const CELL_TAGS: Record<DayMark, string> = {
   present: 'PRESENT', late: 'LATE', absent: 'ABSENT', sunday: '', none: '',
 }
 
-export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick, compact = false }: {
+export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick, selected, compact = false }: {
   yearMonth: string
   markFor: (date: string) => DayMark
   noteFor?: (date: string) => string | undefined
   onDayClick?: (date: string) => void
+  selected?: string   // the clicked day: ringed so it stands out on any background
   compact?: boolean   // smaller type and cells for the employee area
 }) {
   const dates = monthDates(yearMonth)
@@ -106,14 +107,16 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick, compact = f
         const s = MARK_STYLES[mark]
         const note = noteFor?.(date)
         const strong = mark === 'holiday' || mark === 'choice_holiday' || mark === 'leave'
+        const isSelected = date === selected
         return (
           <div
             key={date}
             role={onDayClick ? 'button' : undefined}
             tabIndex={onDayClick ? 0 : undefined}
+            aria-pressed={onDayClick ? isSelected : undefined}
             onClick={onDayClick ? () => onDayClick(date) : undefined}
             onKeyDown={onDayClick ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDayClick(date) } } : undefined}
-            title={[s.label, note].filter(Boolean).join(' — ') || undefined}
+            title={[isSelected && 'Selected', s.label, note].filter(Boolean).join(' — ') || undefined}
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
               minHeight: compact ? 54 : 64, padding: compact ? '0.3125rem' : '0.375rem', borderRadius: 8, boxSizing: 'border-box',
@@ -122,9 +125,11 @@ export function MonthGrid({ yearMonth, markFor, noteFor, onDayClick, compact = f
               color: strong ? '#fff' : '#1e293b',
               cursor: onDayClick ? 'pointer' : 'default',
               textAlign: 'left', fontFamily: 'inherit', overflow: 'hidden',
+              // Outside the cell, so it shows on every colour and doesn't hide today's outline
+              ...(isSelected ? { outline: '3px solid #2563eb', outlineOffset: 1, boxShadow: '0 4px 12px rgba(37, 99, 235, 0.28)', position: 'relative', zIndex: 1 } : null),
             }}
           >
-            <span style={{ fontSize: compact ? 12 : '0.8125rem', fontWeight: 600, color: strong ? '#fff' : mark === 'sunday' ? 'var(--text-faint, #94a3b8)' : mark === 'none' ? 'var(--text-strong, #1e293b)' : '#1e293b' }}>
+            <span style={{ fontSize: compact ? 12 : '0.8125rem', fontWeight: isSelected ? 800 : 600, color: strong ? '#fff' : mark === 'sunday' ? 'var(--text-faint, #94a3b8)' : mark === 'none' ? 'var(--text-strong, #1e293b)' : '#1e293b' }}>
               {Number(date.slice(8))}
             </span>
             {CELL_TAGS[mark] && (
