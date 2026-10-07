@@ -20,8 +20,7 @@ html {
   --brand-800: #166534;
   --brand-900: #14532d;
   --brand-950: #052e16;
-  --brand-side: #14532d;          /* admin sidebar + phone header */
-  --brand-side-muted: #a7d7b4;    /* secondary text on the sidebar */
+  --brand-side: #14532d;          /* superadmin page header */
 }
 
 body {
@@ -157,25 +156,25 @@ a {
   flex-direction: column;
   gap: 2px;
   padding: 18px 12px 14px;
-  background: var(--brand-side);
-  color: var(--brand-100);
-  box-shadow: 1px 0 3px rgba(0, 0, 0, 0.25);
+  background: #fff;
+  color: #334155;
+  border-right: 1px solid #e2e8f0;
   z-index: 10;
   transition: flex-basis 0.15s ease, width 0.15s ease;
 }
 
 .admin-side-brand { display: flex; align-items: center; gap: 12px; padding: 0 6px 18px; }
-.admin-side-brand img { width: 36px; height: 36px; border-radius: 50%; background: #fff; object-fit: cover; flex-shrink: 0; }
+.admin-side-brand img { width: 36px; height: 36px; border-radius: 50%; background: #fff; object-fit: cover; flex-shrink: 0; box-shadow: 0 0 0 1px #e2e8f0; }
 .admin-chip {
   font-size: 0.625rem;
-  background: color-mix(in srgb, var(--brand-200) 15%, transparent);
-  color: var(--brand-200);
+  background: var(--brand-50);
+  color: var(--brand-700);
   padding: 2px 8px;
   border-radius: 4px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  border: 1px solid color-mix(in srgb, var(--brand-200) 25%, transparent);
+  border: 1px solid var(--brand-200);
 }
 
 .admin-side nav { display: flex; flex-direction: column; gap: 2px; }
@@ -191,7 +190,7 @@ a {
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: color-mix(in srgb, var(--brand-100) 82%, transparent);
+  color: #475569;
   font-family: inherit;
   font-size: 0.875rem;
   font-weight: 500;
@@ -199,8 +198,21 @@ a {
   text-decoration: none;
   cursor: pointer;
 }
-.admin-side nav a:hover, .admin-side-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
-.admin-side nav a.active { background: color-mix(in srgb, var(--brand-200) 16%, transparent); color: #fff; font-weight: 700; }
+.admin-side nav a svg, .admin-side-btn svg { color: #64748b; }
+.admin-side nav a:hover, .admin-side-btn:hover { background: #f1f5f9; color: #0f172a; }
+.admin-side nav a.active { background: var(--brand-50); color: var(--brand-700); font-weight: 700; }
+.admin-side nav a.active svg { color: var(--brand-600); }
+/* Short bar on the sidebar's edge beside the current page */
+.admin-side nav a.active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand-600);
+}
 .admin-side svg { flex-shrink: 0; }
 .admin-side-label { flex: 1; white-space: nowrap; overflow: hidden; }
 .admin-side-badge {
@@ -221,13 +233,13 @@ a {
   height: 8px;
   border-radius: 50%;
   background: #f87171;
-  box-shadow: 0 0 0 2px var(--brand-side);
+  box-shadow: 0 0 0 2px #fff;
 }
 
 .admin-side-foot {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--brand-200) 18%, transparent);
+  border-top: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -238,8 +250,8 @@ a {
   height: 32px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--brand-200);
-  color: var(--brand-side);
+  background: var(--brand-100);
+  color: var(--brand-700);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -249,15 +261,15 @@ a {
 .admin-side-initials { overflow: hidden; }
 .admin-side-initials img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .admin-side-who { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
-.admin-side-who strong { color: #fff; font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.admin-side-who span { color: var(--brand-side-muted); font-size: 0.75rem; }
+.admin-side-who strong { color: #0f172a; font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-side-who span { color: #64748b; font-size: 0.75rem; }
 
 /* Desktop with a mouse: icons only, opening over the page on hover (useHoverExpand).
    The open sidebar keeps taking 72px of the layout (negative margin), so the page doesn't move.
    Touch screens keep it open; phones use the slide-out menu. */
 @media (min-width: 901px) and (hover: hover) and (pointer: fine) {
   .admin-side { flex-basis: 232px; margin-right: -160px; transition: flex-basis 0.18s ease, width 0.18s ease, margin-right 0.18s ease, box-shadow 0.18s ease; overflow-x: hidden; }
-  .admin-shell:not(.is-collapsed) .admin-side { z-index: 40; box-shadow: 6px 0 24px rgba(0, 0, 0, 0.25); }
+  .admin-shell:not(.is-collapsed) .admin-side { z-index: 40; box-shadow: 8px 0 28px rgba(15, 23, 42, 0.12); }
   .admin-shell.is-collapsed .admin-side { flex-basis: 72px; width: 72px; margin-right: 0; }
   .admin-shell.is-collapsed .admin-side-label,
   .admin-shell.is-collapsed .admin-side-badge,
@@ -279,7 +291,7 @@ a {
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: #fff;
+  color: #334155;
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -296,8 +308,8 @@ a {
   padding: 0 1rem;
   align-items: center;
   gap: 0.75rem;
-  background: var(--brand-side);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 
@@ -307,10 +319,10 @@ a {
   width: 42px;
   height: 42px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: #fff;
+  color: #334155;
   cursor: pointer;
   align-items: center;
   justify-content: center;

@@ -266,12 +266,12 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
 
             <PreviewLabel>Employee app</PreviewLabel>
             <div className="sb-app" data-theme="light" style={{ minHeight: 0, display: 'flex', borderRadius: 14, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-              <div style={{ width: 132, background: 'var(--side-bg)', color: '#fff', padding: '0.75rem 0.5rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ width: 132, background: 'var(--side-bg)', color: 'var(--text)', borderRight: '1px solid var(--border)', padding: '0.75rem 0.5rem', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <img src={previewIcon} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
-                  <strong style={{ fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{draft.app_name}</strong>
+                  <img src={previewIcon} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', background: '#fff', boxShadow: '0 0 0 1px var(--border)' }} />
+                  <strong style={{ color: 'var(--green-dark)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{draft.app_name}</strong>
                 </div>
-                <span style={{ ...navPill, background: 'var(--surface)', color: 'var(--green-dark)' }}><House size={12} /> Dashboard</span>
+                <span style={{ ...navPill, background: 'var(--green-soft)', color: 'var(--green-dark)', fontWeight: 700 }}><House size={12} /> Dashboard</span>
                 <span style={navPill}><CalendarDays size={12} /> Leave</span>
               </div>
               <div style={{ flex: 1, padding: '0.75rem', background: 'var(--bg)', minWidth: 0 }}>
@@ -285,9 +285,10 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
 
             <PreviewLabel>Admin panel</PreviewLabel>
             <div style={{ display: 'flex', borderRadius: 14, overflow: 'hidden', border: '1px solid #e2e8f0' }}>
-              <div style={{ width: 48, background: 'var(--brand-side)', padding: '0.75rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'color-mix(in srgb, var(--brand-100) 82%, transparent)' }}>
-                <img src={previewIcon} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', background: '#fff' }} />
-                <Users size={16} /><CalendarDays size={16} />
+              <div style={{ width: 48, background: '#fff', borderRight: '1px solid #e2e8f0', padding: '0.75rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: '#64748b' }}>
+                <img src={previewIcon} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', background: '#fff', boxShadow: '0 0 0 1px #e2e8f0' }} />
+                <span style={{ display: 'grid', placeItems: 'center', width: 32, height: 28, borderRadius: 8, background: 'var(--brand-50)', color: 'var(--brand-600)' }}><Users size={16} /></span>
+                <CalendarDays size={16} />
               </div>
               <div style={{ flex: 1, padding: '0.75rem', background: 'var(--brand-50)', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Section heading</span>
@@ -364,4 +365,4 @@ function PreviewLabel({ children }: { children: React.ReactNode }) {
 
 const sectionTitle: CSSProperties = { margin: '0 0 1rem', fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-600)', textTransform: 'uppercase', letterSpacing: '0.06em' }
 const grid2: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', columnGap: '1rem' }
-const navPill: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.85)' }
+const navPill: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 600, color: 'var(--text)' }

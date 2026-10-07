@@ -162,7 +162,7 @@ export function brandChecks(hex: string) {
       ratio: contrast('#ffffff', p[600]),
       note: darkened ? 'buttons use a slightly darker shade of your colour so the text stays readable' : '',
     },
-    { label: 'White text on the sidebar', ratio: contrast('#ffffff', p.side), note: '' },
+    { label: 'Current page in the menu', ratio: contrast(p[700], p[50]), note: '' },
     { label: 'Brand-coloured text and links on white', ratio: contrast(p[700], '#ffffff'), note: '' },
   ]
 }
@@ -175,32 +175,24 @@ export function brandCss(hex: string): string {
   const tone = (l: number, cf: number) => lchToHex({ l, c: c * cf, h })
   // Background tints: gentle, and none at all for a grey brand
   const tint = (l: number, cn: number) => lchToHex({ l, c: cn * Math.min(1, c / 0.12), h })
-  const side = hexToLch(p.side)
-  const sideTone = (dl: number) => lchToHex({ l: Math.max(0.2, side.l + dl), c: side.c, h })
 
   const light = `
     --green: ${tone(0.5, 0.95)}; --green-dark: ${tone(0.4, 0.8)}; --green-soft: ${tint(0.95, 0.035)};
     --green-btn-1: ${tone(0.55, 1)}; --green-btn-2: ${tone(0.43, 0.9)};
     --bg: ${tint(0.975, 0.008)}; --surface-soft: ${tint(0.965, 0.012)}; --border: ${tint(0.92, 0.014)};
     --border-soft: ${tint(0.95, 0.01)}; --row-hover: ${tint(0.98, 0.008)}; --grey-soft: ${tint(0.945, 0.006)};
-    --text-strong: ${tint(0.25, 0.03)}; --text: ${tint(0.36, 0.025)}; --text-muted: ${tint(0.52, 0.02)}; --text-faint: ${tint(0.7, 0.014)};
-    --header-bg: linear-gradient(90deg, ${sideTone(-0.06)} 0%, ${p.side} 55%, ${sideTone(-0.03)} 100%);
-    --side-bg: linear-gradient(180deg, ${sideTone(-0.06)} 0%, ${p.side} 55%, ${sideTone(-0.03)} 100%);`
+    --text-strong: ${tint(0.25, 0.03)}; --text: ${tint(0.36, 0.025)}; --text-muted: ${tint(0.52, 0.02)}; --text-faint: ${tint(0.7, 0.014)};`
   const dark = `
     --green: ${tone(0.8, 0.9)}; --green-dark: ${tone(0.85, 0.8)}; --green-soft: ${tint(0.3, 0.045)};
     --green-btn-1: ${tone(0.55, 1)}; --green-btn-2: ${tone(0.45, 0.9)};
     --bg: ${tint(0.17, 0.015)}; --surface: ${tint(0.205, 0.016)}; --surface-soft: ${tint(0.235, 0.02)};
     --border: ${tint(0.31, 0.025)}; --border-soft: ${tint(0.27, 0.02)}; --row-hover: ${tint(0.235, 0.02)}; --grey-soft: ${tint(0.25, 0.012)};
-    --text-strong: ${tint(0.95, 0.012)}; --text: ${tint(0.87, 0.015)}; --text-muted: ${tint(0.72, 0.02)}; --text-faint: ${tint(0.55, 0.02)};
-    --header-bg: linear-gradient(90deg, ${tone(0.27, 0.6)} 0%, ${tone(0.33, 0.65)} 55%, ${tone(0.29, 0.6)} 100%);
-    --side-bg: linear-gradient(180deg, ${tone(0.27, 0.6)} 0%, ${tone(0.33, 0.65)} 55%, ${tone(0.29, 0.6)} 100%);`
+    --text-strong: ${tint(0.95, 0.012)}; --text: ${tint(0.87, 0.015)}; --text-muted: ${tint(0.72, 0.02)}; --text-faint: ${tint(0.55, 0.02)};`
 
   return `
 html:root {
   ${STEPS.map(s => `--brand-${s}: ${p[s]};`).join(' ')}
-  --brand-side: ${p.side}; --brand-side-muted: ${p.sideMuted};
-  --wordmark-fill: linear-gradient(180deg, #ffffff 0%, ${tone(0.93, 0.25)} 55%, ${tone(0.86, 0.4)} 100%);
-  --wordmark-sub: ${tone(0.92, 0.2)}d9;
+  --brand-side: ${p.side};
   --auth-ink: ${tone(0.3, 0.7)}; --auth-accent: ${tone(0.6, 1)}; --auth-link: ${tone(0.52, 1)};
   --auth-focus: ${tone(0.7, 0.8)}; --auth-ring: ${tone(0.6, 1)}24;
   --auth-btn: linear-gradient(90deg, ${tone(0.4, 0.8)} 0%, ${tone(0.47, 0.9)} 45%, ${tone(0.6, 1)} 100%);
