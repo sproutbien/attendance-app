@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, FileText, Paperclip } from 'lucide-react'
+import { ChevronRight, FileSignature, FileText, Paperclip } from 'lucide-react'
 import { useCandidates } from '../../hooks/useCandidates'
 import type { CandidateFields } from '../../hooks/useCandidates'
 import { useEmployeeManagement, useEmployeeOptions } from '../../hooks/useEmployeeManagement'
@@ -13,7 +13,13 @@ import { fmtDate } from '../../lib/employees'
 import {
   OPEN_STAGES, STAGE_COLORS, STAGE_LABELS, ageLabel, copyResumeToEmployee, nextStage, openResume,
 } from '../../lib/hiring'
+import { fmtClock } from '../../lib/shifts'
+import { localDate } from '../../lib/calendar'
+import { uploadEmployeeDocument } from '../../lib/onboarding'
+import { OFFER_BUCKET, OFFER_STATUS, offerFileName, shownStatus } from '../../lib/offerLetter'
+import type { Offer } from '../../lib/offerLetter'
 import EmployeeFormModal from '../../components/employees/EmployeeFormModal'
+import OfferLetterModal from '../../components/offers/OfferLetterModal'
 import {
   card, errorBox, ghostBtn, hintStyle, inputStyle, modalStyle, overlayStyle, primaryBtn, successBox,
 } from '../../components/employees/styles'
@@ -29,6 +35,12 @@ export default function AdminHiringPage() {
   const [hiring, setHiring] = useState<Candidate | null>(null)
   const [flash, setFlash] = useState<React.ReactNode>(null)
   const [showClosed, setShowClosed] = useState<'hired' | 'not_selected' | null>(null)
+  const [offerFor, setOfferFor] = useState<Candidate | null>(null)
+  const offers = useLatestOffers()
+  const today = localDate()
+  const workingHours = shifts.defaultShift
+    ? `Monday to Saturday, ${fmtClock(shifts.defaultShift.start_time)} to ${fmtClock(shifts.defaultShift.end_time)}`
+    : ''
 
   const byStage = (s: CandidateStage) => c.candidates.filter(x => x.stage === s)
   const openCount = c.candidates.filter(x => OPEN_STAGES.includes(x.stage)).length
@@ -54,6 +66,10 @@ export default function AdminHiringPage() {
       if (error) problems.push(`onboarding wasn't started (${error.message})`)
     }
     try { await copyResumeToEmployee(cand, id) } catch (e) { problems.push((e as Error).message) }
+    const accepted = offers.latest.get(cand.id)
+    if (accepted?.status === 'accepted' && accepted.pdf_path) {
+      try { await copyOfferToEmployee(accepted, id) } catch (e) { problems.push((e as Error).message) }
+    }
     const err = await c.update(cand.id, { stage: 'hired', employee_id: id })
     if (err) problems.push(`the candidate wasn't marked hired (${err})`)
     show(<>
@@ -95,6 +111,7 @@ export default function AdminHiringPage() {
                             {x.resume_path && <FileText size={14} aria-label="Has résumé" style={{ color: '#64748b', flexShrink: 0 }} />}
                           </span>
                           {x.role && <span style={{ color: '#475569' }}>{x.role}</span>}
+                          {offers.latest.has(x.id) && <OfferChip offer={offers.latest.get(x.id)!} today={today} />}
                           <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
                             {stage === 'applied' ? `Added ${ageLabel(x.created_at)}${ageLabel(x.created_at) === 'today' ? '' : ' ago'}` : `In ${STAGE_LABELS[stage]} ${ageLabel(x.stage_changed_at)}`}
                             {x.source && ` · ${x.source}`}
@@ -143,7 +160,7 @@ export default function AdminHiringPage() {
         </>
       )}
 
-      {open && !hiring && (
+      {open && !hiring && !offerFor && (
         <CandidateModal
           key={open === 'new' ? 'new' : open.id}
           candidate={open === 'new' ? null : current}
@@ -151,13 +168,27 @@ export default function AdminHiringPage() {
           onClose={() => setOpen(null)}
           onCreated={x => setOpen(x)}
           onHire={x => { mgmt.setError(null); setHiring(x) }}
+          onOffer={x => setOfferFor(x)}
+          offer={current ? offers.latest.get(current.id) ?? null : null}
+        />
+      )}
+
+      {offerFor && (
+        <OfferLetterModal
+          candidate={offerFor}
+          workingHours={workingHours}
+          onClose={() => setOfferFor(null)}
+          onChanged={() => { offers.reload(); c.refresh() }}
         />
       )}
 
       {hiring && (
         <EmployeeFormModal
           existing={null}
-          prefill={{ full_name: hiring.full_name, email: hiring.email ?? '', phone: hiring.phone ?? '', designation: hiring.role, status: 'probation' }}
+          prefill={{
+            full_name: hiring.full_name, email: hiring.email ?? '', phone: hiring.phone ?? '', status: 'probation',
+            designation: (offers.latest.get(hiring.id)?.status === 'accepted' ? offers.latest.get(hiring.id)!.fields.designation : null) ?? hiring.role,
+          }}
           isSelf={false}
           employees={mgmt.employees}
           options={{ department: lists.byKind('department'), work_location: lists.byKind('work_location'), employment_type: lists.byKind('employment_type') }}
@@ -175,12 +206,14 @@ export default function AdminHiringPage() {
   )
 }
 
-function CandidateModal({ candidate, data, onClose, onCreated, onHire }: {
+function CandidateModal({ candidate, data, onClose, onCreated, onHire, onOffer, offer }: {
   candidate: Candidate | null        // null = add
   data: ReturnType<typeof useCandidates>
   onClose: () => void
   onCreated: (c: Candidate) => void
   onHire: (c: Candidate) => void
+  onOffer: (c: Candidate) => void
+  offer: Offer | null                // their latest offer letter
 }) {
   const s = (v: string | null | undefined) => v ?? ''
   const [f, setF] = useState({
@@ -246,6 +279,12 @@ function CandidateModal({ candidate, data, onClose, onCreated, onHire }: {
           <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#94a3b8', lineHeight: 1 }}>✕</button>
         </div>
 
+        {candidate && offer && (
+          <p style={{ margin: '-0.25rem 0 0.75rem', fontSize: '0.8125rem', color: '#475569' }}>
+            Offer {offer.ref_no}: <OfferChip offer={offer} today={localDate()} />
+            {offer.status === 'accepted' && ' · Hire them to add the signed letter to their documents.'}
+          </p>
+        )}
         {candidate && (
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid #e2e8f0' }}>
             {isOpen && next && (
@@ -253,8 +292,14 @@ function CandidateModal({ candidate, data, onClose, onCreated, onHire }: {
                 Move to {STAGE_LABELS[next]} <ChevronRight size={16} />
               </button>
             )}
+            {(isOpen || offer) && (
+              <button disabled={busy} onClick={() => onOffer(candidate)}
+                style={{ ...(candidate.stage === 'offer' && !offer ? primaryBtn : ghostBtn), display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <FileSignature size={15} /> {offer ? 'Offer letter' : 'Offer letter…'}
+              </button>
+            )}
             {isOpen && (
-              <button disabled={busy} onClick={() => onHire(candidate)} style={candidate.stage === 'offer' ? primaryBtn : ghostBtn}>Hire…</button>
+              <button disabled={busy} onClick={() => onHire(candidate)} style={candidate.stage === 'offer' && offer?.status === 'accepted' ? primaryBtn : ghostBtn}>Hire…</button>
             )}
             {isOpen && (
               <button disabled={busy} onClick={() => act(() => data.update(candidate.id, { stage: 'not_selected' }))} style={{ ...ghostBtn, color: '#b91c1c', borderColor: '#fecaca' }}>
@@ -367,3 +412,28 @@ const candCard: CSSProperties = {
   background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.875rem', color: '#1e293b',
 }
 const linkBtn: CSSProperties = { padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--brand-700)', fontSize: '0.875rem', fontFamily: 'inherit', textAlign: 'left' }
+
+/** Each candidate's latest offer letter. */
+function useLatestOffers() {
+  const [latest, setLatest] = useState<Map<string, Offer>>(new Map())
+  const reload = useCallback(async () => {
+    const { data } = await supabase.from('offers').select('*').order('approved_at', { ascending: false })
+    const m = new Map<string, Offer>()
+    for (const o of (data ?? []) as Offer[]) if (!m.has(o.candidate_id)) m.set(o.candidate_id, o)
+    setLatest(m)
+  }, [])
+  useEffect(() => { reload() }, [reload])
+  return { latest, reload }
+}
+
+function OfferChip({ offer, today }: { offer: Offer; today: string }) {
+  const s = OFFER_STATUS[shownStatus(offer, today)]
+  return <span style={{ ...stagePill, alignSelf: 'flex-start', fontSize: '0.6875rem', background: s.bg, color: s.text }}>Offer {s.label.toLowerCase()}</span>
+}
+
+/** After hiring: the accepted offer letter becomes one of their documents ("Offer letter"). */
+async function copyOfferToEmployee(o: Offer, employeeId: string) {
+  const { data, error } = await supabase.storage.from(OFFER_BUCKET).download(o.pdf_path!)
+  if (error || !data) throw new Error(`The offer letter couldn't be copied to their documents: ${error?.message ?? 'not found'}`)
+  await uploadEmployeeDocument(employeeId, 'Offer letter', new File([data], offerFileName(o), { type: 'application/pdf' }))
+}

@@ -4,3 +4,6 @@ dist
 .env
 .claude/
 .env.*.local
+
+# Signatures and letter templates — never deploy
+private/

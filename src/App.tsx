@@ -6,6 +6,7 @@ import AdminRoute from './components/AdminRoute'
 import AdminLayout from './components/AdminLayout'
 import LoginPage from './pages/LoginPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import OfferResponsePage from './pages/OfferResponsePage'
 import DashboardPage from './pages/DashboardPage'
 import LeavePage from './pages/LeavePage'
 import ReportsPage from './pages/ReportsPage'
@@ -34,6 +35,7 @@ export default function App() {
             {/* Public */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/offer/:token" element={<OfferResponsePage />} />
 
             {/* Employee routes */}
             <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
