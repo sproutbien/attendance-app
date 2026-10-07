@@ -14,7 +14,17 @@ const OFFER_BCC = Deno.env.get('OFFER_BCC')                    // HR copy; defau
 const APP_URL = (Deno.env.get('APP_URL') ?? '').replace(/\/+$/, '')   // e.g. https://attendance.sproutbien.com
 const BUCKET = 'offer-letters'
 
-const admin = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+/** The project's secret key (new-style sb_secret_…), else the legacy service-role key. */
+function secretKey() {
+  try {
+    const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}') as Record<string, string>
+    const key = keys.default ?? Object.values(keys)[0]
+    if (key) return key
+  } catch { /* not set */ }
+  return Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+}
+
+const admin = createClient(SUPABASE_URL, secretKey())
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
