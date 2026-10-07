@@ -61,6 +61,14 @@ export function workingDays(start: string, end: string, half: boolean, holidays:
   return half ? n * 0.5 : n
 }
 
+/** Leave can start up to this many days back (e.g. Sick leave for yesterday). Mirrors leave_backdate_days() in migration 043. */
+export const LEAVE_BACKDATE_DAYS = 7
+
+/** Earliest start date a new leave request can have. */
+export function earliestLeaveDate(today: string) {
+  return addDays(today, -LEAVE_BACKDATE_DAYS)
+}
+
 /** Pending or approved full-day leave that covers `today`: check-in is blocked until today's part is cancelled. */
 export function coversToday(r: Pick<LeaveRequest, 'status' | 'duration' | 'start_date' | 'end_date'>, today: string) {
   return (r.status === 'pending' || r.status === 'approved') && r.duration === 'full' && r.start_date <= today && r.end_date >= today

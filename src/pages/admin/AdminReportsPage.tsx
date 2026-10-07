@@ -31,7 +31,7 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays:
 
   const headers = [
     'Employee', 'Email', 'Department', 'Working Days',
-    'Present', 'Late', 'Absent', 'On Leave', 'Paid Leave', 'LOP',
+    'Present', 'Late', 'Absent', 'On Leave', 'Paid Leave', 'LOP (unpaid leave + absent)',
     ...(hasPayroll ? ['Paid Days', 'Gross Salary', 'Deduction', 'Net Pay'] : []),
   ]
 
@@ -269,6 +269,7 @@ export default function AdminReportsPage() {
         <p style={{ marginTop: '0.75rem', fontSize: '0.75rem', color: '#94a3b8' }}>
           "Work Days" = working days (Sundays and public holidays excluded) from the 1st to today, or the full month for past months.
           Paid Days = days worked + paid leave. Deduction = (Working Days − Paid Days) × Daily Rate, so absences and Loss of Pay are unpaid.
+          Absent days (no check-in, no approved leave) count as Loss of Pay; employees can still apply leave for the last 7 days.
         </p>
       )}
     </div>
@@ -381,8 +382,8 @@ function SummaryRow({ summary: s, showPayroll }: { summary: EmployeeSummary; sho
       <td style={{ ...tdStyle, textAlign: 'center', color: '#64748b', fontWeight: 500 }}>{s.totalDays}</td>
       <StatCell value={s.present}  color="#166534" bg="#dcfce7" />
       <StatCell value={s.late}     color="#854d0e" bg="#fef9c3" />
-      <StatCell value={s.absent}   color="#991b1b" bg="#fee2e2" dim={s.absent === 0} />
-      <StatCell value={s.on_leave} color="#5b21b6" bg="#ede9fe" dim={s.on_leave === 0} note={s.lop > 0 ? `${s.lop} LOP` : undefined} />
+      <StatCell value={s.absent}   color="#991b1b" bg="#fee2e2" dim={s.absent === 0} note={s.absent > 0 ? 'LOP' : undefined} />
+      <StatCell value={s.on_leave} color="#5b21b6" bg="#ede9fe" dim={s.on_leave === 0} note={s.leave_lop > 0 ? `${s.leave_lop} LOP` : undefined} />
       {showPayroll && <>
         <td style={{ ...tdStyle, textAlign: 'center', color: '#166534', fontWeight: 600 }}>
           {s.paidDays != null ? s.paidDays : <span style={{ color: '#cbd5e1' }}>—</span>}

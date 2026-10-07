@@ -54,7 +54,7 @@ export default function LeaveBalanceCards({ balances, loading, error, compact }:
                     {fmtDays(b.used)}
                     <span style={{ fontSize: '0.8125rem', fontWeight: 500, color: 'var(--text-faint, #94a3b8)' }}> taken</span>
                   </div>
-                  <div style={detailStyle}>Unpaid days this year</div>
+                  <div style={detailStyle}>Unpaid days this year, incl. absent days</div>
                   {b.pending > 0 && <div style={{ ...detailStyle, color: '#b45309' }}>{fmtDays(b.pending)} pending approval</div>}
                 </>
               )}

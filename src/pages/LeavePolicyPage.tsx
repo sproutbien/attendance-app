@@ -8,7 +8,7 @@ import { useLeaveMonthCaps, useLeaveTypes } from '../hooks/useLeaveBalances'
 import { useLeavePolicy } from '../hooks/useLeavePolicy'
 import { useMyShift } from '../hooks/useShifts'
 import { currentYearMonth, localDate, monthLabel } from '../lib/calendar'
-import { fmtDays, leaveYearLabel, leaveYearOf } from '../lib/leave'
+import { LEAVE_BACKDATE_DAYS, fmtDays, leaveYearLabel, leaveYearOf } from '../lib/leave'
 import { fmtHolidayDay } from '../lib/holidays'
 import { CANCEL_CUTOFF_MS, FULL_DAY_GRACE_MIN } from '../lib/halfDay'
 import { fmtClock, minutesOf, shiftHours } from '../lib/shifts'
@@ -130,6 +130,7 @@ export default function LeavePolicyPage() {
           <li>A <b>half day</b> (morning or afternoon) counts as 0.5 day.</li>
           <li>If you don’t have enough of a leave type, you can take what’s left and the rest as <b>Loss of Pay</b>.</li>
           <li>Every request is approved or rejected by an admin. You can’t request leave on days you already have leave.</li>
+          <li>A working day with no check-in and no approved leave is <b>Absent</b> and counts as <b>Loss of Pay</b>. You can still request leave for it (e.g. Sick leave) up to {LEAVE_BACKDATE_DAYS} days later; once approved, it’s taken from that leave type instead.</li>
           <li>Sick leave can carry up to {MAX_LEAVE_DOCS} medical documents (optional), added within {LEAVE_DOC_WINDOW_DAYS} days of requesting.</li>
         </ul>
       </Section>

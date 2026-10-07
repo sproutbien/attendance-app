@@ -134,10 +134,13 @@ export default function StatsView({ employee, title, actions }: {
                 <div className="st-leave-row">
                   <span className="st-swatch" style={{ background: 'var(--c-absent)' }} />
                   <span>Loss of pay</span>
-                  <b>{fmtDays(m.leaveByType.lop)} taken</b>
-                  <em>unpaid</em>
+                  <b>{fmtDays(m.leaveByType.lop + m.absent)} taken</b>
+                  <em>{m.absent > 0 ? `incl. ${fmtDays(m.absent)} absent` : 'unpaid'}</em>
                 </div>
-                <p className="st-note">Late check-ins that turned into a half day count as loss of pay.</p>
+                <p className="st-note">
+                  Late check-ins that turned into a half day count as loss of pay, and so do absent days
+                  (no check-in, no approved leave) unless leave is applied for them within 7 days.
+                </p>
               </section>
 
               <section className="st-card">

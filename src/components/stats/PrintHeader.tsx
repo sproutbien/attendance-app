@@ -38,7 +38,7 @@ export function PrintHeader({ employee: e, shift, yearMonth, m }: {
     ['Total hours', fmtHM(m.worked), `avg. ${fmtHM(m.avgWorked)} / day`],
     ['On time', fmtPct(m.onTimeRate), `${fmtDays(m.late)} day${m.late === 1 ? '' : 's'} late`],
     ['Leave', `${fmtDays(m.leave)} day${m.leave === 1 ? '' : 's'}`, m.leaveByType.lop ? `${fmtDays(m.leaveByType.lop)} loss of pay` : 'all paid'],
-    ['Absent', `${fmtDays(m.absent)} day${m.absent === 1 ? '' : 's'}`],
+    ['Absent', `${fmtDays(m.absent)} day${m.absent === 1 ? '' : 's'}`, m.absent ? 'loss of pay' : undefined],
   ] : []
 
   return (

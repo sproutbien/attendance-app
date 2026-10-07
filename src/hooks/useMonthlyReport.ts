@@ -12,7 +12,8 @@ export type EmployeeSummary = {
   late: number
   on_leave: number
   paid_leave: number     // part of on_leave covered by a paid leave balance
-  lop: number            // on_leave days that are unpaid (Loss of Pay)
+  leave_lop: number      // on_leave days that are unpaid
+  lop: number            // all Loss of Pay: unpaid leave + absent days
   absent: number
   paidUnits: number      // worked days + paid leave, before capping at working days
   paidDays: number | null
@@ -138,7 +139,8 @@ export function useMonthlyReport(yearMonth: string) {
           late: t.late,
           on_leave: t.on_leave,
           paid_leave: t.paid_leave,
-          lop: Math.max(0, t.on_leave - t.paid_leave),
+          leave_lop: Math.max(0, t.on_leave - t.paid_leave),
+          lop: Math.max(0, t.on_leave - t.paid_leave) + absent,
           absent,
           paidUnits: t.paid_units,
           ...computePayroll(t.paid_units, salary, wd),

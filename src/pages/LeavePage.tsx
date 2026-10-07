@@ -9,7 +9,7 @@ import { useHolidayDates, useLeaveBalances, useLeaveCapPreview } from '../hooks/
 import LeaveBalanceCards from '../components/LeaveBalanceCards'
 import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import OtherRequests from '../components/OtherRequests'
-import { LEAVE_TYPE_LABELS, addDays, bookableAsOf, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, isMonthCapped, workingDays } from '../lib/leave'
+import { LEAVE_BACKDATE_DAYS, LEAVE_TYPE_LABELS, addDays, bookableAsOf, earliestLeaveDate, bookableDays, coversToday, daysLabel, findLeaveClash, fmtDays, fmtLeaveSpan, isMonthCapped, workingDays } from '../lib/leave'
 import { localDate, monthLabel } from '../lib/calendar'
 import { canCancel, cancelDeadline, leaveLength, sameDayLeaveBlock } from '../lib/halfDay'
 import { fmtClock, sessionLabel } from '../lib/shifts'
@@ -69,12 +69,17 @@ export default function LeavePage() {
     setFormError(null)
     setSuccess(false)
     const half = duration === 'half'
+    if (startDate < earliestLeaveDate(localDate())) {
+      setFormError(`Leave can only be requested for the last ${LEAVE_BACKDATE_DAYS} days.`)
+      return
+    }
     if (!half && endDate < startDate) {
       setFormError('End date must be on or after start date.')
       return
     }
     // Re-check at submit time — the page may have been open since before a cut-off
-    const blocked = startDate === localDate() && sameDayLeaveBlock(todayShift, duration, half ? session : null, checkedInToday)
+    const now = localDate()
+    const blocked = startDate <= now && (half ? startDate : endDate) >= now && sameDayLeaveBlock(todayShift, duration, half ? session : null, checkedInToday)
     if (blocked) {
       setFormError(blocked)
       return
@@ -113,13 +118,17 @@ export default function LeavePage() {
 
   const isHalf = duration === 'half'
   const showDayCount = !isHalf && startDate && endDate && endDate >= startDate
-  // Leave starting today is limited by the time and whether they've checked in
+  const rangeEnd = isHalf ? startDate : endDate
+  // Leave can start up to a week back (e.g. Sick leave for yesterday)
+  const minDate = earliestLeaveDate(today)
+  const startsInPast = !!startDate && startDate < today
+  // Leave covering today is limited by the time and whether they've checked in
   const startsToday = startDate === today
-  const sameDayBlock = startsToday ? sameDayLeaveBlock(todayShift, duration, isHalf ? session : null, checkedInToday) : null
+  const coversTodayRange = !!startDate && startDate <= today && rangeEnd >= today
+  const sameDayBlock = coversTodayRange ? sameDayLeaveBlock(todayShift, duration, isHalf ? session : null, checkedInToday) : null
   const sessionBlocked = (s: HalfDaySession) => startsToday && sameDayLeaveBlock(todayShift, 'half', s, checkedInToday) !== null
 
   // Paid leave must fit in what's credited so far, minus pending requests (the server enforces this too)
-  const rangeEnd = isHalf ? startDate : endDate
   const [holidayVersion, setHolidayVersion] = useState(0)   // bumped when they choose a holiday date
   const holidays = useHolidayDates(startDate, rangeEnd, employee?.id, holidayVersion)
   const booking = useLeaveBalances(employee?.id, bookableAsOf(startDate || today, today))
@@ -259,7 +268,7 @@ export default function LeavePage() {
                 <input
                   type="date"
                   value={startDate}
-                  min={today}
+                  min={minDate}
                   onChange={e => { setStartDate(e.target.value); setSuccess(false) }}
                   required
                   style={inputStyle}
@@ -285,11 +294,11 @@ export default function LeavePage() {
                   </button>
                 ))}
               </div>
-              <p style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
+              {!startsInPast && <p style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
                 {session === 'morning'
                   ? `Once approved, Check In opens at ${fmtClock(leaveShift.split_time)} that day.`
                   : `Once approved, you’ll be checked out automatically at ${fmtClock(leaveShift.split_time)} that day.`}
-              </p>
+              </p>}
             </div>
           ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: showDayCount ? '0.5rem' : '1rem' }}>
@@ -298,7 +307,7 @@ export default function LeavePage() {
               <input
                 type="date"
                 value={startDate}
-                min={today}
+                min={minDate}
                 onChange={e => { setStartDate(e.target.value); setSuccess(false) }}
                 required
                 style={inputStyle}
@@ -309,13 +318,20 @@ export default function LeavePage() {
               <input
                 type="date"
                 value={endDate}
-                min={startDate || today}
+                min={startDate || minDate}
                 onChange={e => { setEndDate(e.target.value); setSuccess(false) }}
                 required
                 style={inputStyle}
               />
             </div>
           </div>
+          )}
+
+          {startsInPast && (
+            <p style={{ margin: '0 0 0.5rem', fontSize: '0.8125rem', color: 'var(--text-muted, #64748b)' }}>
+              Leave for past days can be requested up to {LEAVE_BACKDATE_DAYS} days back. Once approved, those days count as leave instead of Absent.
+              {!isHalf && ' Days you checked in on can only be half-day leave.'}
+            </p>
           )}
 
           {requested != null && (
