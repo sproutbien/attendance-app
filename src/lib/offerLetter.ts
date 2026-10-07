@@ -340,7 +340,9 @@ export async function sendOffer(offerId: string): Promise<string | null> {
       ? 'The email service isn’t set up yet (the offer-letter function isn’t deployed). The letter is saved; send it once that’s done.'
       : error.message
   }
-  return data?.error ?? null
+  if (data?.ok === true) return null
+  return data?.error
+    ?? 'The email function gave an unexpected answer, so the letter may not have been sent. Check that the offer-letter code is deployed in Supabase (docs/OFFER_LETTER_SETUP.md).'
 }
 
 /** File name for a letter's PDF. */
