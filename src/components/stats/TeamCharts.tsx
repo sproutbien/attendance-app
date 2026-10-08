@@ -2,8 +2,10 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { KIND_META, Tooltip, useWidth } from './Charts'
 import type { Tip } from './Charts'
-import { fmtDays } from '../../lib/stats'
-import type { DayKind } from '../../lib/stats'
+import { fmtDays, fmtMinutes } from '../../lib/stats'
+import type { DayKind, DayStat } from '../../lib/stats'
+import { fmtHM } from '../../lib/breaks'
+import { isSunday } from '../../lib/calendar'
 
 // Team comparison charts (admin Team Stats). Same tokens and rules as Charts.tsx:
 // thin marks, 2px surface gaps, hover/focus tooltips, numbers also in the table.
@@ -189,6 +191,147 @@ export function MonthColumns({ points, current, max, format, ticks }: {
       )}
       <Tooltip tip={tip} />
     </div>
+  )
+}
+
+export type HeatRow = {
+  id: string
+  name: string
+  days: DayStat[]                  // from computeMonthStats
+  holidays: Map<string, string>    // date → name (public + their choice holidays)
+  activeFrom?: string | null       // joining date
+  activeTo?: string | null         // last working day
+}
+
+const HEAT_CELL_MIN = 16   // narrowest cell before the chart scrolls sideways
+const HEAT_CELL_MAX = 34
+const HEAT_ROW = 26
+const HEAT_TOP = 30        // day numbers + weekday letters
+const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+/** One row per person, one cell per date: on time / late / leave / absent, with Sundays and holidays greyed. */
+export function TeamHeatmap({ rows, dates, today }: { rows: HeatRow[]; dates: string[]; today: string }) {
+  const [ref, box] = useWidth<HTMLDivElement>()
+  const [tip, setTip] = useState<Tip>(null)
+  const [hover, setHover] = useState<{ id: string; date: string } | null>(null)
+  const nameW = box < 560 ? 96 : NAME_W
+  const n = dates.length
+  const cell = Math.min(HEAT_CELL_MAX, Math.max(HEAT_CELL_MIN, Math.floor((box - nameW) / n)))
+  const width = nameW + cell * n
+  const height = HEAT_TOP + rows.length * HEAT_ROW
+  const size = cell - 3, h = HEAT_ROW - 8
+
+  return (
+    <div className="st-heat-scroll" ref={ref}>
+      {box > 0 && (
+        <div className="st-chart" style={{ width }}>
+          <svg width={width} height={height} role="img" aria-label="Daily attendance for each person">
+            {dates.map((d, j) => {
+              const x = nameW + j * cell + cell / 2
+              const isToday = d === today
+              const style = isToday ? { fill: 'var(--text-strong)', fontWeight: 700 } : { fill: 'var(--text-muted)', opacity: isSunday(d) ? 0.5 : 1 }
+              return (
+                <g key={d}>
+                  {isToday && <rect x={x - cell / 2} y={0} width={cell} height={height} rx={6} fill="var(--c-today)" />}
+                  <text x={x} y={11} textAnchor="middle" style={style}>{Number(d.slice(8))}</text>
+                  {cell >= 20 && <text x={x} y={23} textAnchor="middle" style={{ ...style, fontSize: 9 }}>{WEEKDAY[new Date(d + 'T00:00:00').getDay()]}</text>}
+                </g>
+              )
+            })}
+            {rows.map((r, i) => {
+              const byDate = new Map(r.days.map(d => [d.date, d]))
+              const y = HEAT_TOP + i * HEAT_ROW + 4
+              const dimRow = !!hover && hover.id !== r.id
+              return (
+                <g key={r.id}>
+                  <text x={nameW - 10} y={y + h / 2 + 4} textAnchor="end" style={{ fill: 'var(--text)', fontSize: 12, opacity: dimRow ? 0.5 : 1 }}>{clip(r.name, nameW < NAME_W ? 12 : 18)}</text>
+                  {dates.map((d, j) => {
+                    const st = cellState(r, d, byDate.get(d), today)
+                    if (st.type === 'none') return null
+                    const x = nameW + j * cell + 1.5
+                    const on = hover?.id === r.id && hover.date === d
+                    const show = () => { setHover({ id: r.id, date: d }); setTip({ x: x + size / 2, y: y - 2, content: heatTip(r.name, d, st) }) }
+                    const hide = () => { setHover(null); setTip(null) }
+                    return (
+                      <g key={d} opacity={dimRow ? 0.45 : 1}>
+                        <HeatCell x={x} y={y} w={size} h={h} st={st} />
+                        {on && <rect x={x - 1.5} y={y - 1.5} width={size + 3} height={h + 3} rx={5} fill="none" stroke="var(--text-strong)" strokeWidth={1.5} />}
+                        <rect className="st-hit" x={x - 1.5} y={y - 4} width={cell} height={HEAT_ROW} tabIndex={st.type === 'future' ? -1 : 0}
+                          aria-label={`${r.name}, ${heatDay(d)}: ${stateLabel(st)}`}
+                          onMouseEnter={show} onFocus={show} onMouseLeave={hide} onBlur={hide} />
+                      </g>
+                    )
+                  })}
+                </g>
+              )
+            })}
+          </svg>
+          <Tooltip tip={tip} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+type HeatState =
+  | { type: 'none' }                                   // before joining / after leaving / before tracking
+  | { type: 'future' }                                 // later this month, or today before check-in
+  | { type: 'off'; label: string }                     // Sunday / holiday with no check-in
+  | { type: 'day'; day: DayStat }
+
+function cellState(r: HeatRow, date: string, day: DayStat | undefined, today: string): HeatState {
+  if ((r.activeFrom && date < r.activeFrom) || (r.activeTo && date > r.activeTo)) return { type: 'none' }
+  if (day?.kind) return { type: 'day', day }
+  const holiday = r.holidays.get(date)
+  if (holiday) return { type: 'off', label: holiday }
+  if (isSunday(date)) return { type: 'off', label: 'Sunday' }
+  if (date >= today) return { type: 'future' }
+  return { type: 'none' }
+}
+
+function HeatCell({ x, y, w, h, st }: { x: number; y: number; w: number; h: number; st: HeatState }) {
+  if (st.type === 'future') return <rect x={x} y={y} width={w} height={h} rx={4} fill="var(--c-grid)" opacity={0.4} />
+  if (st.type === 'off') return <rect x={x} y={y} width={w} height={h} rx={4} fill="var(--c-grid)" />
+  if (st.type !== 'day') return null
+  const { kind, half } = st.day
+  // Half-day leave: leave colour on top, the other half's status below
+  if (half && kind !== 'leave') {
+    return (
+      <g>
+        <path d={halfRect(x, y, w, h / 2 - 0.75, 4)} fill={KIND_META.leave.color} />
+        <path d={halfRect(x, y + h, w, -(h / 2 - 0.75), 4)} fill={KIND_META[kind!].color} />
+      </g>
+    )
+  }
+  return <rect x={x} y={y} width={w} height={h} rx={4} fill={KIND_META[kind!].color} />
+}
+
+/** Rect whose two corners on the `y` edge are rounded; a negative h grows upward (the bottom half). */
+function halfRect(x: number, y: number, w: number, h: number, r: number) {
+  const s = Math.sign(h), a = Math.abs(h)
+  r = Math.min(r, w / 2, a)
+  return `M ${x} ${y + s * a} V ${y + s * r} Q ${x} ${y} ${x + r} ${y} H ${x + w - r} Q ${x + w} ${y} ${x + w} ${y + s * r} V ${y + s * a} Z`
+}
+
+function stateLabel(st: HeatState) {
+  if (st.type === 'future') return 'Not yet'
+  if (st.type === 'off') return st.label
+  if (st.type !== 'day') return ''
+  const k = KIND_META[st.day.kind!].label
+  return st.day.half ? (st.day.kind === 'leave' ? 'Half-day leave' : `Half-day leave · ${k}`) : k
+}
+
+const heatDay = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+
+function heatTip(name: string, date: string, st: HeatState) {
+  const day = st.type === 'day' ? st.day : null
+  return (
+    <>
+      <b>{name} · {heatDay(date)}</b>
+      <div>{stateLabel(st)}</div>
+      {day?.checkIn != null && <div>In {fmtMinutes(day.checkIn)}{day.checkOut != null ? ` · out ${fmtMinutes(day.checkOut)}` : ''}</div>}
+      {day && day.worked > 0 && <div>Worked {fmtHM(day.worked)}</div>}
+    </>
   )
 }
 

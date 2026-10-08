@@ -116,8 +116,11 @@ export function useTeamStats(yearMonth: string) {
     const trendFor = (include: (e: TeamMember) => boolean): { yearMonth: string; totals: TeamTotals }[] =>
       months.map((ym, i) => ({ yearMonth: ym, totals: teamTotals(perPerson.filter(p => include(p.employee)).map(p => p.trend[i])) }))
 
-    return { members, trendFor }
+    /** One person's holidays (public + their choice dates), date → name. */
+    const holidaysOf = (id: string) => holidaysFor(raw.holidays, id)
+
+    return { members, trendFor, holidaysOf }
   }, [raw, months])
 
-  return { members: result?.members ?? null, trendFor: result?.trendFor ?? null, loading, error }
+  return { members: result?.members ?? null, trendFor: result?.trendFor ?? null, holidaysOf: result?.holidaysOf ?? null, loading, error }
 }

@@ -4,12 +4,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowDown, ArrowUp, CalendarCheck, ChartColumn, Coffee, DoorOpen, Download, Timer, TriangleAlert, Users } from 'lucide-react'
 import { MonthPicker } from '../../components/MonthCalendar'
 import { KIND_META } from '../../components/stats/Charts'
-import { BreakdownBars, MonthColumns, RankBars } from '../../components/stats/TeamCharts'
+import { BreakdownBars, MonthColumns, RankBars, TeamHeatmap } from '../../components/stats/TeamCharts'
+import { PendingBar, WhosOut } from '../../components/stats/TeamNow'
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar'
 import { usePrintSetup } from '../../components/stats/print'
 import { useTeamStats } from '../../hooks/useTeamStats'
+import { useTeamNow } from '../../hooks/useTeamNow'
 import type { MemberStats, TeamMember } from '../../hooks/useTeamStats'
-import { TRACKING_START, currentYearMonth, monthLabel } from '../../lib/calendar'
+import { TRACKING_START, currentYearMonth, localDate, monthDates, monthLabel } from '../../lib/calendar'
 import { fmtHM } from '../../lib/breaks'
 import { breakFlags, fmtDays, fmtMinutes, fmtPct, teamTotals } from '../../lib/stats'
 import type { DayKind, MonthStats } from '../../lib/stats'
@@ -64,7 +66,8 @@ export default function AdminTeamStatsPage() {
   const [includeAdmins, setIncludeAdmins] = useState(false)
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'attendance', asc: false })
 
-  const { members, trendFor, loading, error } = useTeamStats(yearMonth)
+  const { members, trendFor, holidaysOf, loading, error } = useTeamStats(yearMonth)
+  const { now } = useTeamNow()
   usePrintSetup(`Team attendance – ${monthLabel(yearMonth)}`)
 
   const include = useMemo(() => (e: TeamMember) => (includeAdmins || e.role !== 'admin') && (!dept || e.department === dept), [includeAdmins, dept])
@@ -85,7 +88,8 @@ export default function AdminTeamStatsPage() {
     .map(s => ({ s, flags: breakFlags(s.month) }))
     .filter(f => f.flags.length > 0)
     .sort((a, b) => b.s.month.noBreakDays - a.s.month.noBreakDays || b.s.month.topUpDays - a.s.month.topUpDays)
-  const byAttendance = [...shown].sort((a, b) => (b.month.attendanceRate ?? -1) - (a.month.attendanceRate ?? -1))
+  // The breakdown bar shows every working day, so its % must too — attendanceRate drops leave days and reads 100% for someone mostly on leave
+  const byPresence = [...shown].sort((a, b) => (presenceRate(b.month) ?? -1) - (presenceRate(a.month) ?? -1))
   const byHours = [...shown].sort((a, b) => b.month.avgWorked - a.month.avgWorked)
   const byOnTime = [...shown].sort((a, b) => (b.month.onTimeRate ?? -1) - (a.month.onTimeRate ?? -1))
   const maxHours = Math.max(10, ...shown.map(s => s.month.avgWorked / 3600))
@@ -153,6 +157,7 @@ export default function AdminTeamStatsPage() {
           <div className="st-card"><p className="st-empty">No one had working days in {monthLabel(yearMonth)}{dept ? ` in ${dept}` : ''}.</p></div>
         ) : (
           <div style={{ opacity: loading ? 0.6 : 1, transition: 'opacity 0.15s' }}>
+            {now && <PendingBar pending={now.pending} />}
             <div className="st-kpis">
               {tiles.map(t => (
                 <div className="st-kpi" key={t.label}>
@@ -184,20 +189,44 @@ export default function AdminTeamStatsPage() {
               </section>
             )}
 
+            <div className="st-grid st-grid-32 st-now-row">
+              <section className="st-card">
+                <div className="st-card-head">
+                  <h2>Day breakdown by person</h2>
+                  <p title="Leave counts against this %, unlike the Attendance column">Share of working days · % of days present on the right</p>
+                  <ul className="st-legend">
+                    {(Object.keys(KIND_META) as DayKind[]).map(k => (
+                      <li key={k}><span className="st-swatch" style={{ background: KIND_META[k].color }} />{KIND_META[k].label}</li>
+                    ))}
+                  </ul>
+                </div>
+                <BreakdownBars rows={byPresence.map(s => ({
+                  id: s.employee.id, name: s.employee.full_name, note: fmtPct(presenceRate(s.month)),
+                  values: { on_time: s.month.onTime, late: s.month.late, leave: s.month.leave, absent: s.month.absent },
+                }))} />
+              </section>
+              {now && <WhosOut now={now} people={(members ?? []).map(m => m.employee).filter(include)} />}
+            </div>
+
             <section className="st-card" style={{ marginBottom: 16 }}>
               <div className="st-card-head">
-                <h2>Day breakdown by person</h2>
-                <p>Share of each person’s working days · attendance % on the right</p>
+                <h2>Day by day</h2>
+                <p>Every working day this month · hover a square for times</p>
                 <ul className="st-legend">
                   {(Object.keys(KIND_META) as DayKind[]).map(k => (
                     <li key={k}><span className="st-swatch" style={{ background: KIND_META[k].color }} />{KIND_META[k].label}</li>
                   ))}
+                  <li><span className="st-swatch st-swatch-half" />Half-day leave</li>
+                  <li><span className="st-swatch" style={{ background: 'var(--c-grid)' }} />Sunday / holiday</li>
                 </ul>
               </div>
-              <BreakdownBars rows={byAttendance.map(s => ({
-                id: s.employee.id, name: s.employee.full_name, note: fmtPct(s.month.attendanceRate),
-                values: { on_time: s.month.onTime, late: s.month.late, leave: s.month.leave, absent: s.month.absent },
-              }))} />
+              <TeamHeatmap
+                dates={monthDates(yearMonth)} today={localDate()}
+                rows={[...shown].sort((a, b) => a.employee.full_name.localeCompare(b.employee.full_name)).map(s => ({
+                  id: s.employee.id, name: s.employee.full_name, days: s.month.days, holidays: holidaysOf ? holidaysOf(s.employee.id) : new Map(),
+                  activeFrom: s.employee.joining_date, activeTo: s.employee.last_working_day,
+                }))}
+              />
             </section>
 
             <div className="st-grid st-grid-2">
@@ -342,4 +371,6 @@ function monthTip(yearMonth: string, t: ReturnType<typeof teamTotals>) {
   )
 }
 
-const signedHM = (s: number) => `${s >= 0 ? '+' : '−'}${fmtHM(Math.abs(s))}`
+const presenceRate = (m: MonthStats) => (m.workingDays > 0 ? m.present / m.workingDays : null)
+
+const signedHM =(s: number) => `${s >= 0 ? '+' : '−'}${fmtHM(Math.abs(s))}`
