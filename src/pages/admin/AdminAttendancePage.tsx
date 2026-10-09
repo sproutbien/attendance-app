@@ -357,6 +357,11 @@ const shortDay = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en
 function WeekCards({ overview }: { overview: WeekOverview }) {
   const { today, days, lateStreaks, upcoming } = overview
   const kinds = Object.keys(KIND_META) as DayKind[]
+  // Check-ins vs days people were due in (leave excluded)
+  const lates = days.reduce((n, d) => n + d.late, 0)
+  const arrivals = days.reduce((n, d) => n + d.on_time, 0) + lates
+  const absences = days.reduce((n, d) => n + (d.date === today ? 0 : d.absent), 0)   // today's are just "not in yet"
+  const expected = arrivals + absences
   const inDays = (d: string) => {
     const n = Math.round((new Date(d + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
     return n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`
@@ -384,7 +389,20 @@ function WeekCards({ overview }: { overview: WeekOverview }) {
             <p>Late {LATE_STREAK_MIN}+ times in the last {TREND_DAYS} days · worth a friendly word</p>
           </div>
           {lateStreaks.length === 0 ? (
-            <p className="st-now-none"><CircleCheck size={14} style={{ verticalAlign: '-2px', color: 'var(--green)' }} /> No one — punctuality looks good</p>
+            // Only praise punctuality when enough people actually came in to judge it
+            arrivals === 0 ? (
+              <p className="st-now-none">No one has checked in during the last {TREND_DAYS} days, so there's nothing to judge yet.</p>
+            ) : arrivals < expected / 2 ? (
+              <p className="st-now-none">
+                No one late {LATE_STREAK_MIN}+ times, but only {arrivals} of {expected} expected check-ins happened
+                ({absences} absent) — too few to judge punctuality.
+              </p>
+            ) : (
+              <p className="st-now-none">
+                <CircleCheck size={14} style={{ verticalAlign: '-2px', color: 'var(--green)' }} /> No one — punctuality looks good
+                <br />{lates} late out of {arrivals} check-ins
+              </p>
+            )
           ) : (
             <ul className="st-now-list">
               {lateStreaks.map(({ person, dates }) => (
