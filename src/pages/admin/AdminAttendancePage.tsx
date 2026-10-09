@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { CalendarOff, CircleCheck, Clock, Coffee, LogIn, LogOut, Percent, UserX } from 'lucide-react'
 import { useAdminAttendance } from '../../hooks/useAdminAttendance'
 import type { AdminAttendanceRow } from '../../hooks/useAdminAttendance'
 import { STATUS_COLORS, STATUS_LABELS } from '../../types'
@@ -14,6 +15,16 @@ import { selfieExpired, selfieUrls } from '../../lib/selfies'
 import { SelfieCell, SelfieReview } from '../../components/SelfieAdmin'
 import { LocationCell } from '../../components/GeofenceAdmin'
 import { CheckInRulesButton, CheckInRulesDrawer, useCheckInRules } from '../../components/CheckInRules'
+import { PendingBar } from '../../components/stats/TeamNow'
+import { useTeamNow } from '../../hooks/useTeamNow'
+import { LATE_STREAK_MIN, TREND_DAYS, UPCOMING_DAYS, useWeekOverview } from '../../hooks/useWeekOverview'
+import type { WeekOverview } from '../../hooks/useWeekOverview'
+import { WeekColumns } from '../../components/stats/TeamCharts'
+import { KIND_META } from '../../components/stats/Charts'
+import type { DayKind } from '../../lib/stats'
+import EmployeeAvatar from '../../components/employees/EmployeeAvatar'
+import { Link } from 'react-router-dom'
+import '../../styles/stats.css'
 
 const todayISO = () => localDate()
 
@@ -34,12 +45,19 @@ function fmtTime(iso: string | null | undefined) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-const SUMMARY_CONFIG: Array<{ status: AttendanceRecord['status']; label: string; color: string; bg: string }> = [
-  { status: 'present',  label: 'Present',  color: '#166534', bg: '#dcfce7' },
-  { status: 'late',     label: 'Late',     color: '#854d0e', bg: '#fef9c3' },
-  { status: 'absent',   label: 'Absent',   color: '#991b1b', bg: '#fee2e2' },
-  { status: 'on_leave', label: 'On Leave', color: '#5b21b6', bg: '#ede9fe' },
+const SUMMARY_CONFIG: Array<{ status: AttendanceRecord['status']; label: string; icon: ReactNode; color: string; accent: string; bg: string }> = [
+  { status: 'present',  label: 'Present',  icon: <CircleCheck size={16} />, color: '#166534', accent: '#16a34a', bg: '#dcfce7' },
+  { status: 'late',     label: 'Late',     icon: <Clock size={16} />,       color: '#854d0e', accent: '#ca8a04', bg: '#fef9c3' },
+  { status: 'absent',   label: 'Absent',   icon: <UserX size={16} />,       color: '#991b1b', accent: '#dc2626', bg: '#fee2e2' },
+  { status: 'on_leave', label: 'On Leave', icon: <CalendarOff size={16} />, color: '#5b21b6', accent: '#7c3aed', bg: '#ede9fe' },
 ]
+
+/** First names, at most three, then "+n more". */
+function nameList(rows: AdminAttendanceRow[]) {
+  if (rows.length === 0) return 'No one'
+  const names = rows.slice(0, 3).map(r => r.employee.full_name.split(' ')[0]).join(', ')
+  return rows.length > 3 ? `${names} +${rows.length - 3} more` : names
+}
 
 export default function AdminAttendancePage() {
   const today = todayISO()
@@ -51,6 +69,8 @@ export default function AdminAttendancePage() {
 
   const { rows, loading, error } = useAdminAttendance(selectedDate)
   const dayRequests = useDayRequests(selectedDate)
+  const { now } = useTeamNow()
+  const { overview } = useWeekOverview()
 
   // Summary counts from unfiltered rows
   const summaryCounts = useMemo(() => {
@@ -76,6 +96,20 @@ export default function AdminAttendancePage() {
   }, [rows, search, deptFilter, statusFilter])
 
   const isToday = selectedDate === today
+
+  // "At a glance" figures for the day
+  const glance = useMemo(() => {
+    const ins = rows.flatMap(r => (r.record?.check_in_time ? [new Date(r.record.check_in_time)] : []))
+    const avgIn = ins.length ? Math.round(ins.reduce((a, d) => a + d.getHours() * 60 + d.getMinutes(), 0) / ins.length) : null
+    const expected = rows.length - summaryCounts.on_leave
+    return {
+      rate: expected > 0 ? (summaryCounts.present + summaryCounts.late) / expected : null,
+      working: rows.filter(r => r.record?.check_in_time && !r.record.check_out_time && !r.record.break_started_at).length,
+      onBreak: rows.filter(r => r.record?.break_started_at && !r.record.check_out_time).length,
+      checkedOut: rows.filter(r => r.record?.check_out_time).length,
+      avgIn: avgIn == null ? null : fmtTime(new Date(2000, 0, 1, Math.floor(avgIn / 60), avgIn % 60).toISOString()),
+    }
+  }, [rows, summaryCounts])
 
   // Selfie / Location columns: shown while the rule is on, or when the day has data for them
   const [rules, setRules] = useCheckInRules()
@@ -140,30 +174,82 @@ export default function AdminAttendancePage() {
         {fmtDateLabel(selectedDate)}
       </p>
 
-      {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        {SUMMARY_CONFIG.map(({ status, label, color, bg }) => (
-          <div
-            key={status}
-            onClick={() => setStatusFilter(sf => sf === status ? '' : status)}
-            style={{
-              background: statusFilter === status ? bg : '#fff',
-              border: `1px solid ${statusFilter === status ? color.replace('1b', '7d').replace('4a', 'a5') : '#e2e8f0'}`,
-              borderRadius: 12,
-              padding: '1rem 1.25rem',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            <div style={{ fontSize: '2rem', fontWeight: 700, color, lineHeight: 1 }}>
-              {loading ? '—' : summaryCounts[status]}
-            </div>
-            <div style={{ fontSize: '0.8125rem', fontWeight: 500, color: '#64748b', marginTop: '0.25rem' }}>
-              {label}
-            </div>
-          </div>
-        ))}
+      {/* Approvals waiting — same counts as the sidebar badges */}
+      {now && (
+        <div className="sb-app st-admin" data-theme="light">
+          <PendingBar pending={now.pending} />
+        </div>
+      )}
+
+      {/* Summary cards — click one to filter the table */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+        {SUMMARY_CONFIG.map(({ status, label, icon, color, accent, bg }) => {
+          const active = statusFilter === status
+          const people = rows.filter(r => r.effectiveStatus === status)
+          const share = rows.length ? Math.round((summaryCounts[status] / rows.length) * 100) : 0
+          return (
+            <button
+              key={status}
+              type="button"
+              aria-pressed={active}
+              onClick={() => setStatusFilter(sf => sf === status ? '' : status)}
+              style={{
+                textAlign: 'left',
+                font: 'inherit',
+                minWidth: 0,
+                background: active ? bg : '#fff',
+                border: `1px solid ${active ? accent : '#e2e8f0'}`,
+                borderTop: `4px solid ${accent}`,
+                borderRadius: 12,
+                padding: '0.875rem 1.125rem 1rem',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                boxShadow: active ? `0 0 0 3px ${bg}` : '0 1px 3px rgba(15,23,42,0.06)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 8, background: bg, color: accent }}>
+                  {icon}
+                </span>
+                <span style={{ fontSize: '0.8125rem', fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {label}
+                </span>
+                {!loading && rows.length > 0 && (
+                  <span style={{ marginLeft: 'auto', fontSize: '0.75rem', fontWeight: 600, color, background: bg, padding: '1px 8px', borderRadius: 99 }}>
+                    {share}%
+                  </span>
+                )}
+              </div>
+              <div style={{ marginTop: '0.625rem', display: 'flex', alignItems: 'baseline', gap: '0.375rem' }}>
+                <span style={{ fontSize: '2.25rem', fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>
+                  {loading ? '—' : summaryCounts[status]}
+                </span>
+                {!loading && <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>/ {rows.length}</span>}
+              </div>
+              <div
+                title={people.map(r => r.employee.full_name).join(', ')}
+                style={{ marginTop: '0.5rem', minHeight: '1.2em', fontSize: '0.8125rem', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              >
+                {loading ? '' : status === 'absent' && isToday && people.length > 0 ? `Not in yet: ${nameList(people)}` : nameList(people)}
+              </div>
+            </button>
+          )
+        })}
       </div>
+
+      {/* The day at a glance */}
+      {!loading && rows.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', alignItems: 'center', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '0.75rem 1.125rem', marginBottom: '1.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#1e293b' }}>{isToday ? 'Right now' : 'That day'}</span>
+          <Glance icon={<Percent size={14} />} label="Attendance" value={glance.rate == null ? '—' : `${Math.round(glance.rate * 100)}%`} title="Present + late ÷ everyone not on leave" />
+          {isToday && <Glance icon={<LogIn size={14} />} label="Working now" value={glance.working} />}
+          {isToday && <Glance icon={<Coffee size={14} />} label="On break" value={glance.onBreak} />}
+          <Glance icon={<LogOut size={14} />} label="Checked out" value={glance.checkedOut} />
+          <Glance icon={<Clock size={14} />} label="Avg. check-in" value={glance.avgIn ?? '—'} />
+        </div>
+      )}
+
+      {overview && <WeekCards overview={overview} />}
 
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
@@ -262,6 +348,100 @@ export default function AdminAttendancePage() {
         />
       )}
     </div>
+  )
+}
+
+const shortDay = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
+
+/** Last 7 days trend, late streaks and what's coming up. Independent of the date being viewed. */
+function WeekCards({ overview }: { overview: WeekOverview }) {
+  const { today, days, lateStreaks, upcoming } = overview
+  const kinds = Object.keys(KIND_META) as DayKind[]
+  const inDays = (d: string) => {
+    const n = Math.round((new Date(d + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime()) / 86400000)
+    return n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`
+  }
+  return (
+    <div className="sb-app st-admin" data-theme="light">
+      <div className="st-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', marginBottom: '1.5rem' }}>
+        <section className="st-card">
+          <div className="st-card-head">
+            <h2>Last {TREND_DAYS} days</h2>
+            <p>People per day · hover a day for details</p>
+          </div>
+          <WeekColumns
+            today={today}
+            days={days.map(d => ({ date: d.date, off: d.off, values: { on_time: d.on_time, late: d.late, leave: d.leave, absent: d.absent } }))}
+          />
+          <ul className="st-legend" style={{ marginTop: 8 }}>
+            {kinds.map(k => <li key={k}><span className="st-swatch" style={{ background: KIND_META[k].color }} />{KIND_META[k].label}</li>)}
+          </ul>
+        </section>
+
+        <section className="st-card">
+          <div className="st-card-head">
+            <h2>Running late</h2>
+            <p>Late {LATE_STREAK_MIN}+ times in the last {TREND_DAYS} days · worth a friendly word</p>
+          </div>
+          {lateStreaks.length === 0 ? (
+            <p className="st-now-none"><CircleCheck size={14} style={{ verticalAlign: '-2px', color: 'var(--green)' }} /> No one — punctuality looks good</p>
+          ) : (
+            <ul className="st-now-list">
+              {lateStreaks.map(({ person, dates }) => (
+                <li key={person.id}>
+                  <Link to={`/admin/employees/${person.id}/stats`} style={{ display: 'contents', color: 'inherit', textDecoration: 'none' }}>
+                    <EmployeeAvatar employee={person} size={26} />
+                    <span className="st-now-name">
+                      {person.full_name}
+                      <small>{dates.map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short' })).join(', ')}</small>
+                    </span>
+                  </Link>
+                  <em style={{ color: '#854d0e', background: '#fef9c3', padding: '1px 8px', borderRadius: 99, fontWeight: 600 }}>{dates.length}× late</em>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="st-card">
+          <div className="st-card-head">
+            <h2>Coming up</h2>
+            <p>Holidays, birthdays and work anniversaries · next {UPCOMING_DAYS} days</p>
+          </div>
+          {upcoming.length === 0 ? (
+            <p className="st-now-none">Nothing in the next {UPCOMING_DAYS} days</p>
+          ) : (
+            <ul className="st-now-list">
+              {upcoming.slice(0, 6).map(u => (
+                <li key={`${u.kind}-${u.date}-${u.person?.id ?? u.label}`}>
+                  {u.person ? <EmployeeAvatar employee={u.person} size={26} /> : (
+                    <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#eff6ff', color: '#1d4ed8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <CalendarOff size={14} />
+                    </span>
+                  )}
+                  <span className="st-now-name">
+                    {u.person ? u.person.full_name : u.label}
+                    <small>{u.kind === 'birthday' ? '🎂 Birthday' : u.kind === 'anniversary' ? `🎉 ${u.label}` : 'Public holiday'} · {shortDay(u.date)}</small>
+                  </span>
+                  <em>{inDays(u.date)}</em>
+                </li>
+              ))}
+              {upcoming.length > 6 && <li><span className="st-now-none">+{upcoming.length - 6} more</span></li>}
+            </ul>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
+function Glance({ icon, label, value, title }: { icon: ReactNode; label: string; value: ReactNode; title?: string }) {
+  return (
+    <span title={title} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.8125rem', color: '#64748b' }}>
+      <span style={{ color: '#94a3b8', display: 'inline-flex' }}>{icon}</span>
+      {label}
+      <b style={{ color: '#0f172a', fontSize: '0.9375rem', fontVariantNumeric: 'tabular-nums' }}>{value}</b>
+    </span>
   )
 }
 

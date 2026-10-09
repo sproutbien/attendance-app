@@ -140,6 +140,7 @@ export default function AdminEmployeeProfilePage() {
         <InfoCard title="Employment">
           <Row label="Status" value={<StatusBadge status={e.status} />} />
           <Row label="Date of joining" value={e.joining_date && fmtDate(e.joining_date)} />
+          <Row label="Date of birth" value={e.date_of_birth && fmtDate(e.date_of_birth)} />
           {(e.status === 'probation' || e.probation_end_date) && (
             <Row label="Probation ends" value={
               <ProbationValue employee={e} onConfirmed={async () => { await refetch(); show(`${e.full_name} is now Active. Noted in HR notes.`) }} />

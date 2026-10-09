@@ -137,6 +137,96 @@ export function RankBars({ rows, max, format, reference, referenceLabel }: {
   )
 }
 
+export type WeekDay = { date: string; off: string | null; values: Record<DayKind, number> }
+
+/**
+ * One stacked column per day: how many people were on time / late / on leave / absent.
+ * The worst finished working day is labelled so it stands out; today is marked "so far".
+ */
+export function WeekColumns({ days, today }: { days: WeekDay[]; today: string }) {
+  const [ref, width] = useWidth<HTMLDivElement>()
+  const [tip, setTip] = useState<Tip>(null)
+  const [hover, setHover] = useState<string | null>(null)
+  const height = 190, top = 22, bottom = 36, left = 6, right = 6
+  const plotH = height - top - bottom
+  const plotW = Math.max(0, width - left - right)
+  const slot = plotW / Math.max(1, days.length)
+  const barW = Math.min(36, slot * 0.55)
+  const max = Math.max(1, ...days.map(d => KINDS.reduce((n, k) => n + d.values[k], 0)))
+  const h = (n: number) => (n / max) * plotH
+  const rate = (d: WeekDay) => {
+    const due = d.values.on_time + d.values.late + d.values.absent
+    return due > 0 ? (d.values.on_time + d.values.late) / due : null
+  }
+  // Worst finished day; ignore today, which is still filling in
+  const done = days.filter(d => !d.off && d.date !== today && rate(d) != null)
+  const worst = done.length > 1 ? done.reduce((a, b) => (rate(b)! < rate(a)! ? b : a)) : null
+  const pct = (d: WeekDay) => `${Math.round(rate(d)! * 100)}%`
+
+  return (
+    <div className="st-chart" ref={ref}>
+      {width > 0 && (
+        <svg width={width} height={height} role="img" aria-label="Attendance over the last seven days">
+          <line className="st-baseline" x1={left} x2={width - right} y1={top + plotH} y2={top + plotH} />
+          {days.map((d, i) => {
+            const x = left + (i + 0.5) * slot
+            const isToday = d.date === today
+            const isWorst = worst?.date === d.date
+            const label = new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short' })
+            // Stack bottom-up with a 2px surface gap; only the top segment is rounded
+            const segs = KINDS.filter(k => d.values[k] > 0)
+            let yTop = top + plotH
+            const show = () => {
+              setHover(d.date)
+              setTip({
+                x, y: yTop,
+                content: (
+                  <>
+                    <b>{new Date(d.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}{isToday ? ' · so far' : ''}</b>
+                    {d.off ? <div>{d.off} — no one due in</div> : (
+                      <>
+                        {KINDS.map(k => <div key={k}>{KIND_META[k].label}: {d.values[k]}</div>)}
+                        {rate(d) != null && <div>Attendance {pct(d)}</div>}
+                      </>
+                    )}
+                  </>
+                ),
+              })
+            }
+            const hide = () => { setHover(null); setTip(null) }
+            const paths = segs.map((k, j) => {
+              const sh = Math.max(0, h(d.values[k]) - (j === 0 ? 0 : 2))
+              yTop -= sh + (j === 0 ? 0 : 2)
+              return <path key={k} d={roundedBar(x - barW / 2, yTop, barW, sh, 0, 0, j === segs.length - 1 ? Math.min(4, sh) : 0)} fill={KIND_META[k].color} />
+            })
+            return (
+              <g key={d.date} opacity={hover && hover !== d.date ? 0.45 : 1}>
+                {d.off
+                  ? <rect x={x - barW / 2} y={top + plotH - 4} width={barW} height={4} rx={2} fill="var(--c-grid)" />
+                  : paths}
+                {(isWorst || isToday) && rate(d) != null && (
+                  <text className="st-value-label" x={x} y={yTop - 6} textAnchor="middle"
+                    style={isWorst ? { fill: 'var(--text-strong)', fontWeight: 700 } : undefined}>
+                    {pct(d)}
+                  </text>
+                )}
+                <text x={x} y={height - 20} textAnchor="middle" style={isToday ? { fill: 'var(--text-strong)', fontWeight: 700 } : undefined}>{label}</text>
+                <text x={x} y={height - 6} textAnchor="middle" style={{ fontSize: 10, fill: isWorst ? 'var(--text-strong)' : undefined, fontWeight: isWorst ? 700 : undefined }}>
+                  {isWorst ? '▲ Lowest' : isToday ? 'so far' : d.off && d.off !== 'Sunday' ? 'Holiday' : ''}
+                </text>
+                <rect className="st-hit" x={x - slot / 2} y={top} width={slot} height={plotH} tabIndex={0}
+                  aria-label={`${d.date}: ${d.off ?? KINDS.map(k => `${KIND_META[k].label} ${d.values[k]}`).join(', ')}`}
+                  onMouseEnter={show} onFocus={show} onMouseLeave={hide} onBlur={hide} />
+              </g>
+            )
+          })}
+        </svg>
+      )}
+      <Tooltip tip={tip} />
+    </div>
+  )
+}
+
 /** Small column chart: one value per month, the selected month emphasised. */
 export function MonthColumns({ points, current, max, format, ticks }: {
   points: { yearMonth: string; value: number | null; tip: ReactNode }[]

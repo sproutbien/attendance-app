@@ -46,6 +46,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
     work_location:  s(existing?.work_location),
     reporting_manager_id: s(existing?.reporting_manager_id),
     joining_date:   s(existing?.joining_date),
+    date_of_birth:  s(existing?.date_of_birth),
     salary:         existing?.monthly_salary != null ? String(existing.monthly_salary) : '',
     phone:          existing?.phone ? `+${existing.phone}` : prefill?.phone ?? '',
     ec_name:        s(existing?.emergency_contact_name),
@@ -91,6 +92,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
       work_location:  t(f.work_location),
       reporting_manager_id: t(f.reporting_manager_id),
       joining_date:   t(f.joining_date),
+      date_of_birth:  t(f.date_of_birth),
       monthly_salary: f.salary === '' ? null : Number(f.salary),
       phone,
       shift: shiftId && shiftChanged ? { id: shiftId, from: isEdit ? shiftFrom : localDate() } : null,
@@ -149,6 +151,10 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
                 <PhoneInput value={f.phone} error={phoneError} onChange={v => { setF(p => ({ ...p, phone: v })); setPhoneError(null) }} />
               </Field>
             )}
+            <Field label="Date of birth (optional)">
+              <input type="date" value={f.date_of_birth} onChange={set('date_of_birth')} min="1900-01-01" max={localDate()} style={inputStyle} />
+              <p style={hintStyle}>Admins see upcoming birthdays on the home page (day and month only).</p>
+            </Field>
           </Section>
 
           <Section title="Job">

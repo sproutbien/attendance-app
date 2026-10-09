@@ -14,6 +14,7 @@ export type Employee = {
   monthly_salary: number | null
   phone: string | null            // WhatsApp number, digits with country code
   joining_date: string | null     // leave accrues from this month; null = full year
+  date_of_birth: string | null    // birthdays on the admin home page (migration 045)
   photo_path: string | null       // object path in the 'avatars' storage bucket
   employment_type: string | null
   work_location: string | null
