@@ -3,14 +3,22 @@ import { supabase } from '../lib/supabase'
 import { TRACKING_START, daysInMonth, localDate, shiftMonth } from '../lib/calendar'
 import { computeMonthStats } from '../lib/stats'
 import type { MonthStats, StatsInput } from '../lib/stats'
-import type { Employee } from '../types'
+import type { AttendanceRecord, Employee } from '../types'
 import { holidaysFor, loadHolidays } from '../lib/holidays'
 
 /** How many months the trend covers, ending at the selected month. */
 export const TREND_MONTHS = 6
 
-/** One employee's statistics for the selected month plus a month-by-month trend (oldest first). */
-export function useEmployeeStats(employee: Pick<Employee, 'id' | 'joining_date' | 'last_working_day'> | undefined, yearMonth: string) {
+/**
+ * One employee's statistics for the selected month plus a month-by-month trend (oldest first).
+ * `liveToday` (the dashboard's own copy of today's record) replaces the loaded one, so a
+ * check-in or check-out shows up without reloading.
+ */
+export function useEmployeeStats(
+  employee: Pick<Employee, 'id' | 'joining_date' | 'last_working_day'> | undefined,
+  yearMonth: string,
+  liveToday?: AttendanceRecord | null,
+) {
   const employeeId = employee?.id
   const activeFrom = employee?.joining_date ?? null
   const activeTo = employee?.last_working_day ?? null
@@ -70,9 +78,13 @@ export function useEmployeeStats(employee: Pick<Employee, 'id' | 'joining_date' 
   const stats = useMemo(() => {
     if (!input) return null
     const today = localDate()
-    const trend: MonthStats[] = months.map(ym => computeMonthStats(ym, input, today))
+    const live = liveToday === undefined ? input : {
+      ...input,
+      records: [...input.records.filter(r => r.date !== today), ...(liveToday ? [liveToday] : [])],
+    }
+    const trend: MonthStats[] = months.map(ym => computeMonthStats(ym, live, today))
     return { month: trend[trend.length - 1], previous: trend.length > 1 ? trend[trend.length - 2] : null, trend }
-  }, [input, months])
+  }, [input, months, liveToday])
 
   return { stats, loading, error }
 }

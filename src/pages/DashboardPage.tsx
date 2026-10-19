@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import {
-  BriefcaseBusiness, CalendarCheck, CalendarClock, CalendarDays, ChartColumn, ChevronLeft, ChevronRight,
-  CircleArrowRight, Clock, Coffee, DoorOpen, LogOut, Pause, Play, Timer,
-} from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAttendance } from '../hooks/useAttendance'
 import { useCorrections } from '../hooks/useCorrections'
@@ -24,28 +21,21 @@ import { fmtHolidayDay } from '../lib/holidays'
 import AppLayout from '../components/AppLayout'
 import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
-import { fmtClock, fmtHM, minBreakTopUp, totalBreakSeconds, workedSeconds } from '../lib/breaks'
+import { fmtHM, minBreakTopUp, totalBreakSeconds, workedSeconds } from '../lib/breaks'
 import { halfDaySplit } from '../lib/halfDay'
-import { fmtClock as clock, minutesOf, shiftHours } from '../lib/shifts'
+import { shiftHours } from '../lib/shifts'
 import { useMyShift, useShiftHistory } from '../hooks/useShifts'
+import { useEmployeeStats } from '../hooks/useEmployeeStats'
+import { CheckInBar, MonthCard, RecentDaysCard, ScoreCard, ShiftCard } from '../components/dashboard/TodayPanel'
+import type { DayState } from '../components/dashboard/TodayPanel'
 import { supabase } from '../lib/supabase'
 import { LEAVE_TYPE_LABELS, fmtLeaveSpan } from '../lib/leave'
 import type { LeaveRequest } from '../types'
-import type { AttendanceRecord, HalfDaySession, Shift } from '../types'
-
-type DayState = 'loading' | 'idle' | 'working' | 'break' | 'done'
+import type { AttendanceRecord, Shift } from '../types'
 
 const MARK_LABELS: Record<DayMark, string> = {
   present: 'Present', late: 'Late', absent: 'Absent', leave: 'On Leave', half_leave: 'Half-day leave', leave_pending: 'Leave pending',
   holiday: 'Holiday', choice_holiday: 'Choice holiday', sunday: 'Weekly off', none: 'Not checked in',
-}
-
-const CHIP: Record<DayState, { label: string; cls: string }> = {
-  loading: { label: 'Loading…',          cls: '' },
-  idle:    { label: 'Not started',       cls: '' },
-  working: { label: 'Currently Working', cls: 'is-working' },
-  break:   { label: 'On Break',          cls: 'is-break' },
-  done:    { label: 'Day complete',      cls: 'is-done' },
 }
 
 const SUBTITLE: Record<DayState, string> = {
@@ -165,6 +155,8 @@ export default function DashboardPage() {
 
   const shiftOn = useShiftHistory(employee?.id)
   const log = useMonthLog(yearMonth, monthRecords, calendar, employee?.id, now, shiftOn, employee?.joining_date ?? null)
+  // The cards always show the current month, whatever month the log below is on
+  const { stats, loading: statsLoading } = useEmployeeStats(employee ?? undefined, thisMonth, todayRecord)
   // Before the joining date: can log in (onboarding), can't check in
   const startsOn = notStartedYet(employee) ? employee!.joining_date! : null
 
@@ -189,34 +181,38 @@ export default function DashboardPage() {
         <GettingStartedCard />
         <TodayRequestNote />
 
-        <section className="sb-today">
-          <CheckInPanel
-            state={state}
-            record={todayRecord ?? null}
-            isSubmitting={isSubmitting || preparing !== ''}
-            halfDay={halfDay}
-            pastSplit={pastSplit}
+        <CheckInBar
+          state={state}
+          record={todayRecord ?? null}
+          now={now}
+          shift={shift}
+          isSubmitting={isSubmitting || preparing !== ''}
+          halfDay={halfDay}
+          pastSplit={pastSplit}
+          leave={todaysLeave}
+          startsOn={startsOn}
+          onCheckIn={startCheckIn}
+          onCheckOut={() => setConfirmingOut(true)}
+          onPause={pauseBreak}
+          onResume={resumeBreak}
+          onCancelLeave={() => todaysLeave && navigate(`/leave?cancel=${todaysLeave.id}`)}
+        />
+
+        <section className="sb-dcards">
+          <ShiftCard
             shift={shift}
-            onLeave={!!todaysLeave}
-            startsOn={startsOn}
-            onCheckIn={startCheckIn}
-            onCheckOut={() => setConfirmingOut(true)}
+            highlight={state === 'idle' && !todaysLeave && !halfDay && !startsOn && todayRecord?.status !== 'on_leave'}
           />
-          <TodayTime
-            state={state}
-            record={todayRecord ?? null}
+          <RecentDaysCard
+            trend={stats?.trend ?? null}
+            today={todayRecord ?? null}
             now={now}
-            shift={shiftLoaded ? shift : null}
-            isSubmitting={isSubmitting}
-            onPause={pauseBreak}
-            onResume={resumeBreak}
+            shift={shift}
+            onLeave={!!todaysLeave || todayRecord?.status === 'on_leave'}
+            loading={statsLoading}
           />
-          <MonthSummary
-            title={yearMonth === thisMonth ? 'This Month' : monthLabel(yearMonth)}
-            yearMonth={yearMonth}
-            loading={calendar.loading}
-            log={log}
-          />
+          <MonthCard month={stats?.month ?? null} loading={statsLoading} />
+          <ScoreCard month={stats?.month ?? null} previous={stats?.previous ?? null} loading={statsLoading} />
         </section>
 
         <ChoiceHolidayCard />
@@ -349,214 +345,6 @@ function useTodaysLeave(employeeId: string | undefined) {
       .then(({ data }) => setLeave(data ?? null))
   }, [employeeId])
   return leave
-}
-
-// ── Check-in panel (left) ─────────────────────────────────────
-
-function CheckInPanel({ state, record, isSubmitting, halfDay, pastSplit, shift, onLeave, startsOn, onCheckIn, onCheckOut }: {
-  state: DayState
-  record: AttendanceRecord | null
-  isSubmitting: boolean
-  halfDay: HalfDaySession | null
-  pastSplit: boolean
-  shift: Shift
-  onLeave: boolean        // pending / approved full-day leave today: Check In opens the cancel-leave popup
-  startsOn: string | null // joining date still ahead: Check In is closed until then
-  onCheckIn: () => void
-  onCheckOut: () => void
-}) {
-  let Icon = CalendarClock
-  let head: React.ReactNode = 'Ready to get started?'
-  let sub: string | null = null
-  let action: React.ReactNode = null
-  let hint: string | null = 'Tap to start your workday'
-
-  if (state === 'done') {
-    Icon = CalendarCheck
-    head = 'Done for today'
-    sub = `${fmtTime(record?.check_in_time)} – ${fmtTime(record?.check_out_time)}`
-    hint = null
-  } else if (state === 'working' || state === 'break') {
-    Icon = Timer
-    head = state === 'break' ? 'On a break' : 'Currently working'
-    sub = `Checked in at ${fmtTime(record?.check_in_time)}`
-    hint = state === 'break' ? 'Checking out will also end your break' : 'Tap to end your workday'
-    if (halfDay === 'afternoon') hint = `Half-day leave this afternoon — you’ll be checked out automatically at ${clock(shift.split_time)}`
-    action = (
-      <button className="sb-bigbtn is-out" onClick={onCheckOut} disabled={isSubmitting}>
-        <LogOut size={18} strokeWidth={2.2} />
-        {isSubmitting ? '…' : 'Check Out'}
-      </button>
-    )
-  } else {
-    // Morning leave: locked until the split. Afternoon leave: locked once the split has passed.
-    const locked = !!startsOn || (halfDay === 'morning' && !pastSplit) || (halfDay === 'afternoon' && pastSplit)
-    if (startsOn) {
-      head = 'See you soon'
-      hint = `Check In opens on your first day, ${fmtHolidayDay(startsOn)}`
-    } else if (halfDay === 'morning') {
-      head = pastSplit ? 'Welcome back from your half day' : 'Half-day leave this morning'
-      hint = pastSplit ? 'Tap to start your afternoon' : `Check In opens at ${clock(shift.split_time)}, when your leave ends`
-    } else if (halfDay === 'afternoon') {
-      head = pastSplit ? 'You’re on leave this afternoon' : 'Half-day leave this afternoon'
-      hint = pastSplit ? 'Enjoy your afternoon off' : `You’ll be checked out automatically at ${clock(shift.split_time)}`
-    } else if (onLeave || record?.status === 'on_leave') {
-      head = 'You’re on leave today'
-      hint = 'Working today after all? Cancel today’s leave first'
-    } else {
-      const d = new Date()
-      const minutes = d.getHours() * 60 + d.getMinutes()
-      if (minutes > minutesOf(shift.half_day_after)) hint = `Checking in after ${clock(shift.half_day_after)} counts as a morning half-day leave`
-      else if (minutes > minutesOf(shift.late_after)) hint = `Checking in after ${clock(shift.late_after)} is marked Late`
-    }
-    action = (
-      <button className="sb-bigbtn" onClick={onCheckIn} disabled={isSubmitting || state === 'loading' || locked}>
-        <CircleArrowRight size={18} strokeWidth={2.2} />
-        {isSubmitting ? '…' : 'Check In'}
-      </button>
-    )
-  }
-
-  const mark = todayMark(record)
-
-  return (
-    <div className="sb-card sb-att">
-      <div className="sb-checkin">
-        <div className="sb-card-head">
-          <Clock size={20} strokeWidth={2} />
-          <h2>Today’s Attendance</h2>
-          {mark && <span className={`sb-status s-${mark}`}><i />{MARK_LABELS[mark]}</span>}
-        </div>
-        <div className="sb-att-body">
-          <span className="sb-att-ring"><Icon size={32} strokeWidth={1.8} /></span>
-          <div className="sb-att-main">
-            <strong>{head}</strong>
-            {sub && <span>{sub}</span>}
-          </div>
-        </div>
-        {action}
-        {hint && <p className="sb-hint">{hint}</p>}
-      </div>
-    </div>
-  )
-}
-
-/** Today's status pill: what the day counts as so far (none until something happens) */
-function todayMark(record: AttendanceRecord | null): DayMark | null {
-  if (record?.half_day_session) return 'half_leave'
-  if (record?.check_in_time) return record.status === 'late' ? 'late' : 'present'
-  if (record?.status === 'on_leave') return 'leave'
-  return null
-}
-
-// ── Today's Time panel (right) ────────────────────────────────
-
-function TodayTime({ state, record, now, shift, isSubmitting, onPause, onResume }: {
-  state: DayState
-  record: AttendanceRecord | null
-  now: number
-  shift: Shift | null
-  isSubmitting: boolean
-  onPause: () => void
-  onResume: () => void
-}) {
-  const chip = CHIP[state]
-  const active = state === 'working' || state === 'break'
-  const topUp = minBreakTopUp(record, shift)
-  const minBreak = shift && !record?.half_day_session ? shift.min_break_minutes : 0
-
-  let barTitle = 'Pause / Resume'
-  let barSub = state === 'done' ? 'Your day is complete' : 'Available after check-in'
-  if (state === 'working') { barTitle = 'Pause for a break'; barSub = 'Stops your work timer' }
-  if (state === 'break') {
-    barTitle = 'Resume work'
-    barSub = `On break · ${fmtClock(Math.floor((now - new Date(record!.break_started_at!).getTime()) / 1000))}`
-  }
-
-  return (
-    <div className="sb-card sb-time">
-      <div className="sb-card-head">
-        <Clock size={20} strokeWidth={2} />
-        <h2>Today’s Time</h2>
-        <span className={`sb-chip ${chip.cls}`}><i />{chip.label}</span>
-      </div>
-
-      <div className="sb-stats">
-        <div className="sb-stat">
-          <span className="sb-stat-icon"><BriefcaseBusiness size={22} strokeWidth={2} /></span>
-          <div>
-            <div className="sb-stat-label">Work Time</div>
-            <div className="sb-stat-value">{fmtHM(workedSeconds(record, now, shift))}</div>
-          </div>
-        </div>
-        <span className="sb-stats-divider" />
-        <div className="sb-stat">
-          <span className="sb-stat-icon is-break"><Coffee size={22} strokeWidth={2} /></span>
-          <div>
-            <div className="sb-stat-label">Break Time</div>
-            <div className="sb-stat-value">{fmtHM(totalBreakSeconds(record, now) + topUp)}</div>
-          </div>
-        </div>
-      </div>
-      {topUp > 0 ? (
-        <p className="sb-minbreak-note">Includes {fmtMins(topUp)} added to reach your shift’s {minBreak}-minute minimum break.</p>
-      ) : minBreak > 0 && active && (
-        <p className="sb-minbreak-note">A {minBreak}-minute minimum break is deducted on full days, so pause whenever you step away.</p>
-      )}
-
-      <button
-        className={`sb-pausebar ${state === 'break' ? 'is-break' : ''}`}
-        onClick={state === 'break' ? onResume : onPause}
-        disabled={!active || isSubmitting}
-      >
-        <span className="sb-pause-dot">
-          {state === 'break'
-            ? <Play size={16} strokeWidth={2.5} fill="currentColor" />
-            : <Pause size={16} strokeWidth={2.5} fill="currentColor" />}
-        </span>
-        <span className="sb-pause-text">
-          {barTitle}
-          <small>{barSub}</small>
-        </span>
-      </button>
-    </div>
-  )
-}
-
-// ── This Month card (right) ───────────────────────────────────
-
-function MonthSummary({ title, yearMonth, loading, log }: {
-  title: string
-  yearMonth: string
-  loading: boolean
-  log: ReturnType<typeof useMonthLog>
-}) {
-  const { workedTotal, presentDays, workingDays, leaveDays } = log
-  const items = [
-    { Icon: Clock,          tone: '',         label: 'Total Work Hours', value: fmtHM(workedTotal) },
-    { Icon: ChartColumn,    tone: 'is-blue',  label: 'Avg. Per Day',     value: fmtHM(presentDays ? workedTotal / presentDays : 0) },
-    { Icon: CalendarDays,   tone: '',         label: 'Days Present',     value: `${presentDays} / ${workingDays}` },
-    { Icon: DoorOpen,       tone: 'is-amber', label: 'Leaves',           value: `${leaveDays} ${leaveDays === 1 ? 'day' : 'days'}` },
-  ]
-
-  return (
-    <div className="sb-card sb-month">
-      <Link to={`/reports?month=${yearMonth}`} className="sb-card-head sb-month-head" aria-label={`${title}: see detailed statistics`}>
-        <ChartColumn size={20} strokeWidth={2} />
-        <h2>{title}</h2>
-        <ChevronRight size={18} strokeWidth={2.2} className="sb-month-go" />
-      </Link>
-      <ul className="sb-month-list">
-        {items.map(({ Icon, tone, label, value }) => (
-          <li key={label}>
-            <span className={`sb-month-icon ${tone}`}><Icon size={15} strokeWidth={2.2} /></span>
-            <span className="sb-month-label">{label}</span>
-            <b>{loading ? '—' : value}</b>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
 }
 
 // ── This Month's Log ──────────────────────────────────────────

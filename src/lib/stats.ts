@@ -170,6 +170,37 @@ function addLeave(s: MonthStats, req: LeaveRequest | undefined, rec: AttendanceR
   s.leaveByType.lop += weight - paid
 }
 
+export type ScorePart = { key: 'attendance' | 'punctuality' | 'hours'; label: string; rate: number }
+export type Productivity = { score: number; parts: ScorePart[] }
+
+/**
+ * The dashboard's productivity score: the average of attendance, punctuality and
+ * hours worked against the shift, 0–100. Hours leave today out (a day in progress
+ * would drag it down). Null until there's something to score.
+ */
+export function productivityScore(m: MonthStats, today: string): Productivity | null {
+  const parts: ScorePart[] = []
+  if (m.attendanceRate != null) parts.push({ key: 'attendance', label: 'Attendance', rate: m.attendanceRate })
+  if (m.onTimeRate != null) parts.push({ key: 'punctuality', label: 'Punctuality', rate: m.onTimeRate })
+  const done = m.days.filter(d => d.date < today && d.worked > 0 && d.expected > 0)
+  const expected = done.reduce((n, d) => n + d.expected, 0)
+  if (expected > 0) parts.push({ key: 'hours', label: 'Hours vs shift', rate: Math.min(1, done.reduce((n, d) => n + d.worked, 0) / expected) })
+  if (!parts.length) return null
+  return { score: Math.round(parts.reduce((n, p) => n + p.rate, 0) / parts.length * 100), parts }
+}
+
+/** Working days in a row checked in on time, newest first; leave days are skipped, today only once checked in. */
+export function onTimeStreak(days: DayStat[], today: string): number {
+  let n = 0
+  for (const d of [...days].sort((a, b) => b.date.localeCompare(a.date))) {
+    if (d.kind === 'leave' && !d.checkIn) continue
+    if (d.date === today && d.kind !== 'on_time' && d.kind !== 'late') continue
+    if (d.kind !== 'on_time') break
+    n++
+  }
+  return n
+}
+
 /** Thresholds for the admin's "Worth a look" list. */
 const FLAG_NO_BREAK_DAYS = 3
 const FLAG_TOP_UP_DAYS = 5
