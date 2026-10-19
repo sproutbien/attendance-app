@@ -1,0 +1,69 @@
+# Builds the app for sproutbien.com/attendance and copies it to the hosting space over FTP
+# on every push to master (Vercel keeps deploying on its own, as before).
+#
+# Needs these repository secrets (Settings → Secrets and variables → Actions):
+#   FTP_SERVER             e.g. ftp.sproutbien.com
+#   FTP_USERNAME           FTP account from the hosting control panel
+#   FTP_PASSWORD
+#   VITE_SUPABASE_ANON_KEY same anon key Vercel uses
+# Optional repository variables:
+#   FTP_DIR       folder on the server, default public_html/attendance/
+#                 (use attendance/ if the FTP account opens straight into public_html)
+#   FTP_PROTOCOL  ftps (default) or ftp if the host has no TLS
+# Until the FTP secrets exist the job skips quietly instead of failing.
+
+name: Deploy to sproutbien.com/attendance
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hosting
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check FTP secrets
+        id: setup
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          if [ -z "$FTP_SERVER" ]; then
+            echo "::notice::FTP secrets not set yet, skipping the sproutbien.com deploy."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.setup.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.setup.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build for /attendance/
+        if: steps.setup.outputs.ready == 'true'
+        env:
+          VITE_SUPABASE_URL: https://tfjkvaebeocstmgxyvom.supabase.co
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          npm ci
+          npm run build:hosting
+
+      - name: Upload over FTP
+        if: steps.setup.outputs.ready == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ${{ vars.FTP_PROTOCOL || 'ftps' }}
+          local-dir: ./dist-hosting/
+          server-dir: ${{ vars.FTP_DIR || 'public_html/attendance/' }}
