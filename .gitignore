@@ -8,4 +8,4 @@ dist
 # Signatures and letter templates — never deploy
 private/
 dist-hosting
-attendance-upload.zip
+desk-upload.zip

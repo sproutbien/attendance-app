@@ -1,5 +1,5 @@
 // After `vite build --mode hosting`: add the Apache rules, drop public/ files that aren't in git
-// (local screenshots/mockups), and zip the folder ready to upload into public_html/attendance.
+// (local screenshots/mockups), and zip the folder ready to upload into public_html/desk.
 import { copyFileSync, readdirSync, rmSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { join } from 'node:path'
@@ -10,7 +10,7 @@ const tracked = new Set(execSync('git ls-files public', { encoding: 'utf8' }).sp
 for (const f of readdirSync('public')) if (!tracked.has(f)) rmSync(`${out}/${f}`, { recursive: true, force: true })
 // The GitHub Action uploads dist-hosting straight over FTP; the zip is only for manual uploads from Windows
 if (process.platform !== 'win32') process.exit(0)
-rmSync('attendance-upload.zip', { force: true })
+rmSync('desk-upload.zip', { force: true })
 // Windows' own tar (bsdtar) writes a real .zip; Git Bash's GNU tar would not
-execFileSync(join(process.env.SystemRoot, 'System32', 'tar.exe'), ['-a', '-c', '-f', '../attendance-upload.zip', ...readdirSync(out)], { cwd: out, stdio: 'inherit' })
-console.log('Ready: attendance-upload.zip — extract its contents into public_html/attendance/')
+execFileSync(join(process.env.SystemRoot, 'System32', 'tar.exe'), ['-a', '-c', '-f', '../desk-upload.zip', ...readdirSync(out)], { cwd: out, stdio: 'inherit' })
+console.log('Ready: desk-upload.zip — extract its contents into public_html/desk/')

@@ -1,13 +1,13 @@
-# Sproutbien People Desk at sproutbien.com/attendance — send every app route to index.html
+# Sproutbien People Desk at sproutbien.com/desk — send every app route to index.html
 Options -Indexes
 DirectoryIndex index.html
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /attendance/
+  RewriteBase /desk/
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /attendance/index.html [L]
+  RewriteRule . /desk/index.html [L]
 </IfModule>
 # index.html must never be cached so new uploads show up straight away; hashed assets can be
 <FilesMatch "^index\.html$">

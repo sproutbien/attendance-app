@@ -1,4 +1,4 @@
-# Builds the app for sproutbien.com/attendance and copies it to the hosting space over FTP
+# Builds the app for sproutbien.com/desk and copies it to the hosting space over FTP
 # on every push to master (Vercel keeps deploying on its own, as before).
 #
 # Needs these repository secrets (Settings → Secrets and variables → Actions):
@@ -7,12 +7,12 @@
 #   FTP_PASSWORD
 #   VITE_SUPABASE_ANON_KEY same anon key Vercel uses
 # Optional repository variables:
-#   FTP_DIR       folder on the server, default public_html/attendance/
-#                 (use attendance/ if the FTP account opens straight into public_html)
+#   FTP_DIR       folder on the server, default public_html/desk/
+#                 (use desk/ if the FTP account opens straight into public_html)
 #   FTP_PROTOCOL  ftps (default) or ftp if the host has no TLS
 # Until the FTP secrets exist the job skips quietly instead of failing.
 
-name: Deploy to sproutbien.com/attendance
+name: Deploy to sproutbien.com/desk
 
 on:
   push:
@@ -48,7 +48,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Build for /attendance/
+      - name: Build for /desk/
         if: steps.setup.outputs.ready == 'true'
         env:
           VITE_SUPABASE_URL: https://tfjkvaebeocstmgxyvom.supabase.co
@@ -66,4 +66,4 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ${{ vars.FTP_PROTOCOL || 'ftps' }}
           local-dir: ./dist-hosting/
-          server-dir: ${{ vars.FTP_DIR || 'public_html/attendance/' }}
+          server-dir: ${{ vars.FTP_DIR || 'public_html/desk/' }}
