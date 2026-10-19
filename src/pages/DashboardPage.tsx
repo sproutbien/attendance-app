@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useAttendance } from '../hooks/useAttendance'
 import { useCorrections } from '../hooks/useCorrections'
 import CorrectionDialog from '../components/CorrectionDialog'
 import MyCorrections from '../components/MyCorrections'
-import { isCorrectable } from '../lib/corrections'
 import { useMonthCalendar } from '../hooks/useMonthCalendar'
 import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import GettingStartedCard from '../components/GettingStartedCard'
@@ -19,24 +18,21 @@ import type { LocationFields } from '../lib/geofence'
 import { notStartedYet } from '../lib/onboarding'
 import { fmtHolidayDay } from '../lib/holidays'
 import AppLayout from '../components/AppLayout'
-import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, monthLabel, resolveMark, shiftMonth } from '../lib/calendar'
+import { TRACKING_START, currentYearMonth, isSunday, localDate, monthDates, resolveMark } from '../lib/calendar'
 import type { DayMark } from '../lib/calendar'
-import { fmtHM, minBreakTopUp, totalBreakSeconds, workedSeconds } from '../lib/breaks'
+import { minBreakTopUp, totalBreakSeconds, workedSeconds } from '../lib/breaks'
 import { halfDaySplit } from '../lib/halfDay'
 import { shiftHours } from '../lib/shifts'
 import { useMyShift, useShiftHistory } from '../hooks/useShifts'
 import { useEmployeeStats } from '../hooks/useEmployeeStats'
+import MonthCalendarLog from '../components/dashboard/MonthCalendarLog'
+import type { LogRow } from '../components/dashboard/MonthCalendarLog'
 import { CheckInBar, MonthCard, RecentDaysCard, ScoreCard, ShiftCard } from '../components/dashboard/TodayPanel'
 import type { DayState } from '../components/dashboard/TodayPanel'
 import { supabase } from '../lib/supabase'
 import { LEAVE_TYPE_LABELS, fmtLeaveSpan } from '../lib/leave'
 import type { LeaveRequest } from '../types'
 import type { AttendanceRecord, Shift } from '../types'
-
-const MARK_LABELS: Record<DayMark, string> = {
-  present: 'Present', late: 'Late', absent: 'Absent', leave: 'On Leave', half_leave: 'Half-day leave', leave_pending: 'Leave pending',
-  holiday: 'Holiday', choice_holiday: 'Choice holiday', sunday: 'Weekly off', none: 'Not checked in',
-}
 
 const SUBTITLE: Record<DayState, string> = {
   loading: 'Let’s make today count.',
@@ -51,17 +47,6 @@ function greeting() {
   if (h < 12) return 'morning'
   if (h < 17) return 'afternoon'
   return 'evening'
-}
-
-function fmtTime(iso: string | null | undefined) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-}
-
-/** "2025-06-23" → "23 Jun, Mon" */
-function fmtRowDate(date: string) {
-  const d = new Date(date + 'T00:00:00')
-  return `${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })}, ${d.toLocaleDateString('en-US', { weekday: 'short' })}`
 }
 
 /** Re-renders every second while `active`, so live timers tick */
@@ -217,7 +202,7 @@ export default function DashboardPage() {
 
         <ChoiceHolidayCard />
 
-        <MonthLog
+        <MonthCalendarLog
           yearMonth={yearMonth}
           onMonthChange={setYearMonth}
           maxMonth={thisMonth}
@@ -349,16 +334,6 @@ function useTodaysLeave(employeeId: string | undefined) {
 
 // ── This Month's Log ──────────────────────────────────────────
 
-type LogRow = {
-  date: string
-  mark: DayMark
-  note?: string
-  rec?: AttendanceRecord
-  worked: number | null   // null → no complete work span to show
-  brk: number
-  topUp: number           // added to reach the shift's minimum break
-}
-
 /** The month's rows (newest first, up to today) plus the totals the This Month card shows */
 function useMonthLog(
   yearMonth: string,
@@ -414,114 +389,4 @@ function useMonthLog(
     const leaveDays = rows.reduce((n, r) => n + (r.mark === 'leave' ? 1 : r.mark === 'half_leave' ? 0.5 : 0), 0)
     return { rows, presentDays, workingDays, workedTotal, leaveDays }
   }, [records, calendar.holidays, calendar.leave, calendar.halfDay, employeeId, yearMonth, today, now, shiftOn, joiningDate])
-}
-
-/** Break for the day; marks days where the shift's minimum break was applied. */
-function BreakCell({ r }: { r: LogRow }) {
-  if (r.brk + r.topUp <= 0) return <>—</>
-  if (!r.topUp) return <>{fmtHM(r.brk)}</>
-  return (
-    <span title={`You paused for ${r.brk ? fmtMins(r.brk) : 'no time'}; the minimum break was applied`}>
-      {fmtHM(r.brk + r.topUp)} <small className="sb-minbreak-tag">min</small>
-    </span>
-  )
-}
-
-/** 1680 → "28 min" */
-function fmtMins(seconds: number) {
-  return `${Math.round(seconds / 60)} min`
-}
-
-function MonthLog({ yearMonth, onMonthChange, maxMonth, rows, calendar, pendingCorrections, onCorrect }: {
-  yearMonth: string
-  onMonthChange: (ym: string) => void
-  maxMonth: string
-  rows: LogRow[]
-  calendar: ReturnType<typeof useMonthCalendar>
-  pendingCorrections: Set<string>
-  onCorrect: (date: string, rec?: AttendanceRecord) => void
-}) {
-  const today = localDate()
-  const isThisMonth = yearMonth === maxMonth
-
-  // Last 7 days: "Correct" button, or a marker while a request is open
-  const fix = (r: LogRow) => !isCorrectable(r.date) ? null
-    : pendingCorrections.has(r.date)
-      ? <span className="sb-fix-pending">Correction pending</span>
-      : <button type="button" className="sb-fix-btn" onClick={() => onCorrect(r.date, r.rec)}>Correct</button>
-
-  const status = (r: LogRow) => (
-    <span className={`sb-status s-${r.mark}`} title={r.note}>
-      <i />{(r.mark === 'holiday' || r.mark === 'choice_holiday') && r.note ? r.note : MARK_LABELS[r.mark]}
-    </span>
-  )
-
-  return (
-    <section className="sb-log">
-      <div className="sb-log-head">
-        <CalendarDays size={20} strokeWidth={2} />
-        <h2>{isThisMonth ? 'This Month’s Log' : 'Monthly Log'}</h2>
-        <div className="sb-monthnav">
-          <button onClick={() => onMonthChange(shiftMonth(yearMonth, -1))} disabled={yearMonth <= TRACKING_START.slice(0, 7)} aria-label="Previous month">
-            <ChevronLeft size={18} strokeWidth={2.4} />
-          </button>
-          <span>{monthLabel(yearMonth)}</span>
-          <button onClick={() => onMonthChange(shiftMonth(yearMonth, 1))} disabled={isThisMonth} aria-label="Next month">
-            <ChevronRight size={18} strokeWidth={2.4} />
-          </button>
-        </div>
-      </div>
-
-      {calendar.error ? (
-        <p className="sb-empty">{calendar.error}</p>
-      ) : calendar.loading ? (
-        <p className="sb-empty">Loading…</p>
-      ) : rows.length === 0 ? (
-        <p className="sb-empty">No days to show for this month yet.</p>
-      ) : (
-        <>
-          <div className="sb-table-wrap">
-            <table className="sb-table">
-              <thead>
-                <tr><th>Date</th><th>Status</th><th>In</th><th>Out</th><th>Break</th><th>Total Work Hours</th><th className="sb-fix-cell">Action</th></tr>
-              </thead>
-              <tbody>
-                {rows.map(r => (
-                  <tr key={r.date} className={r.date === today ? 'is-today' : r.mark === 'sunday' ? 'is-off' : undefined}>
-                    <td>{fmtRowDate(r.date)}</td>
-                    <td>{status(r)}</td>
-                    <td>{fmtTime(r.rec?.check_in_time)}</td>
-                    <td>{fmtTime(r.rec?.check_out_time)}</td>
-                    <td><BreakCell r={r} /></td>
-                    <td>{r.worked != null ? fmtHM(r.worked) : '—'}</td>
-                    <td className="sb-fix-cell">{fix(r)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <ul className="sb-loglist">
-            {rows.map(r => (
-              <li key={r.date} className={r.date === today ? 'is-today' : undefined}>
-                <div className="sb-li-top">
-                  <span className="sb-li-date">{fmtRowDate(r.date)}</span>
-                  {status(r)}
-                </div>
-                {r.rec?.check_in_time && (
-                  <dl>
-                    <div><dt>In</dt><dd>{fmtTime(r.rec.check_in_time)}</dd></div>
-                    <div><dt>Out</dt><dd>{fmtTime(r.rec.check_out_time)}</dd></div>
-                    <div><dt>Break</dt><dd><BreakCell r={r} /></dd></div>
-                    <div><dt>Worked</dt><dd>{r.worked != null ? fmtHM(r.worked) : '—'}</dd></div>
-                  </dl>
-                )}
-                {fix(r) && <div className="sb-li-fix">{fix(r)}</div>}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
-  )
 }
