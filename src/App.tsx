@@ -28,7 +28,7 @@ import AdminBrandingPage from './pages/admin/AdminBrandingPage'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <BrandingProvider>
         <AuthProvider>
           <Routes>

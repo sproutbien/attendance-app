@@ -151,7 +151,7 @@ export default function OfferLetterModal({ candidate, workingHours, onClose, onC
   }
 
   async function copyLink(o: Offer) {
-    const url = `${window.location.origin}/offer/${o.token}`
+    const url = `${window.location.origin}${import.meta.env.BASE_URL}offer/${o.token}`
     try { await navigator.clipboard.writeText(url); setNotice('Link copied. Anyone with it can see and answer this offer, so share it only with the candidate.') }
     catch { setNotice(<>Link: <code>{url}</code></>) }
   }

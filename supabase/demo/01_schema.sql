@@ -5688,3 +5688,13 @@ REVOKE EXECUTE ON FUNCTION clear_old_check_in_locations() FROM PUBLIC, anon, aut
 SELECT cron.unschedule('clear-old-check-in-locations')
 WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'clear-old-check-in-locations');
 SELECT cron.schedule('clear-old-check-in-locations', '50 18 * * *', $$SELECT clear_old_check_in_locations()$$);
+
+-- ============================================================
+-- 046 — The product is now "People Desk" (was "Attendance Tracker")
+-- Only replaces the old default; a name a customer set themselves is kept.
+-- ============================================================
+
+ALTER TABLE branding ALTER COLUMN product_name SET DEFAULT 'People Desk';
+
+UPDATE branding SET product_name = 'People Desk', updated_at = now()
+ WHERE product_name = 'Attendance Tracker';

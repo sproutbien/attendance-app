@@ -29,7 +29,7 @@ export type Branding = {
 export const DEFAULT_BRANDING: Branding = {
   app_name: 'SproutBien',
   tagline: 'nurturing businesses digitally',
-  product_name: 'Attendance Tracker',
+  product_name: 'People Desk',
   company_name: 'Sproutbien',
   company_address: '',
   support_email: '',
@@ -42,7 +42,7 @@ export const DEFAULT_BRANDING: Branding = {
 }
 
 export const BRANDING_BUCKET = 'branding'
-const BUILT_IN_LOGO = '/logo.jpg'
+export const BUILT_IN_LOGO = `${import.meta.env.BASE_URL}logo.jpg`
 const CACHE_KEY = 'sb.branding'
 
 export function logoUrl(b: Branding): string {

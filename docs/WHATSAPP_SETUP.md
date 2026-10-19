@@ -69,7 +69,7 @@ New leave request from {{1}} ({{2}}).
 Dates: {{3}} ({{4}})
 Reason: {{5}}
 
-Please review it in the Sproutbien attendance app.
+Please review it in Sproutbien People Desk.
 ```
 Sample values: `Priya Patel`, `Design`, `3 Oct 2026 – 5 Oct 2026`, `3 days`, `Family function`
 

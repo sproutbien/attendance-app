@@ -4,7 +4,7 @@ import { CalendarDays, Check, House, ImageUp, Palette, RotateCcw, TriangleAlert,
 import { supabase } from '../../lib/supabase'
 import { useBranding } from '../../contexts/BrandingContext'
 import {
-  BRANDING_BUCKET, DEFAULT_BRANDING, applyBranding, brandChecks, iconUrl, logoUrl, wordmarkParts,
+  BRANDING_BUCKET, BUILT_IN_LOGO, DEFAULT_BRANDING, applyBranding, brandChecks, iconUrl, logoUrl, wordmarkParts,
 } from '../../lib/brand'
 import type { Branding } from '../../lib/brand'
 import '../../styles/app.css'
@@ -58,7 +58,7 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
 
   const checks = useMemo(() => brandChecks(draft.primary_color), [draft.primary_color])
 
-  const previewLogo = logo === 'remove' ? '/logo.jpg' : logo ? logo.url : logoUrl({ ...branding })
+  const previewLogo = logo === 'remove' ? BUILT_IN_LOGO : logo ? logo.url : logoUrl({ ...branding })
   const previewIcon = icon === 'remove' ? previewLogo : icon ? icon.url : branding.icon_path ? iconUrl(branding) : previewLogo
   const changed = logo !== null || icon !== null ||
     (Object.keys(DEFAULT_BRANDING) as (keyof Branding)[]).some(k => k !== 'logo_path' && k !== 'icon_path' && draft[k] !== branding[k])
@@ -156,7 +156,7 @@ export default function BrandingEditor({ scope }: { scope: 'superadmin' | 'admin
                 <Field label="Tagline" hint="Small line under the name in the sidebar. Optional.">
                   <input value={draft.tagline} onChange={set('tagline')} maxLength={60} style={inputStyle} />
                 </Field>
-                <Field label="Product name" hint="Under the logo on the login page, e.g. “Attendance Tracker”.">
+                <Field label="Product name" hint="Under the logo on the login page, e.g. “People Desk”.">
                   <input value={draft.product_name} onChange={set('product_name')} maxLength={40} style={inputStyle} />
                 </Field>
                 <Field label="Company name" hint="PDF reports, CSV exports and the welcome message.">

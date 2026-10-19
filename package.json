@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:hosting": "tsc -p tsconfig.app.json && tsc -p tsconfig.node.json && vite build --mode hosting --outDir dist-hosting && node hosting/finish.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
