@@ -26,6 +26,7 @@
 --   leave-documents   / d0000000-0000-4000-8000-000000000002/demo/medical-certificate.pdf
 --   leave-documents   / d0000000-0000-4000-8000-000000000005/demo/dental-appointment.pdf
 --   leave-voice-notes / d0000000-0000-4000-8000-000000000002/demo-voice-note.webm
+--   offer-letters     / demo/offer-kiran-babu.pdf, demo/offer-anjali-varma.pdf
 -- ============================================================
 
 -- ── Leave is credited from April (undo migration 017's Oct-2026 start) ──
@@ -592,6 +593,87 @@ BEGIN
     m := (m + interval '1 month')::date;
   END LOOP;
 
+  -- ── Birthdays (two in the next few weeks, for "Coming up" on the admin home) ──
+  UPDATE employees e SET date_of_birth = (v_today + b.off - make_interval(years => b.age))::date
+  FROM (VALUES (1, 160, 41), (2, 95, 27), (3, 230, 36), (4, 40, 31), (5, 300, 29), (6, -60, 25),
+               (7, 120, 38), (8, 210, 24), (9, 19, 28), (10, 6, 30), (11, 330, 22), (12, 270, 27), (13, 150, 33))
+       AS b(n, off, age)
+  WHERE e.id = demo_id(b.n);
+
+  -- ── One-day shift changes and permissions (short leave) ──
+  INSERT INTO shift_changes (employee_id, date, shift_id, from_shift_id, reason, status, requested_by, requested_at,
+                             reviewed_by, reviewed_at, admin_note) VALUES
+    (demo_id(2), demo_day(6), v_eve, v_gen, 'Release call with the US client team in the evening', 'pending',
+     demo_id(2), now() - interval '5 hours', NULL, NULL, NULL),
+    (demo_id(4), demo_day(1), v_early, v_gen, 'Leaving early for a design workshop at KSUM', 'approved',
+     demo_id(4), now() - interval '1 day', demo_id(1), now() - interval '20 hours', 'Approved — share the workshop notes.'),
+    (demo_id(3), demo_day(-6), v_eve, v_gen, 'Production deployment window', 'approved',
+     demo_id(1), demo_ts(demo_day(-9), '11:00'), demo_id(1), demo_ts(demo_day(-9), '11:00'), NULL);
+  INSERT INTO permission_requests (employee_id, date, start_time, end_time, reason, status, requested_at,
+                                   reviewed_by, reviewed_at, admin_note) VALUES
+    (demo_id(6),  demo_day(1),  '16:00', '17:30', 'Parent-teacher meeting at my daughter''s school', 'pending',
+     now() - interval '2 hours', NULL, NULL, NULL),
+    (demo_id(10), demo_day(0),  '14:00', '15:00', 'Bank visit for KYC update', 'approved',
+     now() - interval '1 day', demo_id(1), now() - interval '22 hours', NULL),
+    (demo_id(2),  demo_day(-9), '09:30', '10:30', 'Vehicle pollution test and insurance renewal', 'approved',
+     demo_ts(demo_day(-11), '18:20'), demo_id(1), demo_ts(demo_day(-10), '09:45'), NULL),
+    (demo_id(5),  demo_day(-4), '15:00', '17:30', 'Personal work', 'rejected',
+     demo_ts(demo_day(-5), '17:10'), demo_id(1), demo_ts(demo_day(-4), '10:05'), 'Release day — please pick another day.');
+
+  -- ── Hiring: candidates at every stage, two offer letters, one hire ──
+  -- Offer PDFs are used if they were uploaded once to offer-letters/demo/…
+  PERFORM setval('offer_ref_seq', 6, true);
+  INSERT INTO candidates (full_name, role, email, phone, source, notes, stage, stage_changed_at, employee_id, created_by, created_at)
+  VALUES
+    ('Aswathy Raj',   'Content Writer',       'aswathy.raj@example.com',   '9847012345', 'LinkedIn', 'Writes for two SaaS blogs. Portfolio looks good.', 'applied',      now() - interval '1 day',  NULL, demo_id(1), now() - interval '1 day'),
+    ('Basil Thomas',  'Backend Developer',    'basil.thomas@example.com',  '9847023456', 'Naukri',   '4 yrs Node.js + Postgres. Notice period 60 days.', 'applied',      now() - interval '3 days', NULL, demo_id(1), now() - interval '3 days'),
+    ('Riya George',   'Support Executive',    'riya.george@example.com',   '9847034567', 'Referral', 'Referred by Divya. Malayalam, English, Tamil.',    'applied',      now() - interval '4 days', NULL, demo_id(1), now() - interval '4 days'),
+    ('Hari Shankar',  'QA Engineer',          'hari.shankar@example.com',  '9847045678', 'LinkedIn', 'Round 1 cleared (Gokul). Technical round on ' || to_char(demo_day(2), 'Dy DD Mon') || ', 11 AM.', 'interview', now() - interval '2 days', NULL, demo_id(1), now() - interval '9 days'),
+    ('Neha Kurup',    'UI/UX Designer',       'neha.kurup@example.com',    '9847056789', 'Dribbble', 'Portfolio review with Fathima done. Design task sent.', 'interview', now() - interval '5 days', NULL, demo_id(1), now() - interval '12 days'),
+    ('Kiran Babu',    'Backend Developer',    'kiran.babu@example.com',    '9847067890', 'Referral', 'Strong system design round. Offer at ₹7.8 LPA.',   'offer',        now() - interval '2 days', NULL, demo_id(1), now() - interval '20 days'),
+    ('Anjali Varma',  'Marketing Executive',  'anjali.varma@example.com',  '9847078901', 'Website',  'Accepted. Laptop + email to be ready before joining.', 'offer',    now() - interval '6 days', NULL, demo_id(1), now() - interval '25 days'),
+    ('Nikhil Joseph', 'Frontend Intern',      'nikhil.joseph@example.com', '9847089012', 'Campus',   'Hired from the CET campus drive.',                 'hired',        now() - interval '80 days', demo_id(11), demo_id(1), now() - interval '95 days'),
+    ('Manu Mohan',    'Sales Executive',      'manu.mohan@example.com',    '9847090123', 'Naukri',   'Salary expectation well above the band.',          'not_selected', now() - interval '15 days', NULL, demo_id(1), now() - interval '30 days');
+
+  INSERT INTO offers (candidate_id, status, fields, email_to, letter_date, joining_date, accept_by, pdf_path,
+                      approved_by, approved_at, sent_at, send_count, viewed_at, responded_at, response_name)
+  SELECT c.id, o.status,
+         jsonb_build_object(
+           'letter_date', o.letter_date, 'salutation', o.salutation, 'candidate_name', c.full_name,
+           'candidate_address', o.address, 'candidate_email', c.email, 'designation', c.role,
+           'department', o.dept, 'reporting_to', o.reporting_to, 'employment_type', 'Full-time',
+           'joining_date', o.joining_date, 'accept_by', o.accept_by, 'ctc_annual', o.ctc,
+           'probation_months', 6, 'probation_notice_days', 15, 'notice_days', 60,
+           'work_location', 'Trivandrum — Technopark', 'working_hours', 'Monday to Saturday, 9:30 AM to 5:30 PM',
+           'additional_terms', '',
+           'company_legal_name', ols.company_legal_name, 'company_address', ols.company_address,
+           'company_phone', ols.company_phone, 'company_email', ols.company_email, 'company_website', ols.company_website,
+           'jurisdiction', ols.jurisdiction, 'signatory_name', ols.signatory_name, 'signatory_title', ols.signatory_title),
+         c.email, o.letter_date, o.joining_date, o.accept_by,
+         (SELECT so.name FROM storage.objects so WHERE so.bucket_id = 'offer-letters' AND so.name = o.pdf),
+         demo_id(1), o.letter_date::timestamp + time '11:00', o.letter_date::timestamp + time '11:05', 1,
+         o.viewed, o.responded, o.response_name
+  FROM (VALUES
+    ('Kiran Babu',   'sent',     v_today - 2, 'Mr.', 'Kiran Babu' || chr(10) || 'TC 12/440, Sasthamangalam' || chr(10) || 'Thiruvananthapuram 695010',
+     'Engineering', 'Rahul Krishnan', v_today + 30, v_today + 5, 780000, 'demo/offer-kiran-babu.pdf',
+     now() - interval '1 day', NULL::timestamptz, NULL::text),
+    ('Anjali Varma', 'accepted', v_today - 9, 'Ms.', 'Anjali Varma' || chr(10) || 'Kowdiar Gardens, Lane 3' || chr(10) || 'Thiruvananthapuram 695003',
+     'Marketing', 'Anitha Menon', v_today + 14, v_today - 2, 420000, 'demo/offer-anjali-varma.pdf',
+     now() - interval '8 days', now() - interval '6 days', 'Anjali Varma')
+  ) AS o(name, status, letter_date, salutation, address, dept, reporting_to, joining_date, accept_by, ctc, pdf, viewed, responded, response_name)
+  JOIN candidates c ON c.full_name = o.name
+  CROSS JOIN offer_letter_settings ols;
+
+  -- ── Onboarding: Nikhil (on probation) is part-way through his checklist ──
+  INSERT INTO onboarding_tasks (employee_id, title, details, assignee, document_category, sort_order, done_at, done_by)
+  SELECT demo_id(11), t.title, t.details, t.assignee, t.document_category, t.sort_order,
+         CASE WHEN t.document_category IS NULL AND row_number() OVER (ORDER BY t.sort_order) <= 6
+              THEN now() - interval '70 days' END,
+         CASE WHEN t.document_category IS NULL AND row_number() OVER (ORDER BY t.sort_order) <= 6
+              THEN CASE t.assignee WHEN 'admin' THEN demo_id(1) ELSE demo_id(11) END END
+  FROM onboarding_template t;
+  UPDATE employees SET probation_end_date = v_today + 105 WHERE id = demo_id(11);
+
   -- ── Today's plan (the demo employee is left for the visitor) ──
   IF demo_is_working(v_today) THEN
     FOR p IN SELECT * FROM demo_people
@@ -639,6 +721,11 @@ BEGIN
   INSERT INTO attendance_settings (id) VALUES (true)
     ON CONFLICT (id) DO UPDATE SET selfie_required = false, geofence_required = false, geofence_strict = false;
   INSERT INTO leave_policy (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
+  INSERT INTO offer_letter_settings (id, company_legal_name, company_address, company_phone, company_email,
+                                     company_website, signatory_name, signatory_title)
+  VALUES (true, 'Sproutbien Technologies Pvt Ltd', 'Thejaswini, Technopark Phase 1, Kazhakkoottam, Thiruvananthapuram, Kerala 695581',
+          '+91 471 270 0000', 'hr@demo.sproutbien.com', 'sproutbien.com', 'Anitha Menon', 'HR Manager')
+  ON CONFLICT (id) DO NOTHING;
 
   PERFORM demo_seed();
   PERFORM set_config('sb.demo_reset', 'off', true);

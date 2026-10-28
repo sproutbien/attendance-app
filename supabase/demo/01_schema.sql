@@ -5690,6 +5690,1260 @@ WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'clear-old-check-in-locatio
 SELECT cron.schedule('clear-old-check-in-locations', '50 18 * * *', $$SELECT clear_old_check_in_locations()$$);
 
 -- ============================================================
+-- Sproutbien — Employees can remove a document they just uploaded
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+--   • remove_own_document(id): an employee removes a document they uploaded
+--     themselves within the last 24 hours (e.g. picked the wrong file during
+--     onboarding). Older uploads, and anything HR added, stay admin-only.
+--   • If no documents are left in that category, the matching onboarding
+--     step is unticked again.
+--   • The file itself is then deleted by the app: the existing storage policy
+--     lets an employee delete their own file once its record is gone.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION remove_own_document(p_document uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  d employee_documents;
+BEGIN
+  SELECT * INTO d FROM employee_documents WHERE id = p_document;
+  IF d.id IS NULL THEN RAISE EXCEPTION 'Document not found'; END IF;
+  IF d.employee_id IS DISTINCT FROM auth.uid() OR d.uploaded_by IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'You can only remove documents you uploaded yourself.';
+  END IF;
+  IF d.uploaded_at < now() - interval '24 hours' THEN
+    RAISE EXCEPTION 'This document was uploaded more than a day ago. Ask HR to remove it.';
+  END IF;
+
+  DELETE FROM employee_documents WHERE id = d.id;
+
+  IF NOT EXISTS (SELECT 1 FROM employee_documents WHERE employee_id = d.employee_id AND category = d.category) THEN
+    UPDATE onboarding_tasks SET done_at = NULL, done_by = NULL
+    WHERE employee_id = d.employee_id AND document_category = d.category;
+  END IF;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION remove_own_document(uuid) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION remove_own_document(uuid) TO authenticated;
+
+-- ============================================================
+-- Sproutbien — HR verifies onboarding documents
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+--   • Admin can ask an employee to re-send a document, with a reason
+--     (employee_documents.resend_reason). The matching onboarding step
+--     unticks; the employee's next upload in that category replaces the
+--     flagged file(s) and ticks the step again. The admin can withdraw it.
+--   • Once the employee has finished their own steps and nothing is waiting
+--     to be re-sent, the admin passes verification (onboarding_reviews).
+--     Admin steps don't need to be done first.
+--   • The employee sees "verified" on their Dashboard until they press Done.
+--   • After verification, employees can no longer remove their own uploads.
+--   • Employees who had already finished their steps are marked verified
+--     (and the notice as seen), so nobody is left waiting for a review.
+-- ============================================================
+
+ALTER TABLE employee_documents
+  ADD COLUMN IF NOT EXISTS resend_reason       text CHECK (length(resend_reason) BETWEEN 1 AND 200),
+  ADD COLUMN IF NOT EXISTS resend_requested_at timestamptz;
+
+CREATE TABLE IF NOT EXISTS onboarding_reviews (
+  employee_id uuid        PRIMARY KEY REFERENCES employees(id) ON DELETE CASCADE,
+  verified_at timestamptz NOT NULL DEFAULT now(),
+  verified_by uuid        REFERENCES employees(id) ON DELETE SET NULL,
+  seen_at     timestamptz              -- employee pressed Done on the notice
+);
+
+ALTER TABLE onboarding_reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "onboarding_reviews: own or admin read" ON onboarding_reviews;
+CREATE POLICY "onboarding_reviews: own or admin read" ON onboarding_reviews FOR SELECT
+  USING (employee_id = auth.uid() OR is_admin());
+-- No direct writes: the functions below do them.
+
+-- Already finished before this existed → verified quietly
+INSERT INTO onboarding_reviews (employee_id, verified_at, seen_at)
+SELECT t.employee_id, now(), now()
+FROM onboarding_tasks t
+GROUP BY t.employee_id
+HAVING bool_and(t.done_at IS NOT NULL OR t.assignee <> 'employee')
+   AND bool_or(t.assignee = 'employee')
+ON CONFLICT (employee_id) DO NOTHING;
+
+-- ── Admin: ask for a document again ─────────────────────────
+CREATE OR REPLACE FUNCTION request_document_resend(p_document uuid, p_reason text)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  d employee_documents;
+  r text := btrim(coalesce(p_reason, ''));
+BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  IF r = '' THEN RAISE EXCEPTION 'Say what needs fixing.'; END IF;
+  SELECT * INTO d FROM employee_documents WHERE id = p_document;
+  IF d.id IS NULL THEN RAISE EXCEPTION 'Document not found'; END IF;
+
+  UPDATE employee_documents SET resend_reason = left(r, 200), resend_requested_at = now() WHERE id = d.id;
+  UPDATE onboarding_tasks SET done_at = NULL, done_by = NULL
+  WHERE employee_id = d.employee_id AND document_category = d.category;
+  DELETE FROM onboarding_reviews WHERE employee_id = d.employee_id;
+END;
+$$;
+
+-- ── Admin: withdraw a re-send request ───────────────────────
+CREATE OR REPLACE FUNCTION withdraw_document_resend(p_document uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  d employee_documents;
+BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  SELECT * INTO d FROM employee_documents WHERE id = p_document;
+  IF d.id IS NULL THEN RAISE EXCEPTION 'Document not found'; END IF;
+
+  UPDATE employee_documents SET resend_reason = NULL, resend_requested_at = NULL WHERE id = d.id;
+  IF NOT EXISTS (SELECT 1 FROM employee_documents
+                 WHERE employee_id = d.employee_id AND category = d.category AND resend_reason IS NOT NULL) THEN
+    UPDATE onboarding_tasks SET done_at = now(), done_by = auth.uid()
+    WHERE employee_id = d.employee_id AND document_category = d.category AND done_at IS NULL;
+  END IF;
+END;
+$$;
+
+-- ── A new upload replaces flagged files in its category ─────
+-- Rows only; the app then deletes the files (the storage policy allows an
+-- employee to delete their own file once its record is gone).
+CREATE OR REPLACE FUNCTION replace_flagged_documents()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  DELETE FROM employee_documents
+  WHERE employee_id = NEW.employee_id AND category = NEW.category
+    AND resend_reason IS NOT NULL AND id <> NEW.id;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_employee_document_replace ON employee_documents;
+CREATE TRIGGER on_employee_document_replace
+  AFTER INSERT ON employee_documents
+  FOR EACH ROW EXECUTE FUNCTION replace_flagged_documents();
+
+-- ── Admin: pass / undo verification ─────────────────────────
+CREATE OR REPLACE FUNCTION pass_document_verification(p_employee uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  IF EXISTS (SELECT 1 FROM employee_documents WHERE employee_id = p_employee AND resend_reason IS NOT NULL) THEN
+    RAISE EXCEPTION 'A document is still waiting to be re-sent.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM onboarding_tasks WHERE employee_id = p_employee AND assignee = 'employee' AND done_at IS NULL) THEN
+    RAISE EXCEPTION 'They haven''t finished their steps yet.';
+  END IF;
+  INSERT INTO onboarding_reviews (employee_id, verified_at, verified_by, seen_at)
+  VALUES (p_employee, now(), auth.uid(), NULL)
+  ON CONFLICT (employee_id) DO UPDATE SET verified_at = now(), verified_by = auth.uid(), seen_at = NULL;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION undo_document_verification(p_employee uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  DELETE FROM onboarding_reviews WHERE employee_id = p_employee;
+END;
+$$;
+
+-- ── Employee: Done on the "verified" notice ─────────────────
+CREATE OR REPLACE FUNCTION dismiss_verification_notice()
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  UPDATE onboarding_reviews SET seen_at = now() WHERE employee_id = auth.uid() AND seen_at IS NULL;
+END;
+$$;
+
+-- ── Own-upload removal (038) stops once verified ────────────
+CREATE OR REPLACE FUNCTION remove_own_document(p_document uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  d employee_documents;
+BEGIN
+  SELECT * INTO d FROM employee_documents WHERE id = p_document;
+  IF d.id IS NULL THEN RAISE EXCEPTION 'Document not found'; END IF;
+  IF d.employee_id IS DISTINCT FROM auth.uid() OR d.uploaded_by IS DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'You can only remove documents you uploaded yourself.';
+  END IF;
+  IF d.uploaded_at < now() - interval '24 hours' THEN
+    RAISE EXCEPTION 'This document was uploaded more than a day ago. Ask HR to remove it.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM onboarding_reviews WHERE employee_id = d.employee_id) THEN
+    RAISE EXCEPTION 'HR has already verified your documents. Ask HR to remove it.';
+  END IF;
+
+  DELETE FROM employee_documents WHERE id = d.id;
+
+  IF NOT EXISTS (SELECT 1 FROM employee_documents WHERE employee_id = d.employee_id AND category = d.category) THEN
+    UPDATE onboarding_tasks SET done_at = NULL, done_by = NULL
+    WHERE employee_id = d.employee_id AND document_category = d.category;
+  END IF;
+END;
+$$;
+
+DO $$
+DECLARE f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY[
+    'request_document_resend(uuid, text)', 'withdraw_document_resend(uuid)',
+    'pass_document_verification(uuid)', 'undo_document_verification(uuid)',
+    'dismiss_verification_notice()', 'remove_own_document(uuid)'
+  ] LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon', f);
+    EXECUTE format('GRANT  EXECUTE ON FUNCTION %s TO authenticated', f);
+  END LOOP;
+END $$;
+
+-- ============================================================
+-- Sproutbien — My Profile: employees update their own contact details
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+--   • update_my_contact(): an employee saves their phone / WhatsApp number
+--     and emergency contact. Saved straight away; nothing else on their
+--     record can be changed this way (employees UPDATE stays admin-only).
+--     employees.contact_updated_at records when they last did, for HR.
+--   • my_reporting_manager(): name, designation, photo and contact of the
+--     caller's reporting manager (employees can otherwise only read their
+--     own row).
+-- ============================================================
+
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contact_updated_at timestamptz;   -- by the employee, via My Profile
+
+CREATE OR REPLACE FUNCTION update_my_contact(p_phone text, p_ec_name text, p_ec_relation text, p_ec_phone text)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_phone text := nullif(btrim(coalesce(p_phone, '')), '');
+BEGIN
+  IF auth.uid() IS NULL OR NOT EXISTS (SELECT 1 FROM employees WHERE id = auth.uid()) THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+  IF v_phone IS NOT NULL AND v_phone !~ '^[1-9][0-9]{7,14}$' THEN
+    RAISE EXCEPTION 'Enter a valid phone number with country code, e.g. +91 98765 43210.';
+  END IF;
+  IF length(coalesce(p_ec_name, '')) > 100 OR length(coalesce(p_ec_relation, '')) > 50 OR length(coalesce(p_ec_phone, '')) > 30 THEN
+    RAISE EXCEPTION 'One of the emergency contact fields is too long.';
+  END IF;
+
+  UPDATE employees SET
+    phone                      = v_phone,
+    emergency_contact_name     = nullif(btrim(coalesce(p_ec_name, '')), ''),
+    emergency_contact_relation = nullif(btrim(coalesce(p_ec_relation, '')), ''),
+    emergency_contact_phone    = nullif(btrim(coalesce(p_ec_phone, '')), ''),
+    contact_updated_at         = now()
+  WHERE id = auth.uid();
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION my_reporting_manager()
+RETURNS TABLE (full_name text, designation text, photo_path text, email text, phone text)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT m.full_name, m.designation, m.photo_path, m.email, m.phone
+  FROM employees me JOIN employees m ON m.id = me.reporting_manager_id
+  WHERE me.id = auth.uid() AND m.deleted_at IS NULL;
+$$;
+
+REVOKE EXECUTE ON FUNCTION update_my_contact(text, text, text, text) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION update_my_contact(text, text, text, text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION my_reporting_manager() FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION my_reporting_manager() TO authenticated;
+
+-- ============================================================
+-- Sproutbien — Choice holidays: the admin sets when choosing opens
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+--   • holiday_choices.opens_on: the first day employees can choose (NULL =
+--     straight away, as before; existing choice holidays keep that).
+--     It must be on or before the last day to choose.
+--   • Before that day employees don't see the choice at all (no "Choose your
+--     holiday" card) and can't choose; the default date(s) still apply.
+--     Admins can still set anyone's dates.
+--   • Leave on a choice date before choosing opens explains when it opens.
+-- ============================================================
+
+ALTER TABLE holiday_choices ADD COLUMN IF NOT EXISTS opens_on date;
+ALTER TABLE holiday_choices DROP CONSTRAINT IF EXISTS holiday_choices_opens_before_deadline;
+ALTER TABLE holiday_choices ADD CONSTRAINT holiday_choices_opens_before_deadline CHECK (opens_on IS NULL OR opens_on <= choose_by);
+
+-- ── Employee: their choices (only once choosing has opened) ─
+CREATE OR REPLACE FUNCTION my_holiday_choices()
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT COALESCE(jsonb_agg(x ORDER BY x->>'first_date'), '[]'::jsonb)
+  FROM (
+    SELECT jsonb_build_object(
+      'id', c.id, 'name', c.name, 'pick_count', c.pick_count, 'choose_by', c.choose_by, 'opens_on', c.opens_on,
+      'first_date', min(d.date),
+      'open', (now() AT TIME ZONE 'Asia/Kolkata')::date <= c.choose_by,
+      'chosen', (SELECT count(*) FROM holiday_picks p WHERE p.choice_id = c.id AND p.employee_id = auth.uid()) = c.pick_count,
+      'my_dates', COALESCE(jsonb_agg(d.date ORDER BY d.date) FILTER (WHERE choice_holiday_on(auth.uid(), d.date)), '[]'::jsonb),
+      'dates', jsonb_agg(jsonb_build_object(
+                 'date', d.date, 'is_default', d.is_default, 'max_people', d.max_people,
+                 'taken', (SELECT count(*) FROM holiday_picks p
+                           WHERE p.choice_id = c.id AND p.date = d.date AND p.employee_id <> auth.uid()))
+               ORDER BY d.date)) AS x
+    FROM holiday_choices c
+    JOIN holiday_choice_dates d ON d.choice_id = c.id
+    WHERE auth.uid() IS NOT NULL
+      AND (c.opens_on IS NULL OR c.opens_on <= (now() AT TIME ZONE 'Asia/Kolkata')::date)   -- not shown before the window opens
+    GROUP BY c.id
+    HAVING max(d.date) >= (now() AT TIME ZONE 'Asia/Kolkata')::date
+  ) s
+$$;
+
+-- ── Choose (employee) or set (admin) someone's dates ────────
+CREATE OR REPLACE FUNCTION set_holiday_picks(p_choice uuid, p_dates date[], p_employee uuid DEFAULT NULL)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_emp   uuid    := COALESCE(p_employee, auth.uid());
+  v_admin boolean := is_admin();
+  v_today date    := (now() AT TIME ZONE 'Asia/Kolkata')::date;
+  v_dates date[]  := ARRAY(SELECT DISTINCT x FROM unnest(COALESCE(p_dates, '{}')) AS x ORDER BY 1);
+  c       holiday_choices;
+  v_date  date;
+  v_max   integer;
+BEGIN
+  IF auth.uid() IS NULL OR (v_emp <> auth.uid() AND NOT v_admin) THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+
+  -- Locks: the choice (per-date limits) and the employee's leave (no leave slipping in meanwhile)
+  SELECT * INTO c FROM holiday_choices WHERE id = p_choice FOR UPDATE;
+  IF c.id IS NULL THEN RAISE EXCEPTION 'Holiday not found'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtext('leave:' || v_emp::text));
+
+  IF NOT v_admin AND c.opens_on IS NOT NULL AND v_today < c.opens_on THEN
+    RAISE EXCEPTION 'Choosing your % holiday opens on %.', c.name, to_char(c.opens_on, 'FMDD Mon');
+  END IF;
+  IF NOT v_admin AND v_today > c.choose_by THEN
+    RAISE EXCEPTION 'The last day to choose your % holiday was %. Ask your admin to change it.',
+      c.name, to_char(c.choose_by, 'FMDD Mon');
+  END IF;
+  IF cardinality(v_dates) NOT IN (0, c.pick_count) THEN
+    RAISE EXCEPTION 'Choose % day% for %.', c.pick_count, CASE WHEN c.pick_count = 1 THEN '' ELSE 's' END, c.name;
+  END IF;
+
+  SELECT x INTO v_date FROM unnest(v_dates) AS x
+  WHERE NOT EXISTS (SELECT 1 FROM holiday_choice_dates d WHERE d.choice_id = c.id AND d.date = x)
+  LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION '% isn''t one of the % dates.', to_char(v_date, 'FMDD Mon'), c.name;
+  END IF;
+
+  -- Leave days were counted with today's holidays; don't move a holiday under existing leave
+  SELECT d.date INTO v_date
+  FROM holiday_choice_dates d
+  WHERE d.choice_id = c.id
+    AND EXISTS (SELECT 1 FROM leave_requests l
+                WHERE l.employee_id = v_emp AND l.status IN ('pending', 'approved')
+                  AND d.date BETWEEN l.start_date AND l.end_date)
+  ORDER BY d.date LIMIT 1;
+  IF FOUND THEN
+    RAISE EXCEPTION 'There''s pending or approved leave on %. Cancel that leave first, then change the % holiday.',
+      to_char(v_date, 'FMDD Mon'), c.name;
+  END IF;
+
+  IF NOT v_admin THEN
+    SELECT d.date, d.max_people INTO v_date, v_max
+    FROM holiday_choice_dates d
+    WHERE d.choice_id = c.id AND d.date = ANY (v_dates) AND d.max_people IS NOT NULL
+      AND (SELECT count(*) FROM holiday_picks p
+           WHERE p.choice_id = c.id AND p.date = d.date AND p.employee_id <> v_emp) >= d.max_people
+    ORDER BY d.date LIMIT 1;
+    IF FOUND THEN
+      RAISE EXCEPTION '% is full (% people already chose it). Choose another day.', to_char(v_date, 'FMDD Mon'), v_max;
+    END IF;
+  END IF;
+
+  DELETE FROM holiday_picks WHERE choice_id = c.id AND employee_id = v_emp;
+  INSERT INTO holiday_picks (choice_id, employee_id, date, picked_by)
+  SELECT c.id, v_emp, x, auth.uid() FROM unnest(v_dates) AS x;
+END;
+$$;
+
+-- ── Admin: add / edit a choice holiday, now with opens_on ───
+DROP FUNCTION IF EXISTS save_holiday_choice(uuid, text, integer, date, jsonb);
+CREATE OR REPLACE FUNCTION save_holiday_choice(
+  p_id uuid, p_name text, p_pick_count integer, p_choose_by date, p_dates jsonb, p_opens_on date DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_today   date := (now() AT TIME ZONE 'Asia/Kolkata')::date;
+  v_id      uuid := p_id;
+  v_n       integer;
+  v_first   date;
+  v_bad     record;
+  v_old     holiday_choices;
+  v_clear   boolean := false;
+  v_from    date;
+  v_to      date;
+BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+
+  CREATE TEMP TABLE IF NOT EXISTS _choice_dates (date date, is_default boolean, max_people integer) ON COMMIT DROP;
+  DELETE FROM _choice_dates WHERE true;   -- Supabase refuses a DELETE without WHERE
+  INSERT INTO _choice_dates
+  SELECT (x->>'date')::date, COALESCE((x->>'is_default')::boolean, false), nullif(x->>'max_people', '')::integer
+  FROM jsonb_array_elements(COALESCE(p_dates, '[]')) AS x;
+
+  SELECT count(*), min(date) INTO v_n, v_first FROM _choice_dates;
+
+  IF COALESCE(trim(p_name), '') = '' THEN RAISE EXCEPTION 'Give the holiday a name.'; END IF;
+  IF v_n < 2 THEN RAISE EXCEPTION 'Add at least two dates to choose from.'; END IF;
+  IF (SELECT count(DISTINCT date) FROM _choice_dates) <> v_n THEN RAISE EXCEPTION 'A date is listed twice.'; END IF;
+  IF p_pick_count IS NULL OR p_pick_count < 1 OR p_pick_count >= v_n THEN
+    RAISE EXCEPTION 'Days to take must be at least 1 and fewer than the number of dates.';
+  END IF;
+  IF (SELECT count(DISTINCT date_trunc('month', date)) FROM _choice_dates) > 1 THEN
+    RAISE EXCEPTION 'All the dates must be in the same month (payroll counts holidays per month).';
+  END IF;
+  IF (SELECT count(*) FROM _choice_dates WHERE is_default) <> p_pick_count THEN
+    RAISE EXCEPTION 'Mark % date% as the default for anyone who doesn''t choose.',
+      p_pick_count, CASE WHEN p_pick_count = 1 THEN '' ELSE 's' END;
+  END IF;
+  IF EXISTS (SELECT 1 FROM _choice_dates WHERE max_people IS NOT NULL AND max_people < 1) THEN
+    RAISE EXCEPTION 'The limit per date must be 1 or more (or left empty).';
+  END IF;
+  IF p_choose_by IS NULL OR p_choose_by >= v_first THEN
+    RAISE EXCEPTION 'The last day to choose must be before the first date.';
+  END IF;
+  IF p_opens_on IS NOT NULL AND p_opens_on > p_choose_by THEN
+    RAISE EXCEPTION 'Choosing must open on or before the last day to choose.';
+  END IF;
+
+  SELECT date INTO v_bad FROM _choice_dates WHERE extract(dow FROM date) = 0 LIMIT 1;
+  IF FOUND THEN RAISE EXCEPTION '% is a Sunday.', to_char(v_bad.date, 'FMDD Mon'); END IF;
+  SELECT t.date, h.name INTO v_bad FROM _choice_dates t JOIN public_holidays h ON h.date = t.date LIMIT 1;
+  IF FOUND THEN RAISE EXCEPTION '% is already a public holiday (%).', to_char(v_bad.date, 'FMDD Mon'), v_bad.name; END IF;
+  SELECT t.date, c.name INTO v_bad
+  FROM _choice_dates t JOIN holiday_choice_dates d ON d.date = t.date JOIN holiday_choices c ON c.id = d.choice_id
+  WHERE c.id IS DISTINCT FROM p_id LIMIT 1;
+  IF FOUND THEN RAISE EXCEPTION '% is already a date of %.', to_char(v_bad.date, 'FMDD Mon'), v_bad.name; END IF;
+
+  IF p_id IS NULL THEN
+    INSERT INTO holiday_choices (name, pick_count, choose_by, opens_on)
+    VALUES (trim(p_name), p_pick_count, p_choose_by, p_opens_on) RETURNING id INTO v_id;
+  ELSE
+    SELECT * INTO v_old FROM holiday_choices WHERE id = p_id FOR UPDATE;
+    IF v_old.id IS NULL THEN RAISE EXCEPTION 'Holiday not found'; END IF;
+    SELECT min(date), max(date) INTO v_from, v_to FROM holiday_choice_dates WHERE choice_id = p_id;
+    IF (SELECT min(date) FROM holiday_choice_dates WHERE choice_id = p_id) <= v_today THEN
+      RAISE EXCEPTION '% has already started and can''t be changed. You can still change people''s dates.', v_old.name;
+    END IF;
+    -- Fewer/more days to take, or a date taken away: everyone chooses again
+    v_clear := v_old.pick_count <> p_pick_count
+      OR EXISTS (SELECT 1 FROM holiday_choice_dates d WHERE d.choice_id = p_id
+                 AND NOT EXISTS (SELECT 1 FROM _choice_dates t WHERE t.date = d.date));
+    IF v_clear THEN DELETE FROM holiday_picks WHERE choice_id = p_id; END IF;
+    UPDATE holiday_choices SET name = trim(p_name), pick_count = p_pick_count, choose_by = p_choose_by, opens_on = p_opens_on WHERE id = p_id;
+    DELETE FROM holiday_choice_dates d WHERE d.choice_id = p_id
+      AND NOT EXISTS (SELECT 1 FROM _choice_dates t WHERE t.date = d.date);
+  END IF;
+
+  INSERT INTO holiday_choice_dates (choice_id, date, is_default, max_people)
+  SELECT v_id, date, is_default, max_people FROM _choice_dates
+  ON CONFLICT (choice_id, date) DO UPDATE SET is_default = EXCLUDED.is_default, max_people = EXCLUDED.max_people;
+
+  -- Existing leave on the old and new dates
+  PERFORM recount_leave_between(least(v_first, COALESCE(v_from, v_first)),
+                                greatest((SELECT max(date) FROM _choice_dates), COALESCE(v_to, v_first)));
+  RETURN v_id;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION save_holiday_choice(uuid, text, integer, date, jsonb, date) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION save_holiday_choice(uuid, text, integer, date, jsonb, date) TO authenticated;
+
+-- ── Leave on a choice date needs the choice made first ──────
+CREATE OR REPLACE FUNCTION check_leave_choice_holiday()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v record;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtext('leave:' || NEW.employee_id::text));
+  SELECT d.date, c.name, c.opens_on INTO v
+  FROM holiday_choice_dates d
+  JOIN holiday_choices c ON c.id = d.choice_id
+  WHERE d.date BETWEEN NEW.start_date AND NEW.end_date
+    AND (now() AT TIME ZONE 'Asia/Kolkata')::date <= c.choose_by
+    AND (SELECT count(*) FROM holiday_picks p WHERE p.choice_id = c.id AND p.employee_id = NEW.employee_id) <> c.pick_count
+  ORDER BY d.date LIMIT 1;
+  IF FOUND AND v.opens_on IS NOT NULL AND (now() AT TIME ZONE 'Asia/Kolkata')::date < v.opens_on THEN
+    RAISE EXCEPTION '% is one of the % holiday dates. Choosing opens on %; request leave for that day after you''ve chosen.',
+      to_char(v.date, 'FMDD Mon'), v.name, to_char(v.opens_on, 'FMDD Mon');
+  END IF;
+  IF FOUND THEN
+    RAISE EXCEPTION '% is one of the % holiday dates. Choose your % holiday first (on your Dashboard or Leaves page), then request leave.',
+      to_char(v.date, 'FMDD Mon'), v.name, v.name;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- ============================================================
+-- Sproutbien — One-day shift changes and permissions (short leave)
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+--   • Shift change for a day: an employee asks to work another shift on one
+--     date (e.g. Afternoon instead of Morning). An admin approves or rejects,
+--     or sets one directly. Once approved, shift_for() returns that shift for
+--     the day, so every shift rule follows it (late / half day, leave cut-offs,
+--     auto check-out, minimum break). Asked for before the new shift starts
+--     and before checking in; not on a day with leave.
+--   • Permission: a few hours out on one day (e.g. 2:00–4:00 PM), inside the
+--     shift, made up the same day by working later. Admin approves or rejects.
+--     Limits (attendance_settings): permissions per month (default 2) and
+--     minutes each (default 120); pending and approved ones count. Whether the
+--     time was made up is worked out in the app from that day's hours; a
+--     shortfall is only flagged for HR, nothing is deducted.
+--   • Employees cancel their own pending requests, or approved ones for a
+--     later day. All writes go through the functions below.
+-- ============================================================
+
+ALTER TABLE attendance_settings
+  ADD COLUMN IF NOT EXISTS permission_monthly_limit smallint NOT NULL DEFAULT 2   CHECK (permission_monthly_limit BETWEEN 0 AND 31),
+  ADD COLUMN IF NOT EXISTS permission_max_minutes   smallint NOT NULL DEFAULT 120 CHECK (permission_max_minutes BETWEEN 15 AND 480);
+
+-- ── Tables ──────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS shift_changes (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id   uuid        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  date          date        NOT NULL,
+  shift_id      uuid        NOT NULL REFERENCES shifts(id) ON DELETE RESTRICT,   -- the shift for that day
+  from_shift_id uuid        REFERENCES shifts(id) ON DELETE SET NULL,           -- their usual shift then
+  reason        text        NOT NULL CHECK (length(trim(reason)) BETWEEN 1 AND 300),
+  status        text        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  admin_note    text        CHECK (length(admin_note) <= 300),
+  requested_by  uuid        REFERENCES employees(id) ON DELETE SET NULL,
+  requested_at  timestamptz NOT NULL DEFAULT now(),
+  reviewed_by   uuid        REFERENCES employees(id) ON DELETE SET NULL,
+  reviewed_at   timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS shift_changes_one_open ON shift_changes (employee_id, date) WHERE status IN ('pending', 'approved');
+
+CREATE TABLE IF NOT EXISTS permission_requests (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id  uuid        NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+  date         date        NOT NULL,
+  start_time   time        NOT NULL,
+  end_time     time        NOT NULL,
+  reason       text        NOT NULL CHECK (length(trim(reason)) BETWEEN 1 AND 300),
+  status       text        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'cancelled')),
+  admin_note   text        CHECK (length(admin_note) <= 300),
+  requested_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_by  uuid        REFERENCES employees(id) ON DELETE SET NULL,
+  reviewed_at  timestamptz,
+  CHECK (end_time > start_time)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS permission_requests_one_open ON permission_requests (employee_id, date) WHERE status IN ('pending', 'approved');
+
+ALTER TABLE shift_changes       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE permission_requests ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "shift_changes: own or admin read" ON shift_changes;
+CREATE POLICY "shift_changes: own or admin read" ON shift_changes FOR SELECT USING (employee_id = auth.uid() OR is_admin());
+DROP POLICY IF EXISTS "permission_requests: own or admin read" ON permission_requests;
+CREATE POLICY "permission_requests: own or admin read" ON permission_requests FOR SELECT USING (employee_id = auth.uid() OR is_admin());
+
+-- ── The shift on a date: an approved one-day change first ───
+CREATE OR REPLACE FUNCTION shift_for(p_employee uuid, p_date date)
+RETURNS shifts
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  s shifts;
+BEGIN
+  IF auth.uid() IS NOT NULL AND p_employee <> auth.uid() AND NOT is_admin() THEN
+    RAISE EXCEPTION 'Permission denied';
+  END IF;
+  SELECT sh.* INTO s FROM shift_changes c JOIN shifts sh ON sh.id = c.shift_id
+  WHERE c.employee_id = p_employee AND c.date = p_date AND c.status = 'approved';
+  IF s.id IS NULL THEN
+    SELECT * INTO s FROM shifts WHERE id = (
+      SELECT shift_id FROM employee_shifts
+       WHERE employee_id = p_employee AND effective_from <= p_date
+       ORDER BY effective_from DESC LIMIT 1
+    );
+  END IF;
+  IF s.id IS NULL THEN
+    SELECT * INTO s FROM shifts WHERE is_default;
+  END IF;
+  RETURN s;
+END;
+$$;
+
+-- Their usual shift on a date, ignoring one-day changes
+CREATE OR REPLACE FUNCTION assigned_shift_for(p_employee uuid, p_date date)
+RETURNS shifts
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT * FROM shifts WHERE id = COALESCE(
+    (SELECT shift_id FROM employee_shifts WHERE employee_id = p_employee AND effective_from <= p_date ORDER BY effective_from DESC LIMIT 1),
+    (SELECT id FROM shifts WHERE is_default LIMIT 1));
+$$;
+REVOKE EXECUTE ON FUNCTION assigned_shift_for(uuid, date) FROM PUBLIC, anon, authenticated;
+
+-- Shared checks for a day someone wants to change
+CREATE OR REPLACE FUNCTION request_day_problem(p_employee uuid, p_date date, p_starts time)
+RETURNS text
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now   timestamp := now() AT TIME ZONE 'Asia/Kolkata';
+  v_today date      := v_now::date;
+BEGIN
+  IF p_date < v_today THEN RETURN 'That day has already passed.'; END IF;
+  IF p_date = v_today AND v_now::time >= p_starts THEN RETURN 'It’s past the start time for today.'; END IF;
+  IF EXISTS (SELECT 1 FROM attendance_records WHERE employee_id = p_employee AND date = p_date AND check_in_time IS NOT NULL) THEN
+    RETURN 'Already checked in that day.';
+  END IF;
+  IF EXISTS (SELECT 1 FROM leave_requests WHERE employee_id = p_employee AND status IN ('pending', 'approved')
+             AND p_date BETWEEN start_date AND end_date) THEN
+    RETURN 'There’s leave on that day. Cancel the leave first.';
+  END IF;
+  RETURN NULL;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION request_day_problem(uuid, date, time) FROM PUBLIC, anon, authenticated;
+
+-- ── Shift change: request (employee) or set directly (admin) ─
+CREATE OR REPLACE FUNCTION request_shift_change(p_date date, p_shift uuid, p_reason text, p_employee uuid DEFAULT NULL)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_admin  boolean := is_admin();
+  v_emp    uuid    := COALESCE(p_employee, auth.uid());
+  v_direct boolean := v_admin AND p_employee IS NOT NULL AND p_employee <> auth.uid();
+  v_usual  shifts;
+  v_new    shifts;
+  v_prob   text;
+  v_id     uuid;
+BEGIN
+  IF auth.uid() IS NULL OR (v_emp <> auth.uid() AND NOT v_admin) THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  IF btrim(coalesce(p_reason, '')) = '' THEN RAISE EXCEPTION 'Say why you want to change shift.'; END IF;
+  SELECT * INTO v_new FROM shifts WHERE id = p_shift;
+  IF v_new.id IS NULL THEN RAISE EXCEPTION 'Shift not found'; END IF;
+  v_usual := assigned_shift_for(v_emp, p_date);
+  IF v_usual.id = v_new.id THEN RAISE EXCEPTION 'That’s already the shift for that day.'; END IF;
+  IF EXISTS (SELECT 1 FROM shift_changes WHERE employee_id = v_emp AND date = p_date AND status IN ('pending', 'approved')) THEN
+    RAISE EXCEPTION 'There’s already a shift change for that day.';
+  END IF;
+  v_prob := request_day_problem(v_emp, p_date, least(v_usual.start_time, v_new.start_time));
+  IF v_prob IS NOT NULL THEN RAISE EXCEPTION '%', v_prob; END IF;
+
+  INSERT INTO shift_changes (employee_id, date, shift_id, from_shift_id, reason, status, requested_by, reviewed_by, reviewed_at)
+  VALUES (v_emp, p_date, v_new.id, v_usual.id, btrim(p_reason),
+          CASE WHEN v_direct THEN 'approved' ELSE 'pending' END, auth.uid(),
+          CASE WHEN v_direct THEN auth.uid() END, CASE WHEN v_direct THEN now() END)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+
+-- ── Permission: request ─────────────────────────────────────
+CREATE OR REPLACE FUNCTION request_permission(p_date date, p_start time, p_end time, p_reason text)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_emp   uuid := auth.uid();
+  v_set   attendance_settings;
+  v_shift shifts;
+  v_mins  integer;
+  v_used  integer;
+  v_prob  text;
+  v_id    uuid;
+BEGIN
+  IF v_emp IS NULL OR NOT EXISTS (SELECT 1 FROM employees WHERE id = v_emp) THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  IF btrim(coalesce(p_reason, '')) = '' THEN RAISE EXCEPTION 'Say why you need the time.'; END IF;
+  IF p_start IS NULL OR p_end IS NULL OR p_end <= p_start THEN RAISE EXCEPTION 'The end time must be after the start time.'; END IF;
+  SELECT * INTO v_set FROM attendance_settings LIMIT 1;
+  v_mins := extract(epoch FROM (p_end - p_start))::integer / 60;
+  IF v_mins > v_set.permission_max_minutes THEN
+    RAISE EXCEPTION 'A permission can be up to % minutes.', v_set.permission_max_minutes;
+  END IF;
+  v_shift := shift_for(v_emp, p_date);
+  IF p_start < v_shift.start_time OR p_end > v_shift.end_time THEN
+    RAISE EXCEPTION 'Choose a time within your shift (% – %).', fmt_clock(v_shift.start_time), fmt_clock(v_shift.end_time);
+  END IF;
+  IF EXISTS (SELECT 1 FROM permission_requests WHERE employee_id = v_emp AND date = p_date AND status IN ('pending', 'approved')) THEN
+    RAISE EXCEPTION 'There’s already a permission for that day.';
+  END IF;
+  SELECT count(*) INTO v_used FROM permission_requests
+  WHERE employee_id = v_emp AND status IN ('pending', 'approved')
+    AND date_trunc('month', date) = date_trunc('month', p_date);
+  IF v_used >= v_set.permission_monthly_limit THEN
+    RAISE EXCEPTION 'You’ve used your % permission% for %.', v_set.permission_monthly_limit,
+      CASE WHEN v_set.permission_monthly_limit = 1 THEN '' ELSE 's' END, to_char(p_date, 'FMMonth');
+  END IF;
+  -- Before the permission starts; being checked in already is fine (they leave mid-day)
+  v_prob := request_day_problem(v_emp, p_date, p_start);
+  IF v_prob IS NOT NULL AND v_prob <> 'Already checked in that day.' THEN RAISE EXCEPTION '%', v_prob; END IF;
+
+  INSERT INTO permission_requests (employee_id, date, start_time, end_time, reason)
+  VALUES (v_emp, p_date, p_start, p_end, btrim(p_reason)) RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+
+-- ── Admin: approve / reject ─────────────────────────────────
+CREATE OR REPLACE FUNCTION review_shift_change(p_id uuid, p_approve boolean, p_note text DEFAULT NULL)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  c    shift_changes;
+  v_sh shifts;
+  v_us shifts;
+  v_pr text;
+BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  SELECT * INTO c FROM shift_changes WHERE id = p_id FOR UPDATE;
+  IF c.id IS NULL THEN RAISE EXCEPTION 'Request not found'; END IF;
+  IF c.status <> 'pending' THEN RAISE EXCEPTION 'This request has already been %.', c.status; END IF;
+  IF p_approve THEN
+    SELECT * INTO v_sh FROM shifts WHERE id = c.shift_id;
+    v_us := assigned_shift_for(c.employee_id, c.date);
+    v_pr := request_day_problem(c.employee_id, c.date, least(v_us.start_time, v_sh.start_time));
+    IF v_pr IS NOT NULL THEN RAISE EXCEPTION 'Can’t approve: %', v_pr; END IF;
+  END IF;
+  UPDATE shift_changes SET status = CASE WHEN p_approve THEN 'approved' ELSE 'rejected' END,
+    admin_note = nullif(btrim(coalesce(p_note, '')), ''), reviewed_by = auth.uid(), reviewed_at = now()
+  WHERE id = p_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION review_permission(p_id uuid, p_approve boolean, p_note text DEFAULT NULL)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  r permission_requests;
+BEGIN
+  IF NOT is_admin() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  SELECT * INTO r FROM permission_requests WHERE id = p_id FOR UPDATE;
+  IF r.id IS NULL THEN RAISE EXCEPTION 'Request not found'; END IF;
+  IF r.status <> 'pending' THEN RAISE EXCEPTION 'This request has already been %.', r.status; END IF;
+  IF p_approve AND r.date < (now() AT TIME ZONE 'Asia/Kolkata')::date THEN
+    RAISE EXCEPTION 'Can’t approve: that day has already passed.';
+  END IF;
+  UPDATE permission_requests SET status = CASE WHEN p_approve THEN 'approved' ELSE 'rejected' END,
+    admin_note = nullif(btrim(coalesce(p_note, '')), ''), reviewed_by = auth.uid(), reviewed_at = now()
+  WHERE id = p_id;
+END;
+$$;
+
+-- ── Employee: cancel (pending, or approved for a later day) ─
+CREATE OR REPLACE FUNCTION cancel_my_request(p_kind text, p_id uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_today  date := (now() AT TIME ZONE 'Asia/Kolkata')::date;
+  v_emp    uuid;
+  v_status text;
+  v_date   date;
+BEGIN
+  IF p_kind = 'shift' THEN
+    SELECT employee_id, status, date INTO v_emp, v_status, v_date FROM shift_changes WHERE id = p_id FOR UPDATE;
+  ELSIF p_kind = 'permission' THEN
+    SELECT employee_id, status, date INTO v_emp, v_status, v_date FROM permission_requests WHERE id = p_id FOR UPDATE;
+  ELSE
+    RAISE EXCEPTION 'Unknown request type';
+  END IF;
+  IF v_emp IS NULL OR v_emp <> auth.uid() THEN RAISE EXCEPTION 'Not allowed'; END IF;
+  IF NOT (v_status = 'pending' OR (v_status = 'approved' AND v_date > v_today)) THEN
+    RAISE EXCEPTION 'This request can’t be cancelled any more. Ask your admin.';
+  END IF;
+  IF p_kind = 'shift' THEN
+    UPDATE shift_changes SET status = 'cancelled' WHERE id = p_id;
+  ELSE
+    UPDATE permission_requests SET status = 'cancelled' WHERE id = p_id;
+  END IF;
+END;
+$$;
+
+DO $$
+DECLARE f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY[
+    'request_shift_change(date, uuid, text, uuid)', 'request_permission(date, time, time, text)',
+    'review_shift_change(uuid, boolean, text)', 'review_permission(uuid, boolean, text)', 'cancel_my_request(text, uuid)'
+  ] LOOP
+    EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon', f);
+    EXECUTE format('GRANT  EXECUTE ON FUNCTION %s TO authenticated', f);
+  END LOOP;
+END $$;
+
+-- ============================================================
+-- Sproutbien — Leave for past days; absent days count as Loss of Pay
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+--   • Employees can request leave starting up to 7 days back (any type),
+--     e.g. Sick leave for yesterday. The admin approves it as usual, and the
+--     day turns from Absent into leave (paid if the balance covers it).
+--     A past day they checked in on can't be covered by full-day leave (a
+--     half day is fine). Leave that also covers today keeps today's rules.
+--   • The Loss of Pay balance ("taken") now also counts past working days
+--     with no check-in and no approved leave (Absent), since those are
+--     unpaid in payroll anyway. Requesting leave for such a day moves it
+--     from Loss of Pay to the leave type once approved.
+-- ============================================================
+
+-- How far back leave can start. Mirrors LEAVE_BACKDATE_DAYS in src/lib/leave.ts.
+CREATE OR REPLACE FUNCTION leave_backdate_days()
+RETURNS integer LANGUAGE sql IMMUTABLE AS $$ SELECT 7 $$;
+
+-- First day attendance is tracked; earlier days are never Absent. Mirrors TRACKING_START in src/lib/calendar.ts.
+CREATE OR REPLACE FUNCTION attendance_tracking_start()
+RETURNS date LANGUAGE sql IMMUTABLE AS $$ SELECT date '2026-10-01' $$;
+
+-- ── Leave timing: up to 7 days back ─────────────────────────
+-- Today's rules are unchanged (see migration 020):
+--                        not checked in            already checked in
+--   full day             until start + 1 hour      not allowed
+--   morning half day     any time                  not allowed
+--   afternoon half day   any time                  until split_time
+-- Mirrors sameDayLeaveBlock() in src/lib/halfDay.ts and earliestLeaveDate() in src/lib/leave.ts.
+CREATE OR REPLACE FUNCTION check_leave_request_timing()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_local      timestamp := now() AT TIME ZONE 'Asia/Kolkata';
+  v_today      date      := v_local::date;
+  v_time       time      := date_trunc('minute', v_local)::time;  -- 10:30 counts as 10:30
+  v_checked_in boolean;
+  v_worked     date;
+  s            shifts;
+  v_full_until time;
+BEGIN
+  IF NEW.start_date < v_today - leave_backdate_days() THEN
+    RAISE EXCEPTION 'Leave can only be requested for the last % days (from % onwards)',
+      leave_backdate_days(), to_char(v_today - leave_backdate_days(), 'FMDD Mon');
+  END IF;
+
+  -- A past day they checked in on was worked: full-day leave can't cover it
+  IF NEW.start_date < v_today AND NEW.duration = 'full' THEN
+    SELECT a.date INTO v_worked
+    FROM attendance_records a
+    WHERE a.employee_id = NEW.employee_id
+      AND a.date BETWEEN NEW.start_date AND least(NEW.end_date, v_today - 1)
+      AND a.check_in_time IS NOT NULL
+    ORDER BY a.date LIMIT 1;
+    IF FOUND THEN
+      RAISE EXCEPTION 'You checked in on %, so full-day leave can''t cover that day. Leave it out, or request a half day for it',
+        to_char(v_worked, 'FMDD Mon');
+    END IF;
+  END IF;
+
+  -- Only leave that covers today has today's limits
+  IF NEW.start_date > v_today OR NEW.end_date < v_today THEN
+    RETURN NEW;
+  END IF;
+
+  s := shift_for(NEW.employee_id, v_today);
+  v_full_until := s.start_time + interval '1 hour';
+
+  SELECT EXISTS (
+    SELECT 1 FROM attendance_records
+    WHERE employee_id = NEW.employee_id AND date = v_today AND check_in_time IS NOT NULL
+  ) INTO v_checked_in;
+
+  IF v_checked_in THEN
+    IF NEW.duration = 'full' THEN
+      RAISE EXCEPTION 'You''ve already checked in today, so you can''t take a full day''s leave for today';
+    ELSIF NEW.half_day_session = 'morning' THEN
+      RAISE EXCEPTION 'You''ve already checked in today, so you can''t take the morning off';
+    ELSIF v_time > s.split_time THEN
+      RAISE EXCEPTION 'Afternoon half-day leave for today can only be requested until %', fmt_clock(s.split_time);
+    END IF;
+  ELSIF NEW.duration = 'full' AND v_time > v_full_until THEN
+    RAISE EXCEPTION 'Full-day leave for today can only be requested until %. You can still request a half day', fmt_clock(v_full_until);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- ── Absent days ─────────────────────────────────────────────
+-- Unpaid part of past working days without a check-in or approved leave,
+-- between two dates (today never counts). Same day rules as the Reports page
+-- (useMonthlyReport): a half-day leave covers half; a check-in covers the rest.
+CREATE OR REPLACE FUNCTION absent_days(p_employee uuid, p_from date, p_to date)
+RETURNS numeric LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(sum(greatest(0,
+           1 - CASE WHEN a.status IN ('present', 'late')
+                    THEN CASE WHEN a.half_day_session IS NOT NULL THEN 0.5 ELSE 1 END
+                    ELSE 0 END
+             - CASE WHEN a.half_day_session IS NOT NULL THEN 0.5
+                    WHEN a.status = 'on_leave' THEN 1
+                    ELSE 0 END)), 0)
+  FROM employees e
+  CROSS JOIN LATERAL generate_series(
+    greatest(p_from, attendance_tracking_start(), COALESCE(e.joining_date, p_from)),
+    least(p_to, (now() AT TIME ZONE 'Asia/Kolkata')::date - 1, COALESCE(e.last_working_day, p_to)),
+    interval '1 day') AS g(d)
+  LEFT JOIN attendance_records a ON a.employee_id = e.id AND a.date = g.d::date
+  WHERE e.id = p_employee
+    AND extract(dow FROM g.d) <> 0
+    AND NOT is_holiday_for(e.id, g.d::date)
+$$;
+
+-- ── Balances: Loss of Pay includes absent days ──────────────
+-- Same as migration 022, except the Loss of Pay row's "used" adds absent_days().
+CREATE OR REPLACE FUNCTION leave_balances(p_employee uuid, p_as_of date DEFAULT NULL)
+RETURNS TABLE (
+  leave_type   text,
+  name         text,
+  is_paid      boolean,
+  yearly_quota numeric,
+  carried      numeric,
+  accrued      numeric,
+  adjusted     numeric,
+  used         numeric,
+  pending      numeric,
+  available    numeric
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_as_of date := COALESCE(p_as_of, (now() AT TIME ZONE 'Asia/Kolkata')::date);
+  y       integer := leave_year_of(v_as_of);
+BEGIN
+  -- auth.uid() is NULL only for trusted server-side callers (SQL editor, triggers, cron)
+  IF auth.uid() IS NOT NULL AND p_employee <> auth.uid() AND NOT is_admin() THEN
+    RAISE EXCEPTION 'Not allowed';
+  END IF;
+
+  RETURN QUERY
+  WITH base AS (
+    SELECT
+      t.code, t.name, t.is_paid, t.yearly_quota, t.sort_order,
+      CASE WHEN t.is_paid THEN leave_carried_in(p_employee, t.code, y) ELSE 0 END AS carried,
+      CASE WHEN t.is_paid THEN round(t.yearly_quota / 12 * leave_months_credited(p_employee, y, v_as_of), 2) ELSE 0 END AS accrued,
+      COALESCE((SELECT sum(a.days) FROM leave_adjustments a
+                WHERE a.employee_id = p_employee AND a.leave_type = t.code AND a.leave_year = y), 0) AS adjusted,
+      CASE WHEN t.is_paid
+        THEN COALESCE((SELECT sum(r.paid_days) FROM leave_requests r
+                       WHERE r.employee_id = p_employee AND r.leave_type = t.code AND r.status = 'approved'
+                         AND leave_year_of(r.start_date) = y), 0)
+        -- Loss of Pay row: every unpaid day, whichever type it was requested as, plus absent days
+        ELSE COALESCE((SELECT sum(r.lop_days) FROM leave_requests r
+                       WHERE r.employee_id = p_employee AND r.status = 'approved'
+                         AND leave_year_of(r.start_date) = y), 0)
+             + absent_days(p_employee, make_date(y, 4, 1), least(v_as_of, make_date(y + 1, 3, 31)))
+      END AS used,
+      CASE WHEN t.is_paid
+        THEN COALESCE((SELECT sum(COALESCE(r.planned_paid_days, r.days)) FROM leave_requests r
+                       WHERE r.employee_id = p_employee AND r.leave_type = t.code AND r.status = 'pending'
+                         AND leave_year_of(r.start_date) = y), 0)
+        ELSE COALESCE((SELECT sum(CASE WHEN r.leave_type = t.code THEN r.days ELSE r.days - r.planned_paid_days END)
+                       FROM leave_requests r
+                       WHERE r.employee_id = p_employee AND r.status = 'pending'
+                         AND (r.leave_type = t.code OR r.planned_paid_days IS NOT NULL)
+                         AND leave_year_of(r.start_date) = y), 0)
+      END AS pending
+    FROM leave_types t
+  )
+  SELECT b.code, b.name, b.is_paid, b.yearly_quota, b.carried, b.accrued, b.adjusted, b.used, b.pending,
+         CASE WHEN b.is_paid THEN b.carried + b.accrued + b.adjusted - b.used END
+  FROM base b
+  ORDER BY b.sort_order;
+END;
+$$;
+
+-- Only through leave_balances(), which checks who's asking
+REVOKE EXECUTE ON FUNCTION absent_days(uuid, date, date) FROM PUBLIC, anon, authenticated;
+
+-- ============================================================
+-- Sproutbien — Offer letters
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+--   • offer_letter_settings (one row): company details for the letterhead,
+--     the signatory and their signature image.
+--   • offers: one row per letter sent to a candidate. Made when an admin
+--     approves the final draft: the letter's details are frozen in `fields`
+--     and the PDF is saved in the private 'offer-letters' bucket. The
+--     offer-letter Edge Function emails it (docs/OFFER_LETTER_SETUP.md).
+--       approved → sent → accepted / declined, or withdrawn by an admin.
+--     A sent offer past its accept-by date shows as expired.
+--   • The candidate answers on a public page (/offer/<token>) through
+--     offer_public() and respond_offer(); the random token in the email
+--     link is the only key, and it only ever shows that one offer.
+--   • Admins only otherwise. Signatures and PDFs are never public.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS offer_letter_settings (
+  id                 boolean     PRIMARY KEY DEFAULT true CHECK (id),   -- a single row
+  company_legal_name text        NOT NULL DEFAULT 'Sproutbien LLP' CHECK (length(trim(company_legal_name)) BETWEEN 1 AND 120),
+  company_address    text        NOT NULL DEFAULT 'TC-4/2111, Opp. IOB Bank, Kuravankonam, Kowdiar, Thiruvananthapuram, Kerala'
+                                 CHECK (length(company_address) <= 300),
+  company_phone      text        NOT NULL DEFAULT '+91 75588 00550 / +91 75588 00551' CHECK (length(company_phone) <= 80),
+  company_email      text        NOT NULL DEFAULT 'hr@sproutbien.com' CHECK (length(company_email) <= 120),
+  company_website    text        NOT NULL DEFAULT '' CHECK (length(company_website) <= 120),
+  jurisdiction       text        NOT NULL DEFAULT 'Thiruvananthapuram' CHECK (length(jurisdiction) <= 60),   -- courts named in the terms
+  ref_prefix         text        NOT NULL DEFAULT 'SB/HR' CHECK (length(ref_prefix) BETWEEN 1 AND 20),
+  signatory_name     text        NOT NULL DEFAULT 'Arun Sivaraj' CHECK (length(trim(signatory_name)) BETWEEN 1 AND 80),
+  signatory_title    text        NOT NULL DEFAULT 'Chief Executive Officer' CHECK (length(signatory_title) <= 80),
+  signature_path     text,       -- object in 'offer-letters' (signature/…)
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  updated_by         uuid        REFERENCES employees(id) ON DELETE SET NULL
+);
+INSERT INTO offer_letter_settings (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
+
+ALTER TABLE offer_letter_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "offer settings: admin read" ON offer_letter_settings;
+CREATE POLICY "offer settings: admin read" ON offer_letter_settings FOR SELECT USING (is_admin());
+DROP POLICY IF EXISTS "offer settings: admin update" ON offer_letter_settings;
+CREATE POLICY "offer settings: admin update" ON offer_letter_settings FOR UPDATE USING (is_admin()) WITH CHECK (is_admin());
+
+CREATE SEQUENCE IF NOT EXISTS offer_ref_seq;
+
+CREATE TABLE IF NOT EXISTS offers (
+  id             uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  candidate_id   uuid        NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+  ref_no         text        NOT NULL UNIQUE,                 -- e.g. SB/HR/2026/007, set on insert
+  status         text        NOT NULL DEFAULT 'approved'
+                             CHECK (status IN ('approved', 'sent', 'accepted', 'declined', 'withdrawn')),
+  fields         jsonb       NOT NULL,                        -- everything printed on the letter (see src/lib/offerLetter.ts)
+  email_to       text        NOT NULL CHECK (length(email_to) BETWEEN 3 AND 200),
+  letter_date    date        NOT NULL,
+  joining_date   date        NOT NULL,
+  accept_by      date        NOT NULL,
+  pdf_path       text,                                        -- object in 'offer-letters'
+  token          uuid        NOT NULL UNIQUE DEFAULT gen_random_uuid(),   -- the candidate's link
+  approved_by    uuid        REFERENCES employees(id) ON DELETE SET NULL DEFAULT auth.uid(),
+  approved_at    timestamptz NOT NULL DEFAULT now(),
+  sent_at        timestamptz,
+  send_count     smallint    NOT NULL DEFAULT 0,
+  email_error    text,                                        -- last failed send, cleared on success
+  viewed_at      timestamptz,                                 -- first time the candidate opened the link
+  responded_at   timestamptz,
+  response_name  text        CHECK (response_name IS NULL OR length(response_name) <= 120),   -- name typed to accept
+  decline_reason text        CHECK (decline_reason IS NULL OR length(decline_reason) <= 1000),
+  response_meta  jsonb,                                       -- IP address and browser of the response
+  withdrawn_at   timestamptz,
+  CHECK (accept_by >= letter_date)
+);
+
+CREATE INDEX IF NOT EXISTS offers_candidate_idx ON offers (candidate_id, approved_at DESC);
+
+ALTER TABLE offers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "offers: admin all" ON offers;
+CREATE POLICY "offers: admin all" ON offers FOR ALL USING (is_admin()) WITH CHECK (is_admin());
+
+-- Reference number from the settings prefix and the letter's year
+CREATE OR REPLACE FUNCTION set_offer_ref()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  NEW.ref_no := (SELECT ref_prefix FROM offer_letter_settings WHERE id)
+             || '/' || extract(year FROM NEW.letter_date)::int
+             || '/' || lpad(nextval('offer_ref_seq')::text, 3, '0');
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_offer_ref ON offers;
+CREATE TRIGGER on_offer_ref BEFORE INSERT ON offers FOR EACH ROW EXECUTE FUNCTION set_offer_ref();
+
+-- A letter's content can't change once approved; admins only move it along
+CREATE OR REPLACE FUNCTION guard_offer_update()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.fields IS DISTINCT FROM OLD.fields OR NEW.ref_no IS DISTINCT FROM OLD.ref_no
+     OR NEW.token IS DISTINCT FROM OLD.token OR NEW.candidate_id IS DISTINCT FROM OLD.candidate_id
+     OR NEW.letter_date IS DISTINCT FROM OLD.letter_date OR NEW.accept_by IS DISTINCT FROM OLD.accept_by
+     OR NEW.joining_date IS DISTINCT FROM OLD.joining_date OR NEW.email_to IS DISTINCT FROM OLD.email_to
+     OR (OLD.pdf_path IS NOT NULL AND NEW.pdf_path IS DISTINCT FROM OLD.pdf_path) THEN
+    RAISE EXCEPTION 'An approved offer letter can''t be changed. Withdraw it and send a revised one.';
+  END IF;
+  IF NEW.status = 'withdrawn' AND OLD.status <> 'withdrawn' THEN
+    IF OLD.status IN ('accepted', 'declined') THEN
+      RAISE EXCEPTION 'This offer was already % and can''t be withdrawn', OLD.status;
+    END IF;
+    NEW.withdrawn_at := now();
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_offer_update ON offers;
+CREATE TRIGGER on_offer_update BEFORE UPDATE ON offers FOR EACH ROW EXECUTE FUNCTION guard_offer_update();
+
+-- ── The candidate's page ────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION offer_effective_status(o offers)
+RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT CASE WHEN o.status = 'sent' AND (now() AT TIME ZONE 'Asia/Kolkata')::date > o.accept_by
+              THEN 'expired' ELSE o.status END
+$$;
+
+-- What the candidate's page shows (nothing for an unknown token)
+CREATE OR REPLACE FUNCTION offer_public(p_token uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  o offers;
+BEGIN
+  SELECT * INTO o FROM offers WHERE token = p_token AND status <> 'approved';
+  IF o.id IS NULL THEN RETURN NULL; END IF;
+  IF o.viewed_at IS NULL THEN
+    UPDATE offers SET viewed_at = now() WHERE id = o.id;
+  END IF;
+  RETURN jsonb_build_object(
+    'ref_no',        o.ref_no,
+    'status',        offer_effective_status(o),
+    'candidate_name', o.fields->>'candidate_name',
+    'designation',   o.fields->>'designation',
+    'department',    o.fields->>'department',
+    'company_name',  o.fields->>'company_legal_name',
+    'company_email', o.fields->>'company_email',
+    'company_phone', o.fields->>'company_phone',
+    'ctc_annual',    (o.fields->>'ctc_annual')::numeric,
+    'joining_date',  o.joining_date,
+    'letter_date',   o.letter_date,
+    'accept_by',     o.accept_by,
+    'responded_at',  o.responded_at,
+    'response_name', o.response_name
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION respond_offer(p_token uuid, p_accept boolean, p_name text, p_reason text DEFAULT NULL)
+RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  o       offers;
+  v_hdr   json := COALESCE(nullif(current_setting('request.headers', true), '')::json, '{}'::json);
+BEGIN
+  SELECT * INTO o FROM offers WHERE token = p_token FOR UPDATE;
+  IF o.id IS NULL OR o.status = 'approved' THEN
+    RAISE EXCEPTION 'Offer not found';
+  END IF;
+  IF o.status IN ('accepted', 'declined') THEN
+    RAISE EXCEPTION 'You have already % this offer', o.status;
+  END IF;
+  IF o.status = 'withdrawn' THEN
+    RAISE EXCEPTION 'This offer has been withdrawn. Please contact us if you have any questions.';
+  END IF;
+  IF offer_effective_status(o) = 'expired' THEN
+    RAISE EXCEPTION 'This offer lapsed on %. Please contact us if you are still interested.', to_char(o.accept_by, 'FMDD Mon YYYY');
+  END IF;
+  IF p_accept AND length(trim(COALESCE(p_name, ''))) < 2 THEN
+    RAISE EXCEPTION 'Type your full name to accept';
+  END IF;
+
+  UPDATE offers SET
+    status         = CASE WHEN p_accept THEN 'accepted' ELSE 'declined' END,
+    responded_at   = now(),
+    response_name  = left(nullif(trim(p_name), ''), 120),
+    decline_reason = CASE WHEN p_accept THEN NULL ELSE left(nullif(trim(p_reason), ''), 1000) END,
+    response_meta  = jsonb_build_object(
+                       'ip', split_part(COALESCE(v_hdr->>'x-forwarded-for', v_hdr->>'x-real-ip', ''), ',', 1),
+                       'user_agent', left(COALESCE(v_hdr->>'user-agent', ''), 300))
+  WHERE id = o.id;
+  RETURN CASE WHEN p_accept THEN 'accepted' ELSE 'declined' END;
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION offer_public(uuid) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION offer_public(uuid) TO anon, authenticated;
+REVOKE EXECUTE ON FUNCTION respond_offer(uuid, boolean, text, text) FROM PUBLIC;
+GRANT  EXECUTE ON FUNCTION respond_offer(uuid, boolean, text, text) TO anon, authenticated;
+
+-- ── Storage: signatures and PDFs, admins only ───────────────
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('offer-letters', 'offer-letters', false, 10485760, ARRAY['application/pdf', 'image/png', 'image/jpeg'])
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "offer-letters: admin read" ON storage.objects;
+CREATE POLICY "offer-letters: admin read" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'offer-letters' AND public.is_admin());
+DROP POLICY IF EXISTS "offer-letters: admin insert" ON storage.objects;
+CREATE POLICY "offer-letters: admin insert" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'offer-letters' AND public.is_admin());
+DROP POLICY IF EXISTS "offer-letters: admin delete" ON storage.objects;
+CREATE POLICY "offer-letters: admin delete" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'offer-letters' AND public.is_admin());
+
+-- ============================================================
+-- Sproutbien — Employee date of birth
+-- Run in: Supabase Dashboard → SQL Editor → New query
+--
+-- Set by admins on the Add / Edit Employee form. The admin home page
+-- lists birthdays coming up in the next 30 days (day and month only).
+-- Same access as the rest of the employees row: admins read and write,
+-- employees read only their own.
+-- ============================================================
+
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS date_of_birth date;
+
+ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_date_of_birth_check;
+ALTER TABLE employees ADD CONSTRAINT employees_date_of_birth_check
+  CHECK (date_of_birth IS NULL OR (date_of_birth >= DATE '1900-01-01' AND date_of_birth <= current_date));
+
+
+-- ============================================================
 -- 046 — The product is now "People Desk" (was "Attendance Tracker")
 -- Only replaces the old default; a name a customer set themselves is kept.
 -- ============================================================
