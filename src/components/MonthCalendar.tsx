@@ -29,6 +29,52 @@ export function MonthPicker({ yearMonth, onChange, max, compact = false }: {
   )
 }
 
+// ── Month + year drop-downs with ‹ › arrows ───────────────────
+
+const MONTH_NAMES = Array.from({ length: 12 }, (_, i) =>
+  new Date(2000, i, 1).toLocaleDateString([], { month: 'long' }))
+
+export function MonthYearSelect({ yearMonth, onChange, min, max }: {
+  yearMonth: string
+  onChange: (yearMonth: string) => void
+  min: string   // 'YYYY-MM', earliest month offered
+  max: string   // 'YYYY-MM', latest month offered
+}) {
+  const [year, month] = yearMonth.split('-').map(Number)
+  const [minY, minM] = min.split('-').map(Number)
+  const [maxY, maxM] = max.split('-').map(Number)
+  const years = Array.from({ length: maxY - minY + 1 }, (_, i) => maxY - i)
+  const ym = (y: number, m: number) => `${y}-${String(m).padStart(2, '0')}`
+  // Keep the month inside min..max when the year changes
+  const clamp = (v: string) => (v < min ? min : v > max ? max : v)
+  const prevDisabled = yearMonth <= min
+  const nextDisabled = yearMonth >= max
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+      <button onClick={() => onChange(shiftMonth(yearMonth, -1))} disabled={prevDisabled} style={arrowStyle(prevDisabled, false)} aria-label="Previous month">‹</button>
+      <select aria-label="Month" value={month} onChange={e => onChange(clamp(ym(year, Number(e.target.value))))} style={selectStyle}>
+        {MONTH_NAMES.map((name, i) => {
+          const m = i + 1
+          const out = (year === minY && m < minM) || (year === maxY && m > maxM)
+          return <option key={m} value={m} disabled={out}>{name}</option>
+        })}
+      </select>
+      <select aria-label="Year" value={year} onChange={e => onChange(clamp(ym(Number(e.target.value), month)))} style={selectStyle}>
+        {years.map(y => <option key={y} value={y}>{y}</option>)}
+      </select>
+      <button onClick={() => onChange(shiftMonth(yearMonth, 1))} disabled={nextDisabled} style={arrowStyle(nextDisabled, false)} aria-label="Next month">›</button>
+    </div>
+  )
+}
+
+const selectStyle: CSSProperties = {
+  height: 34, padding: '0 0.5rem', borderRadius: 8,
+  border: '1px solid var(--border, #d1d5db)', background: 'var(--surface, #fff)',
+  color: 'var(--text-strong, #1e293b)', fontSize: '0.875rem', fontWeight: 600,
+  fontFamily: 'inherit', cursor: 'pointer',
+}
+
 function arrowStyle(disabled: boolean, compact: boolean): CSSProperties {
   const size = compact ? 28 : 32
   return {

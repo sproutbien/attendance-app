@@ -5,8 +5,8 @@ import type { EmployeeSummary } from '../../hooks/useMonthlyReport'
 import { useMonthCalendar } from '../../hooks/useMonthCalendar'
 import { useHolidayChoices } from '../../hooks/useHolidayChoices'
 import AttendanceCalendarGrid from '../../components/AttendanceCalendarGrid'
-import { CalendarLegend } from '../../components/MonthCalendar'
-import { suggestedWorkingDays } from '../../lib/calendar'
+import { CalendarLegend, MonthYearSelect } from '../../components/MonthCalendar'
+import { TRACKING_START, currentYearMonth, suggestedWorkingDays } from '../../lib/calendar'
 import { useBranding } from '../../contexts/BrandingContext'
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -94,7 +94,7 @@ function exportCSV(summaries: EmployeeSummary[], yearMonth: string, workingDays:
 
 export default function AdminReportsPage() {
   const { branding } = useBranding()
-  const currentMonth = new Date().toISOString().slice(0, 7)
+  const currentMonth = currentYearMonth()
   const [yearMonth, setYearMonth] = useState(currentMonth)
   const { summaries, loading, error, workingDays, savingWorkingDays, saveWorkingDays } = useMonthlyReport(yearMonth)
   const calendar = useMonthCalendar(yearMonth)
@@ -122,19 +122,11 @@ export default function AdminReportsPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' }}>Reports</h1>
-          <input
-            type="month"
-            value={yearMonth}
+          <MonthYearSelect
+            yearMonth={yearMonth}
+            onChange={setYearMonth}
+            min={TRACKING_START.slice(0, 7)}
             max={currentMonth}
-            onChange={e => setYearMonth(e.target.value)}
-            style={{
-              padding: '0.4rem 0.625rem',
-              border: '1px solid #d1d5db',
-              borderRadius: 8,
-              fontSize: '0.875rem',
-              color: '#1e293b',
-              outline: 'none',
-            }}
           />
         </div>
         <button
