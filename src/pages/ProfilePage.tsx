@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Briefcase, Camera, FileText, KeyRound, Paperclip, Phone, ShieldAlert } from 'lucide-react'
 import AppLayout from '../components/AppLayout'
+import MyWishes from '../components/celebrations/MyWishes'
 import { useAuth } from '../contexts/AuthContext'
 import { useMyProfile } from '../hooks/useMyProfile'
 import type { ContactDraft, Manager } from '../hooks/useMyProfile'
@@ -23,6 +24,7 @@ export default function ProfilePage() {
   return (
     <AppLayout medium>
       <Header />
+      <MyWishes />
       <JobCard manager={manager} />
       <ContactCard saveContact={saveContact} />
       <DocumentsCard />

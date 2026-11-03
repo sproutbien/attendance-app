@@ -55,6 +55,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
     probation_end:  s(existing?.probation_end_date),
     selfie_rule:    existing?.selfie_rule ?? 'default' as SelfieRule,
     geofence_rule:  existing?.geofence_rule ?? 'default' as GeofenceRule,
+    no_celebrations: existing?.no_celebrations ?? false,
   })
   const [startOnboarding, setStartOnboarding] = useState(true)
   // Shift changes start tomorrow by default (today's attendance keeps today's shift); new staff start today
@@ -102,6 +103,7 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
       probation_end_date: f.status === 'probation' ? t(f.probation_end) : existing?.probation_end_date ?? null,
       selfie_rule:    f.selfie_rule,
       geofence_rule:  f.geofence_rule,
+      no_celebrations: f.no_celebrations,
       startOnboarding: isEdit ? undefined : startOnboarding,
     })
   }
@@ -153,8 +155,15 @@ export default function EmployeeFormModal({ existing, prefill, isSelf, employees
             )}
             <Field label="Date of birth (optional)">
               <input type="date" value={f.date_of_birth} onChange={set('date_of_birth')} min="1900-01-01" max={localDate()} style={inputStyle} />
-              <p style={hintStyle}>Admins see upcoming birthdays on the home page (day and month only).</p>
+              <p style={hintStyle}>The team gets a birthday card to sign. Only the day and month are shown, never the year.</p>
             </Field>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: '0.875rem', color: '#334155', cursor: 'pointer' }}>
+              <input type="checkbox" checked={f.no_celebrations} onChange={e => setF(p => ({ ...p, no_celebrations: e.target.checked }))} style={{ marginTop: 3 }} />
+              <span>
+                Don’t celebrate their birthday or work anniversary
+                <span style={{ ...hintStyle, display: 'block', marginTop: 2 }}>Use this if they’ve asked for no fuss. They won’t see this setting.</span>
+              </span>
+            </label>
           </Section>
 
           <Section title="Job">

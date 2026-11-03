@@ -1,3 +1,4 @@
+import CelebrationHost from './celebrations/CelebrationHost'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, Palette, UserPlus, Users, X } from 'lucide-react'
@@ -125,6 +126,7 @@ export default function AdminLayout() {
         <div className="admin-main" style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem 1.5rem', background: 'var(--brand-50)', minHeight: '100vh', boxSizing: 'border-box' }}>
           <Outlet />
         </div>
+        <CelebrationHost />
       </div>
     </div>
   )

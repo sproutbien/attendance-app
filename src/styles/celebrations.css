@@ -1,0 +1,199 @@
+/* Birthdays and work anniversaries: pop-up, team cards, admin reminders (migration 047) */
+
+/* ── Pop-up ──────────────────────────────────────────────── */
+
+.cel-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  overflow-y: auto; overscroll-behavior: contain;
+  background: #174d19;
+  font-family: 'Nunito Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: #fff;
+}
+.cel-confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.cel-confetti span { position: absolute; top: -20px; opacity: 0.9; animation: cel-fall linear forwards; }
+@keyframes cel-fall {
+  to { transform: translateY(110vh) rotate(var(--spin, 540deg)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cel-confetti span { animation: none; top: var(--rest, 10%); }
+}
+.cel-sheet {
+  position: relative; box-sizing: border-box;
+  max-width: 920px; margin: 0 auto; padding: 48px 20px 40px;
+  display: flex; flex-direction: column; align-items: center; gap: 22px;
+}
+.cel-close {
+  position: fixed; top: 14px; right: 14px; z-index: 2;
+  width: 44px; height: 44px; border-radius: 50%; border: none;
+  display: grid; place-items: center; cursor: pointer;
+  background: rgba(255, 255, 255, 0.16); color: #fff;
+}
+.cel-close:hover { background: rgba(255, 255, 255, 0.26); }
+.cel-date { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #f6c344; text-align: center; }
+.cel-title { margin: 6px 0 0; font-size: clamp(32px, 6vw, 52px); line-height: 1.05; font-weight: 900; text-align: center; color: #fff; }
+
+.cel-letter {
+  width: 100%; max-width: 640px; box-sizing: border-box;
+  background: #fff; color: #10261a; border-radius: 20px; padding: 26px 28px;
+  box-shadow: 0 30px 70px -25px rgba(0, 0, 0, 0.6);
+}
+.cel-letter p { margin: 0 0 18px; font-size: 18px; line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.cel-letter img.cel-letter-photo { display: block; width: 100%; max-height: 420px; object-fit: cover; border-radius: 12px; margin: 0 0 16px; }
+.cel-by { display: flex; align-items: center; gap: 12px; }
+.cel-by strong { display: block; font-size: 15px; font-weight: 800; color: #10261a; }
+.cel-by span { display: block; font-size: 13px; color: #5b6f61; }
+
+.cel-team { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+.cel-team h2 { margin: 0; text-align: center; font-size: 15px; font-weight: 800; color: #e3f8d6; }
+.cel-notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; align-items: start; }
+.cel-note {
+  background: #fff; color: #10261a; border-radius: 14px; padding: 12px 14px 14px;
+  box-shadow: 0 10px 24px -14px rgba(0, 0, 0, 0.6);
+}
+.cel-note:nth-child(4n+1) { background: #fff8e1; transform: rotate(-1.2deg); }
+.cel-note:nth-child(4n+2) { transform: rotate(0.8deg); }
+.cel-note:nth-child(4n+3) { background: #eef7ff; transform: rotate(-0.5deg); }
+.cel-note:nth-child(4n)   { background: #fdeef5; transform: rotate(1.2deg); }
+.cel-note img.cel-polaroid {
+  display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+  border: 6px solid #fff; border-bottom-width: 18px; box-sizing: border-box;
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.5); margin-bottom: 10px; background: #f1f5f2;
+}
+.cel-note p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; white-space: pre-line; overflow-wrap: anywhere; }
+.cel-note .cel-by strong { font-size: 13px; font-weight: 700; }
+
+.cel-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cel-thanks-btn {
+  min-height: 50px; padding: 0 30px; border-radius: 12px; border: none; cursor: pointer;
+  background: #f6c344; color: #3a2600; font-weight: 800; font-size: 16px; font-family: inherit;
+}
+.cel-thanks-btn:hover { filter: brightness(1.05); }
+.cel-hint { font-size: 12.5px; color: #cfe5c8; text-align: center; }
+
+@media (max-width: 600px) {
+  .cel-sheet { padding: 56px 14px 28px; gap: 16px; }
+  .cel-letter { padding: 20px; }
+  .cel-letter p { font-size: 16px; }
+  .cel-notes { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; padding: 4px 2px 10px; }
+  .cel-note { flex: 0 0 82%; scroll-snap-align: center; transform: none !important; }
+  .cel-actions { align-self: stretch; }
+  .cel-thanks-btn { width: 100%; }
+}
+
+/* ── Team card (employee dashboard) ──────────────────────── */
+
+.cel-card {
+  display: flex; flex-wrap: wrap; overflow: hidden; margin-bottom: 18px;
+  border-radius: 16px; border: 1px solid #f3d9a6; background: var(--surface, #fff);
+}
+.cel-card-who {
+  flex: 1 1 280px; min-width: 0; box-sizing: border-box; padding: 20px 22px;
+  background: #fffaf0; display: flex; flex-direction: column; gap: 12px;
+}
+[data-theme='dark'] .cel-card { border-color: #5c4a22; }
+[data-theme='dark'] .cel-card-who { background: #2a2416; }
+.cel-card-person { display: flex; align-items: center; gap: 14px; }
+.cel-kicker { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #9a5b00; }
+[data-theme='dark'] .cel-kicker { color: #f0c05a; }
+.cel-card h2 { margin: 2px 0 0; font-size: 19px; font-weight: 900; color: var(--text-strong, #10261a); }
+.cel-card-who p { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text, #2c4234); }
+.cel-signers { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 13px; color: var(--text-muted, #5b6f61); }
+.cel-stack { display: flex; }
+.cel-stack > * { margin-right: -8px; border: 2px solid #fffaf0; border-radius: 50%; }
+.cel-card-form { flex: 1.4 1 340px; min-width: 0; box-sizing: border-box; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
+.cel-card-form label { font-size: 13px; font-weight: 800; color: var(--text-strong, #10261a); }
+.cel-card-form textarea {
+  width: 100%; box-sizing: border-box; min-height: 92px; resize: vertical;
+  border: 1px solid var(--border, #cfe0ca); border-radius: 12px; padding: 11px 13px;
+  font-size: 15px; line-height: 1.5; font-family: inherit; color: var(--text-strong, #10261a); background: var(--surface, #fff);
+}
+.cel-card-form textarea:focus { outline: 2px solid var(--green, #3d7f1f); outline-offset: 1px; }
+.cel-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cel-row .cel-spacer { flex: 1 1 auto; }
+.cel-photo-pick {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
+  border-radius: 10px; border: 1px dashed var(--border, #cfe0ca); background: transparent;
+  color: var(--text, #2c4234); font-weight: 600; font-size: 14px; font-family: inherit; cursor: pointer;
+}
+.cel-photo-pick:hover { border-color: var(--green, #3d7f1f); }
+.cel-thumb { position: relative; display: inline-block; }
+.cel-thumb img { display: block; width: 72px; height: 72px; object-fit: cover; border-radius: 10px; }
+.cel-thumb button {
+  position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--surface, #fff); background: #475569; color: #fff; display: grid; place-items: center; cursor: pointer;
+}
+.cel-note-small { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-muted, #5b6f61); }
+.cel-done { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; color: var(--green-dark, #1d5a1f); }
+.cel-link { border: none; background: none; padding: 0; font-weight: 600; font-size: 13px; font-family: inherit; color: var(--green-dark, #1d5a1f); text-decoration: underline; cursor: pointer; }
+.cel-link.danger { color: #b42318; }
+.cel-err { margin: 0; font-size: 13px; color: #b42318; }
+
+.cel-thanks {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px; padding: 12px 16px;
+  border-radius: 14px; background: #fff8e1; border: 1px solid #f3d9a6; color: #3a2600; font-size: 14px;
+}
+[data-theme='dark'] .cel-thanks { background: #2a2416; border-color: #5c4a22; color: #f6e3b4; }
+.cel-thanks strong { font-weight: 800; }
+.cel-thanks button { margin-left: auto; width: 32px; height: 32px; border-radius: 8px; border: none; background: transparent; color: inherit; cursor: pointer; display: grid; place-items: center; }
+
+/* ── My wishes (profile) ─────────────────────────────────── */
+
+.cel-wish-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.cel-wish-item {
+  width: 100%; display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border-soft, #edf3ea); background: var(--surface-soft, #f6faf4);
+  text-align: left; font-family: inherit; cursor: pointer; color: inherit;
+}
+.cel-wish-item:hover { border-color: var(--green, #3d7f1f); }
+.cel-wish-icon { flex: 0 0 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: #fff; }
+.cel-wish-item strong { display: block; font-size: 15px; color: var(--text-strong, #10261a); }
+.cel-wish-item span.cel-sub { display: block; font-size: 12.5px; color: var(--text-muted, #5b6f61); }
+
+/* ── Admin: reminders + wish dialog ──────────────────────── */
+
+.cel-alert {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; margin-bottom: 12px;
+  padding: 16px 20px; border-radius: 14px; border: 1px solid #f3d9a6; background: #fffaf0; color: #2c4234;
+}
+.cel-alert.quiet { background: #fff; border-color: #e2e8f0; padding: 11px 18px; }
+.cel-alert-icon { flex: 0 0 46px; height: 46px; border-radius: 12px; background: #fdecc8; color: #9a5b00; display: grid; place-items: center; }
+.cel-alert-text { flex: 1 1 300px; min-width: 0; }
+.cel-alert-text strong { display: block; font-size: 15px; font-weight: 800; color: #10261a; }
+.cel-alert-meta { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: #5b6f61; }
+.cel-alert-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.cel-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 38px; padding: 0 16px;
+  border-radius: 9px; font-weight: 700; font-size: 14px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--brand-600, #1a661b); background: var(--brand-600, #1a661b); color: #fff;
+}
+.cel-btn.ghost { background: #fff; color: var(--brand-700, #1d5a1f); border-color: #cbd5e1; }
+.cel-btn.small { min-height: 30px; padding: 0 10px; font-size: 12.5px; }
+.cel-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.cel-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 99px; font-size: 12px; font-weight: 700; background: #e6f2e1; color: #1d5a1f; white-space: nowrap; }
+
+.cel-modal-backdrop { position: fixed; inset: 0; z-index: 900; background: rgba(15, 23, 42, 0.5); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; padding: 32px 16px; box-sizing: border-box; }
+.cel-modal { width: 100%; max-width: 680px; background: #fff; border-radius: 18px; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.45); color: #1e293b; font-family: inherit; }
+.cel-modal-head { display: flex; align-items: center; gap: 14px; padding: 20px 22px 0; }
+.cel-modal-head h2 { margin: 0; font-size: 18px; font-weight: 800; color: #0f172a; }
+.cel-modal-head p { margin: 2px 0 0; font-size: 13px; color: #64748b; }
+.cel-modal-head .cel-x { margin-left: auto; width: 38px; height: 38px; border: none; border-radius: 9px; background: #f1f5f9; cursor: pointer; display: grid; place-items: center; color: #334155; }
+.cel-modal-body { padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+.cel-modal-body > label { font-size: 13px; font-weight: 700; color: #0f172a; }
+.cel-modal-body textarea {
+  width: 100%; box-sizing: border-box; min-height: 120px; resize: vertical; border: 1px solid #cbd5e1; border-radius: 12px;
+  padding: 12px 14px; font-size: 15px; line-height: 1.55; font-family: inherit; color: #0f172a;
+}
+.cel-modal-body textarea:focus { outline: 2px solid var(--brand-500, #2f8a2a); outline-offset: 1px; }
+.cel-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: #64748b; }
+.cel-chips button { min-height: 30px; padding: 0 11px; border-radius: 99px; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; font-size: 12.5px; font-family: inherit; color: #334155; cursor: pointer; }
+.cel-chips button:hover { border-color: var(--brand-600, #1a661b); }
+.cel-modal-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 0 22px 20px; }
+.cel-modal-foot p { flex: 1 1 220px; margin: 0; font-size: 12.5px; color: #64748b; }
+.cel-board { border-top: 1px solid #e2e8f0; padding: 16px 22px 20px; }
+.cel-board h3 { margin: 0 0 10px; font-size: 14px; font-weight: 800; color: #0f172a; }
+.cel-board ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cel-board li { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: #f8fafc; }
+.cel-board li img.cel-board-photo { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+.cel-board li p { margin: 2px 0 6px; font-size: 13.5px; line-height: 1.45; color: #1e293b; white-space: pre-line; overflow-wrap: anywhere; }
+.cel-board li strong { font-size: 13px; color: #0f172a; }
+.cel-board li .cel-row { gap: 12px; }

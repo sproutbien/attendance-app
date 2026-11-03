@@ -24,6 +24,9 @@ import { KIND_META } from '../../components/stats/Charts'
 import type { DayKind } from '../../lib/stats'
 import EmployeeAvatar from '../../components/employees/EmployeeAvatar'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
+import { CelebrationAlerts, WishModal, occasionKey, useAdminCelebrations } from '../../components/celebrations/AdminCelebrations'
+import type { Occasion } from '../../components/celebrations/AdminCelebrations'
 import '../../styles/stats.css'
 
 const todayISO = () => localDate()
@@ -71,6 +74,9 @@ export default function AdminAttendancePage() {
   const dayRequests = useDayRequests(selectedDate)
   const { now } = useTeamNow()
   const { overview } = useWeekOverview()
+  const celebrations = useAdminCelebrations()
+  const [wishing, setWishing] = useState<string | null>(null)   // occasion key with the wish dialog open
+  const wishingOccasion = celebrations.occasions?.find(o => o.key === wishing) ?? null
 
   // Summary counts from unfiltered rows
   const summaryCounts = useMemo(() => {
@@ -174,6 +180,11 @@ export default function AdminAttendancePage() {
         {fmtDateLabel(selectedDate)}
       </p>
 
+      {/* Birthdays / anniversaries in the next 3 days, and ones nobody marked */}
+      {celebrations.occasions && (
+        <CelebrationAlerts occasions={celebrations.occasions} teamSize={celebrations.teamSize} onWrite={o => setWishing(o.key)} />
+      )}
+
       {/* Approvals waiting — same counts as the sidebar badges */}
       {now && (
         <div className="sb-app st-admin" data-theme="light">
@@ -249,7 +260,11 @@ export default function AdminAttendancePage() {
         </div>
       )}
 
-      {overview && <WeekCards overview={overview} />}
+      {overview && <WeekCards overview={overview} occasions={celebrations.occasions ?? []} onWish={setWishing} />}
+
+      {wishingOccasion && (
+        <WishModal occasion={wishingOccasion} onClose={() => setWishing(null)} onSaved={celebrations.reload} />
+      )}
 
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
@@ -354,8 +369,10 @@ export default function AdminAttendancePage() {
 const shortDay = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 
 /** Last 7 days trend, late streaks and what's coming up. Independent of the date being viewed. */
-function WeekCards({ overview }: { overview: WeekOverview }) {
+function WeekCards({ overview, occasions, onWish }: { overview: WeekOverview; occasions: Occasion[]; onWish: (key: string) => void }) {
   const { today, days, lateStreaks, upcoming } = overview
+  const { employee: me } = useAuth()
+  const byKey = new Map(occasions.map(o => [o.key, o]))
   const kinds = Object.keys(KIND_META) as DayKind[]
   // Check-ins vs days people were due in (leave excluded)
   const lates = days.reduce((n, d) => n + d.late, 0)
@@ -441,7 +458,19 @@ function WeekCards({ overview }: { overview: WeekOverview }) {
                     {u.person ? u.person.full_name : u.label}
                     <small>{u.kind === 'birthday' ? '🎂 Birthday' : u.kind === 'anniversary' ? `🎉 ${u.label}` : 'Public holiday'} · {shortDay(u.date)}</small>
                   </span>
-                  <em>{inDays(u.date)}</em>
+                  {(() => {
+                    const o = u.person && u.kind !== 'holiday' ? byKey.get(occasionKey(u.person.id, u.kind, u.date)) : undefined
+                    if (!o || o.person.id === me?.id) return <em>{inDays(u.date)}</em>
+                    const ready = o.wishes.some(w => w.author_id === me?.id)
+                    return (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                        <em>{inDays(u.date)}</em>
+                        <button type="button" className={ready ? 'cel-btn ghost small' : 'cel-btn small'} onClick={() => onWish(o.key)}>
+                          {ready ? 'Wish ready' : 'Write a wish'}
+                        </button>
+                      </span>
+                    )
+                  })()}
                 </li>
               ))}
               {upcoming.length > 6 && <li><span className="st-now-none">+{upcoming.length - 6} more</span></li>}

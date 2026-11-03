@@ -11,6 +11,7 @@ import ChoiceHolidayCard from '../components/ChoiceHolidayCard'
 import GettingStartedCard from '../components/GettingStartedCard'
 import TodayRequestNote from '../components/TodayRequestNote'
 import PolicyUpdateNotice from '../components/PolicyUpdateNotice'
+import TeamCelebrations from '../components/celebrations/TeamCelebrations'
 import SelfieCheckIn from '../components/SelfieCheckIn'
 import { selfieRequired } from '../lib/selfies'
 import { geofenceArea, readLocation } from '../lib/geofence'
@@ -182,6 +183,8 @@ export default function DashboardPage() {
           onResume={resumeBreak}
           onCancelLeave={() => todaysLeave && navigate(`/leave?cancel=${todaysLeave.id}`)}
         />
+
+        <TeamCelebrations />
 
         <section className="sb-dcards">
           <ShiftCard

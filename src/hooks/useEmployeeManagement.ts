@@ -7,7 +7,7 @@ export type EmployeeProfileFields = Pick<Employee,
   | 'full_name' | 'role' | 'status' | 'department' | 'designation' | 'monthly_salary' | 'phone'
   | 'joining_date' | 'date_of_birth' | 'employment_type' | 'work_location' | 'reporting_manager_id' | 'last_working_day'
   | 'emergency_contact_name' | 'emergency_contact_relation' | 'emergency_contact_phone' | 'probation_end_date'
-  | 'selfie_rule' | 'geofence_rule'
+  | 'selfie_rule' | 'geofence_rule' | 'no_celebrations'
 > & { employee_code: string | null }   // null = assign the next SB number
 
 export type EmployeeFormData = EmployeeProfileFields & {

@@ -15,6 +15,7 @@ export type Employee = {
   phone: string | null            // WhatsApp number, digits with country code
   joining_date: string | null     // leave accrues from this month; null = full year
   date_of_birth: string | null    // birthdays on the admin home page (migration 045)
+  no_celebrations?: boolean       // admin only: skip birthday + anniversary cards (migration 047)
   photo_path: string | null       // object path in the 'avatars' storage bucket
   employment_type: string | null
   work_location: string | null

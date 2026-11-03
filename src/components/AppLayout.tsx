@@ -1,3 +1,4 @@
+import CelebrationHost from './celebrations/CelebrationHost'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Link } from 'react-router-dom'
 import { House, CalendarDays, ChartColumn, ChevronUp, User, LogOut, Sun, Moon, Monitor, Camera, Menu, X, PartyPopper, CircleUser } from 'lucide-react'
@@ -71,6 +72,7 @@ export default function AppLayout({ children, wide = false, medium = false }: { 
         <Header onMenu={drawer.show} menuOpen={drawer.open} />
         {wide ? children : <div className={medium ? 'sb-narrow sb-medium' : 'sb-narrow'}>{children}</div>}
       </div>
+      <CelebrationHost />
       <nav className="sb-tabbar" aria-label="Main">
         {NAV.map(({ to, short, Icon }) => (
           <NavLink key={to} to={to}><Icon size={22} strokeWidth={2} />{short}</NavLink>
