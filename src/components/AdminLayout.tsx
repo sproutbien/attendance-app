@@ -1,7 +1,7 @@
 import CelebrationHost from './celebrations/CelebrationHost'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
-import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Menu, Palette, UserPlus, Users, X } from 'lucide-react'
+import { CalendarCheck, CalendarDays, ChartColumn, ChartLine, Clock, FilePen, LogOut, Mail, Menu, Palette, UserPlus, Users, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { LEAVE_CHANGED } from '../hooks/useLeaveQueue'
@@ -48,6 +48,7 @@ const NAV = [
   { to: '/admin/corrections', label: 'Requests',    Icon: FilePen,       badge: 'corrections' },
   { to: '/admin/employees',   label: 'Employees',   Icon: Users },
   { to: '/admin/hiring',      label: 'Hiring',      Icon: UserPlus },
+  { to: '/admin/mail',        label: 'Mail',        Icon: Mail },
   { to: '/admin/reports',     label: 'Reports',     Icon: ChartColumn },
   { to: '/admin/team-stats',  label: 'Team Stats',  Icon: ChartLine },
   { to: '/admin/calendar',    label: 'Calendar',    Icon: CalendarDays },
